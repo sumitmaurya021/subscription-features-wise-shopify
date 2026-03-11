@@ -15,6 +15,7 @@ export default function PlanCard({
   isCurrentPlan,
   onSubscribe,
 }) {
+
   return (
     <div
       style={{

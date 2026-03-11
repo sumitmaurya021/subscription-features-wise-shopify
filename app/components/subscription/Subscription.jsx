@@ -96,6 +96,10 @@ const plans = [
   },
 ];
 
+async function subscribe(plan) {
+  console.log("Subscribing to:", plan);
+}
+
 export default function Subscription() {
   return (
     <Page title="Subscription Plans">
@@ -117,6 +121,7 @@ export default function Subscription() {
               features={plan.features}
               isPopular={plan.isPopular}
               isCurrentPlan={plan.isCurrentPlan}
+              onSubscribe={() => subscribe(plan.name)}
             />
           </Grid.Cell>
         ))}
