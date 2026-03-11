@@ -20,7 +20,6 @@ export default function PlanCard({
       style={{
         height: "100%",
         position: "relative",
-        display: "flex",
       }}
     >
       {isPopular && (
