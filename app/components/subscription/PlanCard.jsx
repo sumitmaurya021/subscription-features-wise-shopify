@@ -15,12 +15,12 @@ export default function PlanCard({
   isCurrentPlan,
   onSubscribe,
 }) {
+
   return (
     <div
       style={{
         height: "100%",
         position: "relative",
-        display: "flex",
       }}
     >
       {isPopular && (

@@ -96,6 +96,19 @@ const plans = [
   },
 ];
 
+async function subscribe(plan) {
+
+  const res = await fetch(`/api/billing/create?plan=${plan}`, {
+    method: "POST",
+  });
+
+  const data = await res.json();
+
+  if (data.confirmationUrl) {
+    window.top.location.href = data.confirmationUrl;
+  }
+}
+
 export default function Subscription() {
   return (
     <Page title="Subscription Plans">
@@ -105,10 +118,10 @@ export default function Subscription() {
           <Grid.Cell
             key={plan.name}
             columnSpan={{
-              xs: 12,  // mobile → 1 card
-              sm: 6,   // small tablet → 2 cards
-              md: 4,   // tablet → 3 cards
-              lg: 4,   // desktop → 3 cards
+              xs: 12,
+              sm: 6,
+              md: 4,
+              lg: 4,
             }}
           >
             <PlanCard
@@ -117,6 +130,7 @@ export default function Subscription() {
               features={plan.features}
               isPopular={plan.isPopular}
               isCurrentPlan={plan.isCurrentPlan}
+              onSubscribe={() => subscribe(plan.name)}
             />
           </Grid.Cell>
         ))}
