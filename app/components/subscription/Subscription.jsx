@@ -97,7 +97,16 @@ const plans = [
 ];
 
 async function subscribe(plan) {
-  console.log("Subscribing to:", plan);
+
+  const res = await fetch(`/api/billing/create?plan=${plan}`, {
+    method: "POST",
+  });
+
+  const data = await res.json();
+
+  if (data.confirmationUrl) {
+    window.top.location.href = data.confirmationUrl;
+  }
 }
 
 export default function Subscription() {
