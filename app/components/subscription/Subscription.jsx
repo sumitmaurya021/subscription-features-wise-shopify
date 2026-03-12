@@ -109,10 +109,10 @@ export default function Subscription() {
           <Grid.Cell
             key={plan.name}
             columnSpan={{
-              xs: 12,  // mobile → 1 card
-              sm: 6,   // small tablet → 2 cards
-              md: 4,   // tablet → 3 cards
-              lg: 4,   // desktop → 3 cards
+              xs: 12,
+              sm: 6,
+              md: 4,
+              lg: 4,
             }}
           >
             <PlanCard
