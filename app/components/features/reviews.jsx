@@ -163,9 +163,9 @@ export default function ReviewsPage() {
             <Text as="span" variant="bodyMd" fontWeight="semibold">
               {review.productTitle || "Untitled Product"}
             </Text>
-            {/* <Text as="span" tone="subdued" variant="bodySm">
+            <Text as="span" tone="subdued" variant="bodySm">
               ID: {review.productId || "-"}
-            </Text> */}
+            </Text>
           </BlockStack>
         </IndexTable.Cell>
 
@@ -199,11 +199,11 @@ export default function ReviewsPage() {
           </Box>
         </IndexTable.Cell>
 
-        {/* <IndexTable.Cell>
+        <IndexTable.Cell>
           <Badge tone={getBadgeTone(review.status)}>
             {review.status || "pending"}
           </Badge>
-        </IndexTable.Cell> */}
+        </IndexTable.Cell>
 
         <IndexTable.Cell>
           <Text as="span" variant="bodySm">
@@ -340,7 +340,7 @@ export default function ReviewsPage() {
                         { title: "Customer" },
                         { title: "Rating" },
                         { title: "Review" },
-                        // { title: "Status" },
+                        { title: "Status" },
                         { title: "Created" },
                         { title: "Action" },
                       ]}
