@@ -51,6 +51,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   let lightboxImages = [];
   let lightboxIndex = 0;
 
+  const MAX_REVIEW_IMAGES = 4;
+
   const RATING_LABELS = {
     1: "Poor",
     2: "Fair",
@@ -224,6 +226,28 @@ document.addEventListener("DOMContentLoaded", async () => {
       toastEl.textContent = "";
       toastEl.className = "pr-toast";
     }, 3000);
+  }
+
+  function getHelpfulStorageKey(reviewId) {
+    return `pr_helpful_${shop}_${productId}_${reviewId}`;
+  }
+
+  function hasMarkedHelpful(reviewId) {
+    try {
+      return localStorage.getItem(getHelpfulStorageKey(reviewId)) === "1";
+    } catch {
+      return false;
+    }
+  }
+
+  function setMarkedHelpful(reviewId, value) {
+    try {
+      if (value) {
+        localStorage.setItem(getHelpfulStorageKey(reviewId), "1");
+      } else {
+        localStorage.removeItem(getHelpfulStorageKey(reviewId));
+      }
+    } catch {}
   }
 
   function renderSummary(averageRating, totalReviews, ratingStats, reviews) {
@@ -476,6 +500,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const needsClamp = String(review.message || "").length > 180;
     const messageId = `pr-message-${index}`;
     const helpfulCount = Number(review.helpfulCount || 0);
+    const reviewId = review.id || String(index);
+    const isHelpfulMarked = review.id ? hasMarkedHelpful(review.id) : false;
     const prosTags = extractProsTags(review);
     const badges = getReviewBadges(review, index);
 
@@ -535,13 +561,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         <div class="pr-review-actions">
           <button
             type="button"
-            class="pr-helpful-btn"
-            data-helpful="${review.id || index}"
+            class="pr-helpful-btn ${isHelpfulMarked ? "is-active" : ""}"
+            data-helpful="${escapeHtml(reviewId)}"
             data-count="${helpfulCount}"
+            data-marked="${isHelpfulMarked ? "true" : "false"}"
           >
-            👍 Helpful
+            ${isHelpfulMarked ? "✓ Marked helpful" : "👍 Helpful"}
           </button>
-          <div class="pr-helpful-text" data-helpful-text="${review.id || index}">
+          <div class="pr-helpful-text" data-helpful-text="${escapeHtml(reviewId)}">
             ${helpfulCount} people found this helpful
           </div>
         </div>
@@ -658,25 +685,58 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const helpfulButtons = Array.from(root.querySelectorAll(".pr-helpful-btn"));
     helpfulButtons.forEach((btn) => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", async () => {
         const id = btn.getAttribute("data-helpful");
         const textEl = root.querySelector(`[data-helpful-text="${id}"]`);
-        const alreadyActive = btn.classList.contains("is-active");
-        let count = Number(btn.getAttribute("data-count") || 0);
+        const alreadyMarked = btn.getAttribute("data-marked") === "true";
 
-        if (alreadyActive) {
-          count = Math.max(0, count - 1);
-          btn.classList.remove("is-active");
-          btn.textContent = "👍 Helpful";
-        } else {
-          count += 1;
-          btn.classList.add("is-active");
-          btn.textContent = "✓ Marked helpful";
-        }
+        if (!id) return;
 
-        btn.setAttribute("data-count", String(count));
-        if (textEl) {
-          textEl.textContent = `${count} people found this helpful`;
+        btn.disabled = true;
+
+        try {
+          const response = await fetch(endpoint, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({
+              reviewId: id,
+              increment: !alreadyMarked,
+            }),
+          });
+
+          const result = await response.json();
+
+          if (!response.ok || !result.success) {
+            showToast(result.message || "Failed to update helpful count", "error");
+            return;
+          }
+
+          const updatedReview = result.data || {};
+          const nextCount = Number(updatedReview.helpfulCount || 0);
+          const nextMarked = !alreadyMarked;
+
+          btn.setAttribute("data-count", String(nextCount));
+          btn.setAttribute("data-marked", nextMarked ? "true" : "false");
+          btn.classList.toggle("is-active", nextMarked);
+          btn.textContent = nextMarked ? "✓ Marked helpful" : "👍 Helpful";
+
+          if (textEl) {
+            textEl.textContent = `${nextCount} people found this helpful`;
+          }
+
+          setMarkedHelpful(id, nextMarked);
+
+          const reviewIndex = allReviews.findIndex((review) => String(review.id) === String(id));
+          if (reviewIndex !== -1) {
+            allReviews[reviewIndex].helpfulCount = nextCount;
+          }
+        } catch (error) {
+          showToast("Failed to update helpful count", "error");
+        } finally {
+          btn.disabled = false;
         }
       });
     });
@@ -804,17 +864,53 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  function getFileUniqueKey(file) {
+    return [file.name, file.size, file.lastModified, file.type].join("__");
+  }
+
   function handleSelectedFiles(fileList) {
     const incomingFiles = Array.from(fileList || []);
+    if (!incomingFiles.length) return;
+
     const validFiles = incomingFiles.filter((file) =>
       ["image/jpeg", "image/jpg", "image/png"].includes(file.type)
     );
 
-    selectedImages = validFiles.slice(0, 4);
+    if (!validFiles.length) {
+      setFieldError("reviewImages", "Only JPG and PNG images are allowed.", uploadDropzone);
+      uploadDropzone?.classList.add("pr-invalid");
+      showToast("Only JPG and PNG images are allowed.", "error");
+      return;
+    }
+
+    const existingMap = new Map(
+      selectedImages.map((file) => [getFileUniqueKey(file), file])
+    );
+
+    validFiles.forEach((file) => {
+      const key = getFileUniqueKey(file);
+      if (!existingMap.has(key)) {
+        existingMap.set(key, file);
+      }
+    });
+
+    const mergedFiles = Array.from(existingMap.values());
+
+    if (mergedFiles.length > MAX_REVIEW_IMAGES) {
+      selectedImages = mergedFiles.slice(0, MAX_REVIEW_IMAGES);
+      showToast(`You can upload up to ${MAX_REVIEW_IMAGES} images only.`, "error");
+    } else {
+      selectedImages = mergedFiles;
+    }
+
     updateFileInputFromSelectedImages();
     renderImagePreview(selectedImages);
-    clearFieldError("reviewImages");
+    clearFieldError("reviewImages", uploadDropzone);
     uploadDropzone?.classList.remove("pr-invalid");
+
+    if (imageInput) {
+      imageInput.value = "";
+    }
   }
 
   function bindImageUploader() {
@@ -938,6 +1034,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (showErrors) setFieldError("message", "Please write at least 20 characters for a better review.", messageInput);
     } else {
       clearFieldError("message", messageInput);
+    }
+
+    if (selectedImages.length > MAX_REVIEW_IMAGES) {
+      isValid = false;
+      if (showErrors) setFieldError("reviewImages", `You can upload up to ${MAX_REVIEW_IMAGES} images only.`, uploadDropzone);
+    } else {
+      clearFieldError("reviewImages", uploadDropzone);
     }
 
     return isValid;
@@ -1088,7 +1191,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
 
-      allReviews = Array.isArray(result?.data) ? result.data : [];
+      allReviews = Array.isArray(result?.data)
+        ? result.data.filter((review) => review?.status === "approved")
+        : [];
+
       renderReviewsState();
     } catch (error) {
       renderErrorState("Failed to load reviews");
@@ -1187,6 +1293,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         form.reset();
         selectedImages = [];
+        updateFileInputFromSelectedImages();
+
         if (imagePreview) imagePreview.innerHTML = "";
         if (imagePreviewWrap) imagePreviewWrap.hidden = true;
         updateStarUI(0);

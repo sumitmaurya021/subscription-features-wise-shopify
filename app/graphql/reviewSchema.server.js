@@ -1,5 +1,36 @@
 import prisma from "../db.server";
 
+function parseReviewImages(value) {
+  if (!value) return [];
+
+  if (Array.isArray(value)) return value;
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function normalizeReview(review) {
+  if (!review) return null;
+
+  return {
+    ...review,
+    reviewImages: parseReviewImages(review.reviewImages),
+    helpfulCount: Number(review.helpfulCount || 0),
+    createdAt:
+      review.createdAt instanceof Date
+        ? review.createdAt.toISOString()
+        : String(review.createdAt),
+    updatedAt:
+      review.updatedAt instanceof Date
+        ? review.updatedAt.toISOString()
+        : String(review.updatedAt),
+  };
+}
+
 export const typeDefs = /* GraphQL */ `
   type Review {
     id: ID!
@@ -11,6 +42,8 @@ export const typeDefs = /* GraphQL */ `
     rating: Int!
     title: String
     message: String!
+    reviewImages: [String!]!
+    helpfulCount: Int!
     status: String!
     createdAt: String!
     updatedAt: String!
@@ -46,6 +79,7 @@ export const typeDefs = /* GraphQL */ `
     rating: Int!
     title: String
     message: String!
+    reviewImages: [String!]
   }
 
   input UpdateReviewInput {
@@ -55,6 +89,7 @@ export const typeDefs = /* GraphQL */ `
     rating: Int
     title: String
     message: String
+    reviewImages: [String!]
     status: String
   }
 
@@ -70,6 +105,7 @@ export const typeDefs = /* GraphQL */ `
     deleteReview(id: ID!): ReviewResponse!
     approveReview(id: ID!): ReviewResponse!
     rejectReview(id: ID!): ReviewResponse!
+    toggleReviewHelpful(id: ID!, increment: Boolean!): ReviewResponse!
   }
 `;
 
@@ -81,7 +117,7 @@ export const resolvers = {
 
         if (args.shop) where.shop = args.shop;
         if (args.status) where.status = args.status;
-        if (args.productId) where.productId = args.productId;
+        if (args.productId) where.productId = String(args.productId);
 
         const reviews = await prisma.review.findMany({
           where,
@@ -94,7 +130,7 @@ export const resolvers = {
           success: true,
           message: "Reviews fetched successfully",
           count: reviews.length,
-          data: reviews,
+          data: reviews.map(normalizeReview),
         };
       } catch (error) {
         console.error("GRAPHQL REVIEWS ERROR:", error);
@@ -124,7 +160,7 @@ export const resolvers = {
         return {
           success: true,
           message: "Review fetched successfully",
-          data: review,
+          data: normalizeReview(review),
         };
       } catch (error) {
         console.error("GRAPHQL SINGLE REVIEW ERROR:", error);
@@ -163,7 +199,7 @@ export const resolvers = {
           message: "Product reviews fetched successfully",
           totalReviews,
           averageRating: Number(averageRating.toFixed(1)),
-          data: reviews,
+          data: reviews.map(normalizeReview),
         };
       } catch (error) {
         console.error("GRAPHQL PRODUCT REVIEWS ERROR:", error);
@@ -190,6 +226,7 @@ export const resolvers = {
           rating,
           title,
           message,
+          reviewImages,
         } = input;
 
         if (!shop || !productId || !customerName || !rating || !message) {
@@ -210,6 +247,20 @@ export const resolvers = {
           };
         }
 
+        const normalizedImages = Array.isArray(reviewImages)
+          ? reviewImages.filter(
+              (item) => typeof item === "string" && item.trim() !== ""
+            )
+          : [];
+
+        if (normalizedImages.length > 4) {
+          return {
+            success: false,
+            message: "You can upload up to 4 images only",
+            data: null,
+          };
+        }
+
         const review = await prisma.review.create({
           data: {
             shop,
@@ -220,6 +271,10 @@ export const resolvers = {
             rating: parsedRating,
             title: title || null,
             message,
+            reviewImages: normalizedImages.length
+              ? JSON.stringify(normalizedImages)
+              : null,
+            helpfulCount: 0,
             status: "pending",
           },
         });
@@ -227,7 +282,7 @@ export const resolvers = {
         return {
           success: true,
           message: "Review created successfully",
-          data: review,
+          data: normalizeReview(review),
         };
       } catch (error) {
         console.error("GRAPHQL CREATE REVIEW ERROR:", error);
@@ -253,6 +308,40 @@ export const resolvers = {
           };
         }
 
+        if (input.rating !== undefined) {
+          const parsedRating = Number(input.rating);
+
+          if (parsedRating < 1 || parsedRating > 5) {
+            return {
+              success: false,
+              message: "Rating must be between 1 and 5",
+              data: null,
+            };
+          }
+        }
+
+        let nextReviewImages;
+
+        if (input.reviewImages !== undefined) {
+          const normalizedImages = Array.isArray(input.reviewImages)
+            ? input.reviewImages.filter(
+                (item) => typeof item === "string" && item.trim() !== ""
+              )
+            : [];
+
+          if (normalizedImages.length > 4) {
+            return {
+              success: false,
+              message: "You can upload up to 4 images only",
+              data: null,
+            };
+          }
+
+          nextReviewImages = normalizedImages.length
+            ? JSON.stringify(normalizedImages)
+            : null;
+        }
+
         const updatedReview = await prisma.review.update({
           where: { id },
           data: {
@@ -260,9 +349,15 @@ export const resolvers = {
             customerName: input.customerName ?? existingReview.customerName,
             customerEmail: input.customerEmail ?? existingReview.customerEmail,
             rating:
-              input.rating !== undefined ? Number(input.rating) : existingReview.rating,
+              input.rating !== undefined
+                ? Number(input.rating)
+                : existingReview.rating,
             title: input.title ?? existingReview.title,
             message: input.message ?? existingReview.message,
+            reviewImages:
+              input.reviewImages !== undefined
+                ? nextReviewImages
+                : existingReview.reviewImages,
             status: input.status ?? existingReview.status,
           },
         });
@@ -270,7 +365,7 @@ export const resolvers = {
         return {
           success: true,
           message: "Review updated successfully",
-          data: updatedReview,
+          data: normalizeReview(updatedReview),
         };
       } catch (error) {
         console.error("GRAPHQL UPDATE REVIEW ERROR:", error);
@@ -303,7 +398,7 @@ export const resolvers = {
         return {
           success: true,
           message: "Review deleted successfully",
-          data: deletedReview,
+          data: normalizeReview(deletedReview),
         };
       } catch (error) {
         console.error("GRAPHQL DELETE REVIEW ERROR:", error);
@@ -339,7 +434,7 @@ export const resolvers = {
         return {
           success: true,
           message: "Review approved successfully",
-          data: updatedReview,
+          data: normalizeReview(updatedReview),
         };
       } catch (error) {
         console.error("GRAPHQL APPROVE REVIEW ERROR:", error);
@@ -375,13 +470,56 @@ export const resolvers = {
         return {
           success: true,
           message: "Review rejected successfully",
-          data: updatedReview,
+          data: normalizeReview(updatedReview),
         };
       } catch (error) {
         console.error("GRAPHQL REJECT REVIEW ERROR:", error);
         return {
           success: false,
           message: "Failed to reject review",
+          data: null,
+        };
+      }
+    },
+
+    toggleReviewHelpful: async (_, { id, increment }) => {
+      try {
+        const existingReview = await prisma.review.findUnique({
+          where: { id },
+        });
+
+        if (!existingReview) {
+          return {
+            success: false,
+            message: "Review not found",
+            data: null,
+          };
+        }
+
+        const currentHelpfulCount = Number(existingReview.helpfulCount || 0);
+        const nextHelpfulCount = increment
+          ? currentHelpfulCount + 1
+          : Math.max(0, currentHelpfulCount - 1);
+
+        const updatedReview = await prisma.review.update({
+          where: { id },
+          data: {
+            helpfulCount: nextHelpfulCount,
+          },
+        });
+
+        return {
+          success: true,
+          message: increment
+            ? "Review marked helpful"
+            : "Helpful mark removed",
+          data: normalizeReview(updatedReview),
+        };
+      } catch (error) {
+        console.error("GRAPHQL TOGGLE HELPFUL ERROR:", error);
+        return {
+          success: false,
+          message: "Failed to update helpful count",
           data: null,
         };
       }

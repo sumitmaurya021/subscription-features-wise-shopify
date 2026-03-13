@@ -43,6 +43,8 @@ model Review {
   rating        Int
   title         String?
   message       String
+  reviewImages  String?
+  helpfulCount  Int      @default(0) 
   status        String   @default("pending")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

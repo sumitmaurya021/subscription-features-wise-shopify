@@ -317,8 +317,8 @@
   min-height: 130px;
   padding: 18px 18px;
   border-radius: 18px;
-  border: 1.5px dashed #94a3b8;
-  background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
+  border: 1px dashed #94a3b8;
+  background: #fff;
   display: flex;
   flex-direction: column;
   align-items: center;
