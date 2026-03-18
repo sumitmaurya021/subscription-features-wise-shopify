@@ -38,6 +38,7 @@ const GET_REVIEWS_QUERY = `
         reviewImages
         helpfulCount
         status
+        isPinned
         createdAt
         updatedAt
       }
@@ -63,6 +64,7 @@ const CREATE_REVIEW_MUTATION = `
         reviewImages
         helpfulCount
         status
+        isPinned
         createdAt
         updatedAt
       }
@@ -88,6 +90,7 @@ const UPDATE_REVIEW_MUTATION = `
         reviewImages
         helpfulCount
         status
+        isPinned
         createdAt
         updatedAt
       }
@@ -128,6 +131,32 @@ const REJECT_REVIEW_MUTATION = `
       data {
         id
         status
+      }
+    }
+  }
+`;
+
+const PIN_REVIEW_MUTATION = `
+  mutation PinReview($id: ID!) {
+    pinReview(id: $id) {
+      success
+      message
+      data {
+        id
+        isPinned
+      }
+    }
+  }
+`;
+
+const UNPIN_REVIEW_MUTATION = `
+  mutation UnpinReview($id: ID!) {
+    unpinReview(id: $id) {
+      success
+      message
+      data {
+        id
+        isPinned
       }
     }
   }
@@ -310,6 +339,7 @@ const initialFormState = {
   title: "",
   message: "",
   status: "pending",
+  isPinned: "false",
 };
 
 export default function ReviewsPage() {
@@ -327,6 +357,7 @@ export default function ReviewsPage() {
   const [approveLoadingId, setApproveLoadingId] = useState(null);
   const [rejectLoadingId, setRejectLoadingId] = useState(null);
   const [saveLoading, setSaveLoading] = useState(false);
+  const [pinLoadingId, setPinLoadingId] = useState(null);
 
   const [formData, setFormData] = useState(initialFormState);
   const isEditMode = Boolean(formData.id);
@@ -391,6 +422,7 @@ export default function ReviewsPage() {
       title: review.title || "",
       message: review.message || "",
       status: review.status || "pending",
+      isPinned: String(Boolean(review.isPinned)),
     });
     setModalOpen(true);
   };
@@ -437,6 +469,7 @@ export default function ReviewsPage() {
             title: formData.title || null,
             message: formData.message,
             status: formData.status,
+            isPinned: formData.isPinned === "true",
           },
         });
 
@@ -535,6 +568,48 @@ export default function ReviewsPage() {
       setPageError(error.message || "Delete failed");
     } finally {
       setDeleteLoadingId(null);
+    }
+  };
+
+    const handlePin = async (id) => {
+    try {
+      setPinLoadingId(id);
+      setPageError("");
+      setPageMessage("");
+
+      const data = await graphqlRequest(PIN_REVIEW_MUTATION, { id });
+
+      if (!data.pinReview.success) {
+        throw new Error(data.pinReview.message || "Failed to pin review");
+      }
+
+      setPageMessage("Review pinned successfully.");
+      await fetchReviews();
+    } catch (error) {
+      setPageError(error.message || "Pin failed");
+    } finally {
+      setPinLoadingId(null);
+    }
+  };
+
+  const handleUnpin = async (id) => {
+    try {
+      setPinLoadingId(id);
+      setPageError("");
+      setPageMessage("");
+
+      const data = await graphqlRequest(UNPIN_REVIEW_MUTATION, { id });
+
+      if (!data.unpinReview.success) {
+        throw new Error(data.unpinReview.message || "Failed to unpin review");
+      }
+
+      setPageMessage("Review unpinned successfully.");
+      await fetchReviews();
+    } catch (error) {
+      setPageError(error.message || "Unpin failed");
+    } finally {
+      setPinLoadingId(null);
     }
   };
 
@@ -714,6 +789,7 @@ export default function ReviewsPage() {
                             "Customer",
                             "Rating",
                             "Status",
+                            "Pinned",
                             "Message",
                             "Images",
                             "helpfulCount",
@@ -846,6 +922,38 @@ export default function ReviewsPage() {
                                 padding: "18px",
                                 verticalAlign: "top",
                                 borderBottom: "1px solid rgba(15, 23, 42, 0.06)",
+                                minWidth: "140px",
+                              }}
+                            >
+                              {review.isPinned ? (
+                                <div
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "8px",
+                                    padding: "8px 14px",
+                                    borderRadius: "999px",
+                                    background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
+                                    border: "1px solid rgba(37, 99, 235, 0.15)",
+                                    color: "#1d4ed8",
+                                    fontSize: "13px",
+                                    fontWeight: 700,
+                                  }}
+                                >
+                                  📌 Pinned
+                                </div>
+                              ) : (
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                  Not pinned
+                                </Text>
+                              )}
+                            </td>
+
+                            <td
+                              style={{
+                                padding: "18px",
+                                verticalAlign: "top",
+                                borderBottom: "1px solid rgba(15, 23, 42, 0.06)",
                                 minWidth: "360px",
                                 maxWidth: "520px",
                                 whiteSpace: "normal",
@@ -968,6 +1076,22 @@ export default function ReviewsPage() {
                                 >
                                   Delete
                                 </Button>
+                                {review.isPinned ? (
+                                  <Button
+                                    loading={pinLoadingId === review.id}
+                                    onClick={() => handleUnpin(review.id)}
+                                  >
+                                    Unpin
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="primary"
+                                    loading={pinLoadingId === review.id}
+                                    onClick={() => handlePin(review.id)}
+                                  >
+                                    Pin
+                                  </Button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -1086,6 +1210,18 @@ export default function ReviewsPage() {
                 ]}
                 value={formData.status}
                 onChange={handleFieldChange("status")}
+              />
+            ) : null}
+
+            {isEditMode ? (
+              <Select
+                label="Pinned"
+                options={[
+                  { label: "Not pinned", value: "false" },
+                  { label: "Pinned", value: "true" },
+                ]}
+                value={formData.isPinned}
+                onChange={handleFieldChange("isPinned")}
               />
             ) : null}
           </BlockStack>

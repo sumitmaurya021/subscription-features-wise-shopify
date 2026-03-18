@@ -20,6 +20,7 @@ function normalizeReview(review) {
     ...review,
     reviewImages: parseReviewImages(review.reviewImages),
     helpfulCount: Number(review.helpfulCount || 0),
+    isPinned: Boolean(review.isPinned),
     createdAt:
       review.createdAt instanceof Date
         ? review.createdAt.toISOString()
@@ -45,6 +46,7 @@ export const typeDefs = /* GraphQL */ `
     reviewImages: [String!]!
     helpfulCount: Int!
     status: String!
+    isPinned: Boolean!
     createdAt: String!
     updatedAt: String!
   }
@@ -91,6 +93,7 @@ export const typeDefs = /* GraphQL */ `
     message: String
     reviewImages: [String!]
     status: String
+    isPinned: Boolean
   }
 
   type Query {
@@ -106,6 +109,8 @@ export const typeDefs = /* GraphQL */ `
     approveReview(id: ID!): ReviewResponse!
     rejectReview(id: ID!): ReviewResponse!
     toggleReviewHelpful(id: ID!, increment: Boolean!): ReviewResponse!
+    pinReview(id: ID!): ReviewResponse!
+    unpinReview(id: ID!): ReviewResponse!
   }
 `;
 
@@ -121,9 +126,10 @@ export const resolvers = {
 
         const reviews = await prisma.review.findMany({
           where,
-          orderBy: {
-            createdAt: "desc",
-          },
+          orderBy: [
+            { isPinned: "desc" },
+            { createdAt: "desc" },
+          ],
         });
 
         return {
@@ -183,9 +189,10 @@ export const resolvers = {
 
         const reviews = await prisma.review.findMany({
           where,
-          orderBy: {
-            createdAt: "desc",
-          },
+          orderBy: [
+            { isPinned: "desc" },
+            { createdAt: "desc" },
+          ],
         });
 
         const totalReviews = reviews.length;
@@ -320,6 +327,24 @@ export const resolvers = {
           }
         }
 
+        if (input.isPinned === true && !existingReview.isPinned) {
+          const pinnedCount = await prisma.review.count({
+            where: {
+              shop: existingReview.shop,
+              productId: existingReview.productId,
+              isPinned: true,
+            },
+          });
+
+          if (pinnedCount >= 3) {
+            return {
+              success: false,
+              message: "You can pin maximum 3 reviews only for this product.",
+              data: null,
+            };
+          }
+        }
+
         let nextReviewImages;
 
         if (input.reviewImages !== undefined) {
@@ -359,6 +384,10 @@ export const resolvers = {
                 ? nextReviewImages
                 : existingReview.reviewImages,
             status: input.status ?? existingReview.status,
+            isPinned:
+              input.isPinned !== undefined
+                ? Boolean(input.isPinned)
+                : existingReview.isPinned,
           },
         });
 
@@ -520,6 +549,94 @@ export const resolvers = {
         return {
           success: false,
           message: "Failed to update helpful count",
+          data: null,
+        };
+      }
+    },
+
+    pinReview: async (_, { id }) => {
+      try {
+        const existingReview = await prisma.review.findUnique({
+          where: { id },
+        });
+
+        if (!existingReview) {
+          return {
+            success: false,
+            message: "Review not found",
+            data: null,
+          };
+        }
+
+        const pinnedCount = await prisma.review.count({
+          where: {
+            shop: existingReview.shop,
+            productId: existingReview.productId,
+            isPinned: true,
+          },
+        });
+
+        if (!existingReview.isPinned && pinnedCount >= 3) {
+          return {
+            success: false,
+            message: "You can pin maximum 3 reviews only for this product.",
+            data: null,
+          };
+        }
+
+        const updatedReview = await prisma.review.update({
+          where: { id },
+          data: {
+            isPinned: true,
+          },
+        });
+
+        return {
+          success: true,
+          message: "Review pinned successfully",
+          data: normalizeReview(updatedReview),
+        };
+      } catch (error) {
+        console.error("GRAPHQL PIN REVIEW ERROR:", error);
+        return {
+          success: false,
+          message: "Failed to pin review",
+          data: null,
+        };
+      }
+    },
+
+    unpinReview: async (_, { id }) => {
+      try {
+        const existingReview = await prisma.review.findUnique({
+          where: { id },
+        });
+
+        if (!existingReview) {
+          return {
+            success: false,
+            message: "Review not found",
+            data: null,
+          };
+        }
+
+        const updatedReview = await prisma.review.update({
+          where: { id },
+          data: {
+            isPinned: false,
+          },
+        });
+
+        return {
+          success: true,
+          message: "Review unpinned successfully",
+          data: normalizeReview(updatedReview),
+        };
+      } catch (error) {
+        console.error("GRAPHQL UNPIN REVIEW ERROR:", error);
+        return {
+          success: false,
+          message: "Failed to unpin review",
           data: null,
         };
       }

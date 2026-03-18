@@ -1608,3 +1608,13 @@
     max-width: none;
   }
 }
+
+.pr-badge--pinned {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 1px solid #93c5fd;
+  color: #1d4ed8;
+}
+
+.pr-item:has(.pr-badge--pinned) {
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.08);
+}

@@ -405,7 +405,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   function getFilteredSortedReviews() {
     let reviews = [...allReviews];
 
-    if (currentFilter !== "all") {
+    if (currentFilter === "pinned") {
+      reviews = reviews.filter((review) => Boolean(review.isPinned));
+    } else if (currentFilter !== "all") {
       reviews = reviews.filter((review) => Number(review.rating) === Number(currentFilter));
     }
 
@@ -421,20 +423,40 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (currentSort === "newest") {
       reviews.sort((a, b) => {
+        const aPinned = a.isPinned ? 1 : 0;
+        const bPinned = b.isPinned ? 1 : 0;
+        if (bPinned !== aPinned) return bPinned - aPinned;
+
         const aTime = parseDateValue(a.createdAt)?.getTime() || 0;
         const bTime = parseDateValue(b.createdAt)?.getTime() || 0;
         return bTime - aTime;
       });
     } else if (currentSort === "oldest") {
       reviews.sort((a, b) => {
+        const aPinned = a.isPinned ? 1 : 0;
+        const bPinned = b.isPinned ? 1 : 0;
+        if (bPinned !== aPinned) return bPinned - aPinned;
+
         const aTime = parseDateValue(a.createdAt)?.getTime() || 0;
         const bTime = parseDateValue(b.createdAt)?.getTime() || 0;
         return aTime - bTime;
       });
     } else if (currentSort === "highest") {
-      reviews.sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0));
+      reviews.sort((a, b) => {
+        const aPinned = a.isPinned ? 1 : 0;
+        const bPinned = b.isPinned ? 1 : 0;
+        if (bPinned !== aPinned) return bPinned - aPinned;
+
+        return Number(b.rating || 0) - Number(a.rating || 0);
+      });
     } else if (currentSort === "lowest") {
-      reviews.sort((a, b) => Number(a.rating || 0) - Number(b.rating || 0));
+      reviews.sort((a, b) => {
+        const aPinned = a.isPinned ? 1 : 0;
+        const bPinned = b.isPinned ? 1 : 0;
+        if (bPinned !== aPinned) return bPinned - aPinned;
+
+        return Number(a.rating || 0) - Number(b.rating || 0);
+      });
     }
 
     return reviews;
@@ -449,6 +471,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     const badges = [
       { className: "pr-badge--verified", label: "Verified Purchase" },
     ];
+
+    if (Boolean(review.isPinned)) {
+      badges.unshift({ className: "pr-badge--pinned", label: "Pinned Review" });
+    }
 
     if (index === 0 && Number(review.rating) >= 4) {
       badges.push({ className: "pr-badge--top", label: "Top Review" });

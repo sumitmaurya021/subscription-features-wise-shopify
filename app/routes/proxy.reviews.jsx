@@ -17,6 +17,7 @@ function normalizeReview(review) {
     ...review,
     reviewImages: safeParseImages(review.reviewImages),
     helpfulCount: Number(review.helpfulCount || 0),
+    isPinned: Boolean(review.isPinned),
   };
 }
 
@@ -41,9 +42,10 @@ export const loader = async ({ request }) => {
 
     const reviews = await prisma.review.findMany({
       where,
-      orderBy: {
-        createdAt: "desc",
-      },
+      orderBy: [
+        { isPinned: "desc" },
+        { createdAt: "desc" },
+      ],
     });
 
     const normalizedReviews = reviews.map(normalizeReview);
