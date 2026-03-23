@@ -1,0 +1,95 @@
+<div
+  id="product-loyalty-root"
+  data-shop="{{ shop.permanent_domain }}"
+  data-endpoint="/apps/reviews/loyalty"
+  data-customer-id="{% if customer %}{{ customer.id }}{% endif %}"
+  data-customer-email="{% if customer %}{{ customer.email | escape }}{% endif %}"
+  data-customer-first-name="{% if customer %}{{ customer.first_name | escape }}{% endif %}"
+  data-customer-last-name="{% if customer %}{{ customer.last_name | escape }}{% endif %}"
+>
+  <div class="pl-card">
+    <div class="pl-header">
+      <div>
+        <h3 class="pl-title">Loyalty Rewards</h3>
+        <p class="pl-subtitle">Earn points, redeem rewards, and share referrals.</p>
+      </div>
+      <div class="pl-badge">Rewards</div>
+    </div>
+
+    <div id="pl-auth-block" class="pl-auth-block" {% if customer %}hidden{% endif %}>
+      <div class="pl-row">
+        <input
+          id="pl-email"
+          type="email"
+          class="pl-input"
+          placeholder="Enter your email to join"
+          value="{% if customer %}{{ customer.email | escape }}{% endif %}"
+        >
+        <button type="button" id="pl-join-btn" class="pl-primary-btn">
+          Join Now
+        </button>
+      </div>
+      <p class="pl-helper">Join loyalty program to collect and redeem points.</p>
+    </div>
+
+    <div id="pl-dashboard" class="pl-dashboard" hidden>
+      <div class="pl-summary-grid">
+        <div class="pl-summary-box">
+          <span class="pl-label">Points</span>
+          <strong id="pl-points">0</strong>
+        </div>
+        <div class="pl-summary-box">
+          <span class="pl-label">Tier</span>
+          <strong id="pl-tier">bronze</strong>
+        </div>
+        <div class="pl-summary-box">
+          <span class="pl-label">Referral Code</span>
+          <strong id="pl-referral-code">-</strong>
+        </div>
+      </div>
+
+      <div class="pl-referral-box">
+        <div class="pl-section-title">Referral Link</div>
+        <div class="pl-row">
+          <input id="pl-referral-link" class="pl-input" type="text" readonly>
+          <button type="button" id="pl-copy-referral-btn" class="pl-secondary-btn">
+            Copy
+          </button>
+        </div>
+      </div>
+
+      <div class="pl-rewards-box">
+        <div class="pl-section-title">Redeem Rewards</div>
+        <div id="pl-reward-list" class="pl-reward-list"></div>
+      </div>
+
+      <div class="pl-referral-invite-box">
+        <div class="pl-section-title">Invite Friend</div>
+        <div class="pl-row">
+          <input id="pl-referral-email" class="pl-input" type="email" placeholder="Friend email">
+          <button type="button" id="pl-send-referral-btn" class="pl-primary-btn">
+            Save Invite
+          </button>
+        </div>
+      </div>
+
+      <div class="pl-history-box">
+        <div class="pl-section-title">Recent Rewards</div>
+        <div id="pl-redemption-list" class="pl-history-list"></div>
+      </div>
+    </div>
+
+    <div id="pl-message" class="pl-message"></div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Product Loyalty",
+  "target": "section",
+  "templates": ["product"],
+  "javascript": "product-loyalty.js",
+  "stylesheet": "product-loyalty.css",
+  "settings": []
+}
+{% endschema %}

@@ -1,0 +1,197 @@
+#product-loyalty-root {
+  width: 100%;
+  margin: 16px 0;
+}
+
+#product-loyalty-root * {
+  box-sizing: border-box;
+}
+
+.pl-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+}
+
+.pl-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.pl-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.pl-subtitle {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.pl-badge {
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.pl-auth-block,
+.pl-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pl-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pl-summary-box {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 14px;
+  background: #f8fafc;
+}
+
+.pl-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.pl-summary-box strong {
+  font-size: 18px;
+  color: #0f172a;
+}
+
+.pl-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+.pl-input {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 13px;
+  outline: none;
+}
+
+.pl-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+.pl-primary-btn,
+.pl-secondary-btn,
+.pl-redeem-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.pl-primary-btn {
+  background: linear-gradient(135deg, #111827 0%, #2563eb 100%);
+  color: #ffffff;
+}
+
+.pl-secondary-btn {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+}
+
+.pl-reward-list,
+.pl-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pl-reward-item,
+.pl-history-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+}
+
+.pl-reward-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.pl-reward-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.pl-reward-subtitle {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.pl-section-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 6px;
+}
+
+.pl-helper,
+.pl-message {
+  font-size: 13px;
+}
+
+.pl-message {
+  min-height: 18px;
+  font-weight: 700;
+}
+
+.pl-message--success {
+  color: #166534;
+}
+
+.pl-message--error {
+  color: #b91c1c;
+}
+
+@media screen and (max-width: 767px) {
+  .pl-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pl-row {
+    grid-template-columns: 1fr;
+  }
+
+  .pl-primary-btn,
+  .pl-secondary-btn,
+  .pl-redeem-btn {
+    width: 100%;
+  }
+}

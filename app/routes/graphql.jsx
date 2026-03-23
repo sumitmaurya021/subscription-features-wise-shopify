@@ -7,6 +7,10 @@ import {
   typeDefs as wishlistTypeDefs,
   resolvers as wishlistResolvers,
 } from "../graphql/wishlistSchema.server";
+import {
+  typeDefs as loyaltyTypeDefs,
+  resolvers as loyaltyResolvers,
+} from "../graphql/loyaltySchema.server";
 
 const rootTypeDefs = /* GraphQL */ `
   type Query
@@ -15,15 +19,17 @@ const rootTypeDefs = /* GraphQL */ `
 
 const yoga = createYoga({
   schema: createSchema({
-    typeDefs: [rootTypeDefs, reviewTypeDefs, wishlistTypeDefs],
+    typeDefs: [rootTypeDefs, reviewTypeDefs, wishlistTypeDefs, loyaltyTypeDefs],
     resolvers: {
       Query: {
         ...(reviewResolvers.Query || {}),
         ...(wishlistResolvers.Query || {}),
+        ...(loyaltyResolvers.Query || {}),
       },
       Mutation: {
         ...(reviewResolvers.Mutation || {}),
         ...(wishlistResolvers.Mutation || {}),
+        ...(loyaltyResolvers.Mutation || {}),
       },
     },
   }),

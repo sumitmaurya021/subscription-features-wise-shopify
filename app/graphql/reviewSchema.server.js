@@ -1,4 +1,9 @@
 import prisma from "../db.server";
+import {
+  LOYALTY_CONFIG,
+  getOrCreateLoyaltyCustomer,
+  addPointsToCustomer,
+} from "../utils/loyalty.server";
 
 function parseReviewImages(value) {
   if (!value) return [];
@@ -459,6 +464,34 @@ export const resolvers = {
             status: "approved",
           },
         });
+
+        if (updatedReview.customerEmail) {
+          try {
+            const loyaltyCustomer = await getOrCreateLoyaltyCustomer({
+              shop: updatedReview.shop,
+              customerEmail: updatedReview.customerEmail,
+              firstName: updatedReview.customerName,
+            });
+
+            const normalizedReview = normalizeReview(updatedReview);
+
+            await addPointsToCustomer({
+              shop: updatedReview.shop,
+              loyaltyCustomerId: loyaltyCustomer.id,
+              eventType: "REVIEW_APPROVED",
+              points:
+                Number(LOYALTY_CONFIG.points.reviewApproved || 25) +
+                ((Array.isArray(normalizedReview?.reviewImages) &&
+                  normalizedReview.reviewImages.length > 0)
+                  ? Number(LOYALTY_CONFIG.points.photoReviewBonus || 10)
+                  : 0),
+              reviewId: updatedReview.id,
+              note: "Points for approved review",
+            });
+          } catch (loyaltyError) {
+            console.error("REVIEW LOYALTY CREDIT ERROR:", loyaltyError);
+          }
+        }
 
         return {
           success: true,

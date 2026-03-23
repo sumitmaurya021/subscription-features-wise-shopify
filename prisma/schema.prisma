@@ -107,3 +107,81 @@ model PriceDropAlert {
 
   @@unique([shop, productId, customerEmail])
 }
+
+model LoyaltyCustomer {
+  id                     String   @id @default(cuid())
+  shop                   String
+  customerId             String?
+  customerEmail          String?
+  sessionId              String?
+  ownerKey               String
+  firstName              String?
+  lastName               String?
+  pointsBalance          Int      @default(0)
+  lifetimePointsEarned   Int      @default(0)
+  lifetimePointsRedeemed Int      @default(0)
+  tier                   String   @default("bronze")
+  referralCode           String   @unique
+  referredByCode         String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  pointEvents            LoyaltyPointEvent[]
+  redemptions            RewardRedemption[]
+  referralsMade          ReferralInvite[] @relation("ReferrerRelation")
+
+  @@unique([shop, ownerKey], name: "shop_ownerKey")
+}
+
+model LoyaltyPointEvent {
+  id                String          @id @default(cuid())
+  shop              String
+  loyaltyCustomerId String
+  eventType         String
+  points            Int
+  orderId           String?
+  reviewId          String?
+  note              String?
+  status            String          @default("completed")
+  createdAt         DateTime        @default(now())
+
+  loyaltyCustomer   LoyaltyCustomer @relation(fields: [loyaltyCustomerId], references: [id], onDelete: Cascade)
+
+  @@index([shop, loyaltyCustomerId])
+}
+
+model RewardRedemption {
+  id                String          @id @default(cuid())
+  shop              String
+  loyaltyCustomerId String
+  rewardKey         String
+  rewardTitle       String
+  rewardType        String
+  pointsUsed        Int
+  rewardCode        String?
+  rewardValue       Float?
+  status            String          @default("issued")
+  createdAt         DateTime        @default(now())
+
+  loyaltyCustomer   LoyaltyCustomer @relation(fields: [loyaltyCustomerId], references: [id], onDelete: Cascade)
+
+  @@index([shop, loyaltyCustomerId])
+}
+
+model ReferralInvite {
+  id                 String          @id @default(cuid())
+  shop               String
+  referrerCustomerId String
+  referredEmail      String
+  referralCode       String
+  status             String          @default("pending")
+  convertedOrderId   String?
+  rewardPoints       Int             @default(0)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  referrer           LoyaltyCustomer @relation("ReferrerRelation", fields: [referrerCustomerId], references: [id], onDelete: Cascade)
+
+  @@unique([shop, referrerCustomerId, referredEmail], name: "shop_referrer_email")
+  @@index([shop, referralCode])
+}
