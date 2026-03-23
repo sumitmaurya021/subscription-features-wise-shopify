@@ -1,0 +1,65 @@
+<div
+  id="product-wishlist-root"
+  data-product-id="{{ product.id }}"
+  data-product-title="{{ product.title | escape }}"
+  data-product-handle="{{ product.handle }}"
+  data-product-url="{{ product.url }}"
+  data-product-image="{% if product.featured_image %}{{ product.featured_image | image_url: width: 400 }}{% endif %}"
+  data-shop="{{ shop.permanent_domain }}"
+  data-endpoint="/apps/reviews/wishlist"
+  data-available="{{ product.selected_or_first_available_variant.available }}"
+  data-variant-id="{{ product.selected_or_first_available_variant.id }}"
+>
+  <div class="pw-card">
+    <div class="pw-top">
+      <button type="button" id="pw-toggle-btn" class="pw-toggle-btn">
+        ♡ Save to Wishlist
+      </button>
+
+      <div id="pw-count" class="pw-count">0 saves</div>
+    </div>
+
+    {% unless product.selected_or_first_available_variant.available %}
+      <div class="pw-divider"></div>
+
+      <div class="pw-alert-box">
+        <h4 class="pw-alert-title">Back in stock alert</h4>
+        <p class="pw-alert-subtitle">Email mil jayega jab ye product wapas stock me aayega.</p>
+
+        <form id="pw-back-in-stock-form" class="pw-form" novalidate>
+          <input
+            id="pw-customer-name"
+            type="text"
+            name="customerName"
+            placeholder="Your name"
+            class="pw-input"
+          >
+
+          <input
+            id="pw-customer-email"
+            type="email"
+            name="customerEmail"
+            placeholder="Your email"
+            class="pw-input"
+            required
+          >
+
+          <button type="submit" class="pw-submit-btn">Notify me</button>
+        </form>
+
+        <div id="pw-message" class="pw-message"></div>
+      </div>
+    {% endunless %}
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Product Wishlist",
+  "target": "section",
+  "templates": ["product"],
+  "javascript": "product-wishlist.js",
+  "stylesheet": "product-wishlist.css",
+  "settings": []
+}
+{% endschema %}

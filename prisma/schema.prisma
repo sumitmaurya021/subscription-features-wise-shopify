@@ -50,3 +50,60 @@ model Review {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
+
+model WishlistItem {
+  id            String   @id @default(cuid())
+  shop          String
+  productId     String
+  variantId     String   @default("")
+  productTitle  String?
+  productHandle String?
+  productImage  String?
+  productUrl    String?
+  customerId    String?
+  customerEmail String?
+  sessionId     String?
+  ownerKey      String
+  ownerType     String   // "customer" | "guest"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([shop, productId, variantId, ownerKey], name: "shop_product_variant_ownerKey")
+}
+
+model BackInStockRequest {
+  id            String    @id @default(cuid())
+  shop          String
+  productId     String
+  variantId     String    @default("")
+  productTitle  String?
+  productHandle String?
+  productImage  String?
+  productUrl    String?
+  customerName  String?
+  customerEmail String
+  isActive      Boolean   @default(true)
+  notifiedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([shop, productId, variantId, customerEmail], name: "shop_product_variant_email")
+}
+
+model PriceDropAlert {
+  id                String   @id @default(cuid())
+  shop              String
+  productId         String
+  productTitle      String?
+  productHandle     String?
+  customerEmail     String
+  customerName      String?
+  currentPrice      Float
+  targetPrice       Float?
+  lastNotifiedPrice Float?
+  status            String   @default("active")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([shop, productId, customerEmail])
+}
