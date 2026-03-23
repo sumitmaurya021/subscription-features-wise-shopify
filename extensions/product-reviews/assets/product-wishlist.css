@@ -1,0 +1,149 @@
+#product-wishlist-root {
+  width: 100%;
+  margin: 16px 0;
+}
+
+#product-wishlist-root * {
+  box-sizing: border-box;
+}
+
+.pw-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+}
+
+.pw-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pw-toggle-btn {
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #111827 0%, #2563eb 100%);
+  color: #ffffff;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.pw-toggle-btn:hover {
+  transform: translateY(-1px);
+}
+
+.pw-toggle-btn[data-active="true"] {
+  background: linear-gradient(135deg, #dc2626 0%, #f43f5e 100%);
+}
+
+.pw-toggle-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.pw-count {
+  font-size: 13px;
+  font-weight: 700;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  padding: 8px 12px;
+}
+
+.pw-divider {
+  height: 1px;
+  background: #edf2f7;
+  margin: 16px 0;
+}
+
+.pw-alert-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pw-alert-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.pw-alert-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.pw-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+}
+
+.pw-input {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 13px;
+  outline: none;
+}
+
+.pw-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+.pw-submit-btn {
+  border: none;
+  border-radius: 10px;
+  background: #111827;
+  color: #ffffff;
+  padding: 11px 14px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.pw-message {
+  min-height: 18px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pw-message--success {
+  color: #166534;
+}
+
+.pw-message--error {
+  color: #b91c1c;
+}
+
+@media screen and (max-width: 767px) {
+  .pw-form {
+    grid-template-columns: 1fr;
+  }
+
+  .pw-submit-btn {
+    width: 100%;
+  }
+
+  .pw-toggle-btn {
+    width: 100%;
+  }
+
+  .pw-count {
+    width: 100%;
+    text-align: center;
+  }
+}
