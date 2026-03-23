@@ -2,32 +2,38 @@ document.addEventListener("DOMContentLoaded", async () => {
   const root = document.getElementById("product-reviews-root");
   if (!root) return;
 
-  const productId = root.dataset.productId;
-  const productTitle = root.dataset.productTitle;
-  const shop = root.dataset.shop;
-  const endpoint = root.dataset.endpoint;
+  const productId = root.dataset.productId || "";
+  const productTitle = root.dataset.productTitle || "";
+  const shop = root.dataset.shop || "";
+  const endpoint = root.dataset.endpoint || "";
 
   const summaryEl = root.querySelector(".pr-average");
   const listEl = root.querySelector(".pr-list");
   const form = root.querySelector("#product-review-form");
   const messageEl = root.querySelector("#product-review-message");
-  const submitBtn = form?.querySelector('button[type="submit"]');
+  const submitBtn = form?.querySelector('button[type="submit"]') || null;
+
   const ratingInput = root.querySelector("#pr-rating");
   const ratingLiveText = root.querySelector("#pr-rating-live-text");
   const starButtons = Array.from(root.querySelectorAll(".pr-star-btn"));
+
   const imageInput = root.querySelector("#pr-review-images");
   const imagePreview = root.querySelector("#pr-image-preview");
   const imagePreviewWrap = root.querySelector("#pr-image-preview-wrap");
   const uploadDropzone = root.querySelector("#pr-upload-dropzone");
+
   const filterChipsWrap = root.querySelector("#pr-filter-chips");
   const filterChips = Array.from(root.querySelectorAll(".pr-filter-chip"));
+
   const loadMoreBtn = root.querySelector("#pr-load-more-btn");
   const sortSegment = root.querySelector("#pr-sort-segment");
   const sortButtons = Array.from(root.querySelectorAll(".pr-sort-btn"));
   const searchInput = root.querySelector("#pr-search-input");
   const resultsMetaEl = root.querySelector("#pr-results-meta");
+
   const toggleFormBtn = root.querySelector("#pr-toggle-form-btn");
   const formContainer = root.querySelector("#pr-form-container");
+
   const titleInput = root.querySelector("#pr-title");
   const titleCount = root.querySelector("#pr-title-count");
   const messageInput = root.querySelector("#pr-message");
@@ -41,17 +47,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const lightboxNext = root.querySelector("#pr-lightbox-next");
   const lightboxCounter = root.querySelector("#pr-lightbox-counter");
 
-  let allReviews = [];
-  let currentFilter = "all";
-  let currentSort = "newest";
-  let currentSearch = "";
-  let visibleCount = 5;
-  let selectedImages = [];
-  let activeRating = 0;
-  let lightboxImages = [];
-  let lightboxIndex = 0;
-
   const MAX_REVIEW_IMAGES = 4;
+  const DEFAULT_VISIBLE_COUNT = 4;
+  const LOAD_MORE_STEP = 4;
 
   const RATING_LABELS = {
     1: "Poor",
@@ -60,6 +58,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     4: "Very Good",
     5: "Excellent",
   };
+
+  let allReviews = [];
+  let currentFilter = "all";
+  let currentSort = "newest";
+  let currentSearch = "";
+  let visibleCount = DEFAULT_VISIBLE_COUNT;
+  let selectedImages = [];
+  let activeRating = 0;
+
+  let lightboxImages = [];
+  let lightboxIndex = 0;
 
   function escapeHtml(value) {
     if (value === null || value === undefined) return "";
@@ -71,8 +80,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       .replace(/'/g, "&#39;");
   }
 
+  function safeText(value) {
+    return value === null || value === undefined ? "" : String(value);
+  }
+
   function getInitial(name = "") {
-    const cleanName = String(name).trim();
+    const cleanName = safeText(name).trim();
     return cleanName ? cleanName.charAt(0).toUpperCase() : "A";
   }
 
@@ -124,16 +137,27 @@ document.addEventListener("DOMContentLoaded", async () => {
   function isRecentReview(dateValue) {
     const date = parseDateValue(dateValue);
     if (!date) return false;
+
     const diffMs = new Date() - date;
     return diffMs <= 7 * 24 * 60 * 60 * 1000;
   }
 
+  function normalizeImages(review) {
+    if (Array.isArray(review?.images)) return review.images;
+    if (Array.isArray(review?.reviewImages)) return review.reviewImages;
+    return [];
+  }
+
   function getRatingStats(reviews) {
     const stats = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+
     reviews.forEach((review) => {
       const rating = Number(review?.rating) || 0;
-      if (stats[rating] !== undefined) stats[rating] += 1;
+      if (stats[rating] !== undefined) {
+        stats[rating] += 1;
+      }
     });
+
     return stats;
   }
 
@@ -146,17 +170,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function getInsightText(stats) {
-    const topTwo = Object.entries(stats)
+    const sorted = Object.entries(stats)
       .sort((a, b) => b[1] - a[1])
+      .filter(([, count]) => count > 0)
       .slice(0, 2)
       .map(([star]) => `${star}★`);
 
-    if (topTwo.length >= 2) {
-      return `Most people rated ${topTwo[0]} and ${topTwo[1]}.`;
+    if (sorted.length >= 2) {
+      return `Most customers rated ${sorted[0]} and ${sorted[1]}.`;
     }
-    if (topTwo.length === 1) {
-      return `Most people rated ${topTwo[0]}.`;
+
+    if (sorted.length === 1) {
+      return `Most customers rated ${sorted[0]}.`;
     }
+
     return "No rating insight available yet.";
   }
 
@@ -182,7 +209,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function extractProsTags(review) {
-    const source = `${review?.title || ""} ${review?.message || ""}`.toLowerCase();
+    const source = `${safeText(review?.title)} ${safeText(review?.message)}`.toLowerCase();
     const tags = [];
 
     const rules = [
@@ -247,7 +274,25 @@ document.addEventListener("DOMContentLoaded", async () => {
       } else {
         localStorage.removeItem(getHelpfulStorageKey(reviewId));
       }
-    } catch {}
+    } catch {
+      // ignore localStorage failures
+    }
+  }
+
+  function getErrorEl(fieldName) {
+    return root.querySelector(`[data-error-for="${fieldName}"]`);
+  }
+
+  function setFieldError(fieldName, message, inputEl) {
+    const errorEl = getErrorEl(fieldName);
+    if (errorEl) errorEl.textContent = message || "";
+    if (inputEl) inputEl.classList.add("pr-invalid");
+  }
+
+  function clearFieldError(fieldName, inputEl) {
+    const errorEl = getErrorEl(fieldName);
+    if (errorEl) errorEl.textContent = "";
+    if (inputEl) inputEl.classList.remove("pr-invalid");
   }
 
   function renderSummary(averageRating, totalReviews, ratingStats, reviews) {
@@ -259,6 +304,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const statChips = getStatChips(reviews);
 
     const highestCount = Math.max(...Object.values(ratingStats), 0);
+
     const progressRows = [5, 4, 3, 2, 1]
       .map((star) => {
         const count = ratingStats[star] || 0;
@@ -269,7 +315,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           <div class="pr-progress-row ${isTop ? "is-top" : ""}">
             <div class="pr-progress-label">${star}★</div>
             <div class="pr-progress-bar">
-              <div class="pr-progress-fill" style="width: ${percentage}%;"></div>
+              <div class="pr-progress-fill" style="width:${percentage}%;"></div>
             </div>
             <div class="pr-progress-value">${count}</div>
             <div class="pr-progress-percent">${percentage}%</div>
@@ -298,12 +344,18 @@ document.addEventListener("DOMContentLoaded", async () => {
 
           <div class="pr-summary-stars">${renderStars(Math.round(avg))}</div>
           <div class="pr-summary-label">${avgLabel}</div>
-          <div class="pr-summary-count">${avgLabel} based on ${total} review${total !== 1 ? "s" : ""}</div>
+          <div class="pr-summary-count">
+            ${avgLabel} based on ${total} review${total !== 1 ? "s" : ""}
+          </div>
           <div class="pr-summary-insight">${escapeHtml(insightText)}</div>
 
           <div class="pr-summary-cta-group">
-            <button type="button" class="pr-summary-cta-btn" id="pr-summary-write-review-btn">Share Feedback</button>
-            <button type="button" class="pr-summary-filter-btn" id="pr-summary-filter-5-btn">See 5★ reviews</button>
+            <button type="button" class="pr-summary-cta-btn" id="pr-summary-write-review-btn">
+              Write review
+            </button>
+            <button type="button" class="pr-summary-filter-btn" id="pr-summary-filter-5-btn">
+              View 5★ reviews
+            </button>
           </div>
         </div>
 
@@ -313,7 +365,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         <div class="pr-recommend-box">
           <div class="pr-recommend-title">${recommendationPercent}% customers recommend this product</div>
-          <div class="pr-recommend-text">Customers mostly liked the quality, value, and overall experience.</div>
+          <div class="pr-recommend-text">
+            Customers mostly liked the quality, value, and overall experience.
+          </div>
         </div>
 
         <div class="pr-chip-list">
@@ -324,6 +378,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function renderEmptyState() {
+    if (!listEl) return;
+
     listEl.innerHTML = `
       <div class="pr-empty">
         <div class="pr-empty-icon-wrap">
@@ -333,73 +389,71 @@ document.addEventListener("DOMContentLoaded", async () => {
         <h4 class="pr-empty-title">No reviews yet</h4>
         <p>Be the first to share your experience with this product.</p>
         <div class="pr-empty-action">
-          <button type="button" class="pr-empty-btn" id="pr-empty-review-btn">Write the First Review</button>
+          <button type="button" class="pr-empty-btn" id="pr-empty-review-btn">Write the first review</button>
         </div>
       </div>
     `;
 
     const emptyBtn = root.querySelector("#pr-empty-review-btn");
-    if (emptyBtn) {
-      emptyBtn.addEventListener("click", () => {
-        openFormAndScroll();
-      });
-    }
+    emptyBtn?.addEventListener("click", openFormAndScroll);
   }
 
   function renderLoadingState() {
-    summaryEl.innerHTML = `
-      <div class="pr-skeleton-summary">
-        <div class="pr-skeleton-line lg"></div>
-        <div class="pr-skeleton-line md"></div>
-        <div class="pr-skeleton-line sm"></div>
-        <div class="pr-skeleton-line"></div>
-        <div class="pr-skeleton-line"></div>
-        <div class="pr-skeleton-line"></div>
-        <div class="pr-skeleton-line"></div>
-      </div>
-    `;
+    if (summaryEl) {
+      summaryEl.innerHTML = `
+        <div class="pr-skeleton-summary">
+          <div class="pr-skeleton-line lg"></div>
+          <div class="pr-skeleton-line md"></div>
+          <div class="pr-skeleton-line sm"></div>
+          <div class="pr-skeleton-line"></div>
+          <div class="pr-skeleton-line"></div>
+          <div class="pr-skeleton-line"></div>
+          <div class="pr-skeleton-line"></div>
+        </div>
+      `;
+    }
 
-    listEl.innerHTML = `
-      <div class="pr-skeleton-card"></div>
-      <div class="pr-skeleton-card"></div>
-      <div class="pr-skeleton-card"></div>
-    `;
+    if (listEl) {
+      listEl.innerHTML = `
+        <div class="pr-skeleton-card"></div>
+        <div class="pr-skeleton-card"></div>
+        <div class="pr-skeleton-card"></div>
+      `;
+    }
 
     if (loadMoreBtn) loadMoreBtn.hidden = true;
     if (resultsMetaEl) resultsMetaEl.textContent = "";
   }
 
   function renderErrorState(message = "Failed to load reviews") {
-    summaryEl.innerHTML = `
-      <div class="pr-summary-box">
-        <div class="pr-summary-top">
-          <div class="pr-summary-meter-wrap">
-            <div class="pr-summary-meter" style="--progress:0deg;">
-              <div class="pr-summary-meter-inner">
-                <div class="pr-summary-rating">0.0</div>
-                <div class="pr-summary-outof">out of 5</div>
+    if (summaryEl) {
+      summaryEl.innerHTML = `
+        <div class="pr-summary-box">
+          <div class="pr-summary-top">
+            <div class="pr-summary-meter-wrap">
+              <div class="pr-summary-meter" style="--progress:0deg;">
+                <div class="pr-summary-meter-inner">
+                  <div class="pr-summary-rating">0.0</div>
+                  <div class="pr-summary-outof">out of 5</div>
+                </div>
               </div>
             </div>
+            <div class="pr-summary-stars">☆☆☆☆☆</div>
+            <div class="pr-summary-label">Unavailable</div>
+            <div class="pr-summary-count">Reviews are temporarily unavailable</div>
           </div>
-          <div class="pr-summary-stars">☆☆☆☆☆</div>
-          <div class="pr-summary-label">Unavailable</div>
-          <div class="pr-summary-count">Reviews are temporarily unavailable</div>
         </div>
-      </div>
-    `;
+      `;
+    }
 
-    listEl.innerHTML = `
-      <div class="pr-error-box">${escapeHtml(message)}</div>
-    `;
+    if (listEl) {
+      listEl.innerHTML = `
+        <div class="pr-error-box">${escapeHtml(message)}</div>
+      `;
+    }
 
     if (loadMoreBtn) loadMoreBtn.hidden = true;
     if (resultsMetaEl) resultsMetaEl.textContent = "";
-  }
-
-  function normalizeImages(review) {
-    if (Array.isArray(review?.images)) return review.images;
-    if (Array.isArray(review?.reviewImages)) return review.reviewImages;
-    return [];
   }
 
   function getFilteredSortedReviews() {
@@ -408,24 +462,35 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (currentFilter === "pinned") {
       reviews = reviews.filter((review) => Boolean(review.isPinned));
     } else if (currentFilter !== "all") {
-      reviews = reviews.filter((review) => Number(review.rating) === Number(currentFilter));
+      reviews = reviews.filter(
+        (review) => Number(review.rating) === Number(currentFilter)
+      );
     }
 
     if (currentSearch.trim()) {
       const keyword = currentSearch.trim().toLowerCase();
       reviews = reviews.filter((review) => {
-        const name = String(review.customerName || "").toLowerCase();
-        const title = String(review.title || "").toLowerCase();
-        const message = String(review.message || "").toLowerCase();
-        return name.includes(keyword) || title.includes(keyword) || message.includes(keyword);
+        const name = safeText(review.customerName).toLowerCase();
+        const title = safeText(review.title).toLowerCase();
+        const message = safeText(review.message).toLowerCase();
+        return (
+          name.includes(keyword) ||
+          title.includes(keyword) ||
+          message.includes(keyword)
+        );
       });
     }
 
+    const pinnedFirst = (a, b) => {
+      const aPinned = a.isPinned ? 1 : 0;
+      const bPinned = b.isPinned ? 1 : 0;
+      return bPinned - aPinned;
+    };
+
     if (currentSort === "newest") {
       reviews.sort((a, b) => {
-        const aPinned = a.isPinned ? 1 : 0;
-        const bPinned = b.isPinned ? 1 : 0;
-        if (bPinned !== aPinned) return bPinned - aPinned;
+        const pinDiff = pinnedFirst(a, b);
+        if (pinDiff !== 0) return pinDiff;
 
         const aTime = parseDateValue(a.createdAt)?.getTime() || 0;
         const bTime = parseDateValue(b.createdAt)?.getTime() || 0;
@@ -433,9 +498,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     } else if (currentSort === "oldest") {
       reviews.sort((a, b) => {
-        const aPinned = a.isPinned ? 1 : 0;
-        const bPinned = b.isPinned ? 1 : 0;
-        if (bPinned !== aPinned) return bPinned - aPinned;
+        const pinDiff = pinnedFirst(a, b);
+        if (pinDiff !== 0) return pinDiff;
 
         const aTime = parseDateValue(a.createdAt)?.getTime() || 0;
         const bTime = parseDateValue(b.createdAt)?.getTime() || 0;
@@ -443,19 +507,27 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     } else if (currentSort === "highest") {
       reviews.sort((a, b) => {
-        const aPinned = a.isPinned ? 1 : 0;
-        const bPinned = b.isPinned ? 1 : 0;
-        if (bPinned !== aPinned) return bPinned - aPinned;
+        const pinDiff = pinnedFirst(a, b);
+        if (pinDiff !== 0) return pinDiff;
 
-        return Number(b.rating || 0) - Number(a.rating || 0);
+        const ratingDiff = Number(b.rating || 0) - Number(a.rating || 0);
+        if (ratingDiff !== 0) return ratingDiff;
+
+        const aTime = parseDateValue(a.createdAt)?.getTime() || 0;
+        const bTime = parseDateValue(b.createdAt)?.getTime() || 0;
+        return bTime - aTime;
       });
     } else if (currentSort === "lowest") {
       reviews.sort((a, b) => {
-        const aPinned = a.isPinned ? 1 : 0;
-        const bPinned = b.isPinned ? 1 : 0;
-        if (bPinned !== aPinned) return bPinned - aPinned;
+        const pinDiff = pinnedFirst(a, b);
+        if (pinDiff !== 0) return pinDiff;
 
-        return Number(a.rating || 0) - Number(b.rating || 0);
+        const ratingDiff = Number(a.rating || 0) - Number(b.rating || 0);
+        if (ratingDiff !== 0) return ratingDiff;
+
+        const aTime = parseDateValue(a.createdAt)?.getTime() || 0;
+        const bTime = parseDateValue(b.createdAt)?.getTime() || 0;
+        return bTime - aTime;
       });
     }
 
@@ -468,9 +540,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function getReviewBadges(review, index) {
-    const badges = [
-      { className: "pr-badge--verified", label: "Verified Purchase" },
-    ];
+    const badges = [{ className: "pr-badge--verified", label: "Verified Purchase" }];
 
     if (Boolean(review.isPinned)) {
       badges.unshift({ className: "pr-badge--pinned", label: "Pinned Review" });
@@ -501,6 +571,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const ratingClass = getRatingClass(rating);
 
     const imageList = normalizeImages(review);
+    const encodedImages = encodeURIComponent(JSON.stringify(imageList));
+
     const galleryHtml = imageList.length
       ? `
         <div class="pr-review-gallery">
@@ -510,7 +582,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 <button
                   type="button"
                   class="pr-review-image"
-                  data-lightbox-images='${escapeHtml(JSON.stringify(imageList))}'
+                  data-lightbox-images="${encodedImages}"
                   data-lightbox-index="${imgIndex}"
                   aria-label="Open review image"
                 >
@@ -523,8 +595,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       `
       : "";
 
-    const needsClamp = String(review.message || "").length > 180;
-    const messageId = `pr-message-${index}`;
+    const needsClamp = safeText(review.message).length > 180;
+    const messageId = `pr-message-${index}-${safeText(review.id || "item")}`;
     const helpfulCount = Number(review.helpfulCount || 0);
     const reviewId = review.id || String(index);
     const isHelpfulMarked = review.id ? hasMarkedHelpful(review.id) : false;
@@ -532,13 +604,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     const badges = getReviewBadges(review, index);
 
     const badgesHtml = badges
-      .map((badge) => `<span class="pr-badge ${badge.className}">${escapeHtml(badge.label)}</span>`)
+      .map(
+        (badge) =>
+          `<span class="pr-badge ${badge.className}">${escapeHtml(badge.label)}</span>`
+      )
       .join("");
 
     const tagsHtml = prosTags.length
       ? `
         <div class="pr-tag-list">
-          ${prosTags.map((tag) => `<span class="pr-tag">${escapeHtml(tag)}</span>`).join("")}
+          ${prosTags
+            .map((tag) => `<span class="pr-tag">${escapeHtml(tag)}</span>`)
+            .join("")}
         </div>
       `
       : "";
@@ -562,7 +639,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           <div class="pr-item-side">
             <div class="pr-date-chip">${escapeHtml(createdAt)}</div>
             <div class="pr-item-stars">${renderStars(rating)}</div>
-            <div class="pr-rating-text">${RATING_LABELS[rating] || `${rating}/5`} • ${rating}/5 rating</div>
+            <div class="pr-rating-text">
+              ${RATING_LABELS[rating] || `${rating}/5`} • ${rating}/5 rating
+            </div>
           </div>
         </div>
 
@@ -594,6 +673,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           >
             ${isHelpfulMarked ? "✓ Marked helpful" : "👍 Helpful"}
           </button>
+
           <div class="pr-helpful-text" data-helpful-text="${escapeHtml(reviewId)}">
             ${helpfulCount} people found this helpful
           </div>
@@ -620,12 +700,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     loadMoreBtn.hidden = remaining <= 0;
 
     if (!loadMoreBtn.hidden) {
-      const nextCount = Math.min(5, remaining);
+      const nextCount = Math.min(LOAD_MORE_STEP, remaining);
       loadMoreBtn.textContent = `Load ${nextCount} more reviews`;
     }
   }
 
   function renderVisibleReviews() {
+    if (!listEl) return;
+
     const filteredSorted = getFilteredSortedReviews();
     const totalVisible = Math.min(visibleCount, filteredSorted.length);
     const reviewsToRender = filteredSorted.slice(0, totalVisible);
@@ -649,6 +731,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           <p>Try changing the filter, search, or sort option to see more reviews.</p>
         </div>
       `;
+
       if (loadMoreBtn) loadMoreBtn.hidden = true;
       return;
     }
@@ -665,11 +748,23 @@ document.addEventListener("DOMContentLoaded", async () => {
     const totalReviews = Number(allReviews.length) || 0;
     const averageRating =
       totalReviews > 0
-        ? allReviews.reduce((sum, review) => sum + (Number(review.rating) || 0), 0) / totalReviews
+        ? allReviews.reduce(
+            (sum, review) => sum + (Number(review.rating) || 0),
+            0
+          ) / totalReviews
         : 0;
+
     const ratingStats = getRatingStats(allReviews);
 
-    summaryEl.innerHTML = renderSummary(averageRating, totalReviews, ratingStats, allReviews);
+    if (summaryEl) {
+      summaryEl.innerHTML = renderSummary(
+        averageRating,
+        totalReviews,
+        ratingStats,
+        allReviews
+      );
+    }
+
     renderVisibleReviews();
     bindSummaryActions();
   }
@@ -678,13 +773,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     const writeBtn = root.querySelector("#pr-summary-write-review-btn");
     const filter5Btn = root.querySelector("#pr-summary-filter-5-btn");
 
-    writeBtn?.addEventListener("click", () => {
-      openFormAndScroll();
-    });
+    writeBtn?.addEventListener("click", openFormAndScroll);
 
     filter5Btn?.addEventListener("click", () => {
       setActiveFilter("5");
-      root.querySelector(".pr-list-column")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      root
+        .querySelector(".pr-list-column")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }
 
@@ -693,10 +788,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     readMoreButtons.forEach((btn) => {
       btn.addEventListener("click", () => {
         const targetId = btn.getAttribute("data-target");
-        const target = root.querySelector(`#${targetId}`);
+        if (!targetId) return;
+
+        const target = root.querySelector(`#${CSS.escape(targetId)}`);
         if (!target) return;
 
         const expanded = btn.getAttribute("data-expanded") === "true";
+
         if (expanded) {
           target.classList.add("is-clamped");
           btn.textContent = "Read more";
@@ -713,10 +811,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     helpfulButtons.forEach((btn) => {
       btn.addEventListener("click", async () => {
         const id = btn.getAttribute("data-helpful");
-        const textEl = root.querySelector(`[data-helpful-text="${id}"]`);
-        const alreadyMarked = btn.getAttribute("data-marked") === "true";
-
         if (!id) return;
+
+        const textEl = root.querySelector(`[data-helpful-text="${CSS.escape(id)}"]`);
+        const alreadyMarked = btn.getAttribute("data-marked") === "true";
 
         btn.disabled = true;
 
@@ -755,11 +853,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
           setMarkedHelpful(id, nextMarked);
 
-          const reviewIndex = allReviews.findIndex((review) => String(review.id) === String(id));
+          const reviewIndex = allReviews.findIndex(
+            (review) => String(review.id) === String(id)
+          );
           if (reviewIndex !== -1) {
             allReviews[reviewIndex].helpfulCount = nextCount;
           }
-        } catch (error) {
+        } catch {
           showToast("Failed to update helpful count", "error");
         } finally {
           btn.disabled = false;
@@ -771,7 +871,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     galleryButtons.forEach((btn) => {
       btn.addEventListener("click", () => {
         try {
-          const images = JSON.parse(btn.getAttribute("data-lightbox-images") || "[]");
+          const raw = btn.getAttribute("data-lightbox-images") || "";
+          const images = JSON.parse(decodeURIComponent(raw));
           const index = Number(btn.getAttribute("data-lightbox-index") || 0);
           openLightbox(images, index);
         } catch (error) {
@@ -783,7 +884,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function setActiveFilter(nextFilter) {
     currentFilter = nextFilter;
-    visibleCount = 5;
+    visibleCount = DEFAULT_VISIBLE_COUNT;
 
     filterChips.forEach((chip) => {
       chip.classList.toggle("is-active", chip.dataset.rating === nextFilter);
@@ -794,7 +895,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function setActiveSort(nextSort) {
     currentSort = nextSort;
-    visibleCount = 5;
+    visibleCount = DEFAULT_VISIBLE_COUNT;
 
     sortButtons.forEach((btn) => {
       btn.classList.toggle("is-active", btn.dataset.sort === nextSort);
@@ -806,9 +907,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   function updateStarUI(value) {
     const numericValue = Number(value) || 0;
     activeRating = numericValue;
-    if (ratingInput) ratingInput.value = numericValue ? String(numericValue) : "";
+
+    if (ratingInput) {
+      ratingInput.value = numericValue ? String(numericValue) : "";
+    }
+
     if (ratingLiveText) {
-      ratingLiveText.textContent = numericValue ? RATING_LABELS[numericValue] : "Select rating";
+      ratingLiveText.textContent = numericValue
+        ? RATING_LABELS[numericValue]
+        : "Select rating";
     }
 
     starButtons.forEach((btn) => {
@@ -824,7 +931,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       btn.addEventListener("mouseenter", () => {
         const hoverValue = Number(btn.dataset.value);
         starButtons.forEach((starBtn) => {
-          starBtn.classList.toggle("is-active", Number(starBtn.dataset.value) <= hoverValue);
+          starBtn.classList.toggle(
+            "is-active",
+            Number(starBtn.dataset.value) <= hoverValue
+          );
         });
       });
 
@@ -870,13 +980,22 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     files.forEach((file, index) => {
       const reader = new FileReader();
+
       reader.onload = (e) => {
         const item = document.createElement("div");
         item.className = "pr-image-preview-item";
         item.innerHTML = `
           <img src="${escapeHtml(e.target?.result || "")}" alt="Preview">
-          <button type="button" class="pr-image-preview-remove" data-remove-index="${index}" aria-label="Remove image">×</button>
+          <button
+            type="button"
+            class="pr-image-preview-remove"
+            data-remove-index="${index}"
+            aria-label="Remove image"
+          >
+            ×
+          </button>
         `;
+
         imagePreview.appendChild(item);
 
         const removeBtn = item.querySelector(".pr-image-preview-remove");
@@ -884,8 +1003,11 @@ document.addEventListener("DOMContentLoaded", async () => {
           selectedImages.splice(index, 1);
           updateFileInputFromSelectedImages();
           renderImagePreview(selectedImages);
+          clearFieldError("reviewImages", uploadDropzone);
+          uploadDropzone?.classList.remove("pr-invalid");
         });
       };
+
       reader.readAsDataURL(file);
     });
   }
@@ -903,7 +1025,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     );
 
     if (!validFiles.length) {
-      setFieldError("reviewImages", "Only JPG and PNG images are allowed.", uploadDropzone);
+      setFieldError(
+        "reviewImages",
+        "Only JPG and PNG images are allowed.",
+        uploadDropzone
+      );
       uploadDropzone?.classList.add("pr-invalid");
       showToast("Only JPG and PNG images are allowed.", "error");
       return;
@@ -992,23 +1118,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  function getErrorEl(fieldName) {
-    return root.querySelector(`[data-error-for="${fieldName}"]`);
-  }
-
-  function setFieldError(fieldName, message, inputEl) {
-    const errorEl = getErrorEl(fieldName);
-    if (errorEl) errorEl.textContent = message || "";
-    if (inputEl) inputEl.classList.add("pr-invalid");
-  }
-
-  function clearFieldError(fieldName, inputEl) {
-    const errorEl = getErrorEl(fieldName);
-    if (errorEl) errorEl.textContent = "";
-    if (inputEl) inputEl.classList.remove("pr-invalid");
-  }
-
   function validateForm(showErrors = true) {
+    if (!form) return false;
+
     const formData = new FormData(form);
 
     const customerName = formData.get("customerName")?.toString().trim() || "";
@@ -1017,25 +1129,32 @@ document.addEventListener("DOMContentLoaded", async () => {
     const message = formData.get("message")?.toString().trim() || "";
     const rating = Number(ratingInput?.value || 0);
 
+    const nameInput = root.querySelector("#pr-customer-name");
+    const emailInput = root.querySelector("#pr-customer-email");
+
     let isValid = true;
 
     if (!customerName) {
       isValid = false;
-      if (showErrors) setFieldError("customerName", "Name is required.", root.querySelector("#pr-customer-name"));
+      if (showErrors) {
+        setFieldError("customerName", "Name is required.", nameInput);
+      }
     } else {
-      clearFieldError("customerName", root.querySelector("#pr-customer-name"));
+      clearFieldError("customerName", nameInput);
     }
 
     if (customerEmail) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(customerEmail)) {
         isValid = false;
-        if (showErrors) setFieldError("customerEmail", "Please enter a valid email.", root.querySelector("#pr-customer-email"));
+        if (showErrors) {
+          setFieldError("customerEmail", "Please enter a valid email.", emailInput);
+        }
       } else {
-        clearFieldError("customerEmail", root.querySelector("#pr-customer-email"));
+        clearFieldError("customerEmail", emailInput);
       }
     } else {
-      clearFieldError("customerEmail", root.querySelector("#pr-customer-email"));
+      clearFieldError("customerEmail", emailInput);
     }
 
     if (!rating) {
@@ -1047,24 +1166,40 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (title.length > 80) {
       isValid = false;
-      if (showErrors) setFieldError("title", "Title should be 80 characters or less.", titleInput);
+      if (showErrors) {
+        setFieldError("title", "Title should be 80 characters or less.", titleInput);
+      }
     } else {
       clearFieldError("title", titleInput);
     }
 
     if (!message) {
       isValid = false;
-      if (showErrors) setFieldError("message", "Message is required.", messageInput);
+      if (showErrors) {
+        setFieldError("message", "Message is required.", messageInput);
+      }
     } else if (message.length < 20) {
       isValid = false;
-      if (showErrors) setFieldError("message", "Please write at least 20 characters for a better review.", messageInput);
+      if (showErrors) {
+        setFieldError(
+          "message",
+          "Please write at least 20 characters for a better review.",
+          messageInput
+        );
+      }
     } else {
       clearFieldError("message", messageInput);
     }
 
     if (selectedImages.length > MAX_REVIEW_IMAGES) {
       isValid = false;
-      if (showErrors) setFieldError("reviewImages", `You can upload up to ${MAX_REVIEW_IMAGES} images only.`, uploadDropzone);
+      if (showErrors) {
+        setFieldError(
+          "reviewImages",
+          `You can upload up to ${MAX_REVIEW_IMAGES} images only.`,
+          uploadDropzone
+        );
+      }
     } else {
       clearFieldError("reviewImages", uploadDropzone);
     }
@@ -1077,11 +1212,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     const emailInput = root.querySelector("#pr-customer-email");
 
     nameInput?.addEventListener("input", () => {
-      if (nameInput.value.trim()) clearFieldError("customerName", nameInput);
+      if (nameInput.value.trim()) {
+        clearFieldError("customerName", nameInput);
+      }
     });
 
     emailInput?.addEventListener("input", () => {
       const email = emailInput.value.trim();
+
       if (!email) {
         clearFieldError("customerEmail", emailInput);
         return;
@@ -1096,7 +1234,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     titleInput?.addEventListener("input", () => {
       const count = titleInput.value.length;
       if (titleCount) titleCount.textContent = `${count} / 80`;
-      if (count <= 80) clearFieldError("title", titleInput);
+
+      if (count <= 80) {
+        clearFieldError("title", titleInput);
+      }
     });
 
     messageInput?.addEventListener("input", () => {
@@ -1114,11 +1255,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     formContainer.classList.remove("is-collapsed");
     formContainer.classList.add("is-open");
+
     toggleFormBtn.setAttribute("aria-expanded", "true");
     toggleFormBtn.textContent = "Hide form";
 
-    const formSection = root.querySelector(".pr-form-section-card");
-    formSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+    root
+      .querySelector(".pr-form-section-card")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function bindFormToggle() {
@@ -1126,13 +1269,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       const isOpen = formContainer?.classList.contains("is-open");
 
       if (isOpen) {
-        formContainer.classList.remove("is-open");
-        formContainer.classList.add("is-collapsed");
+        formContainer?.classList.remove("is-open");
+        formContainer?.classList.add("is-collapsed");
         toggleFormBtn.setAttribute("aria-expanded", "false");
         toggleFormBtn.textContent = "Write a review";
       } else {
-        formContainer.classList.remove("is-collapsed");
-        formContainer.classList.add("is-open");
+        formContainer?.classList.remove("is-collapsed");
+        formContainer?.classList.add("is-open");
         toggleFormBtn.setAttribute("aria-expanded", "true");
         toggleFormBtn.textContent = "Hide form";
       }
@@ -1140,7 +1283,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function openLightbox(images, index = 0) {
-    if (!lightbox || !lightboxImage || !Array.isArray(images) || !images.length) return;
+    if (
+      !lightbox ||
+      !lightboxImage ||
+      !Array.isArray(images) ||
+      !images.length
+    ) {
+      return;
+    }
 
     lightboxImages = images;
     lightboxIndex = Math.max(0, Math.min(index, images.length - 1));
@@ -1165,7 +1315,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function showPrevLightbox() {
     if (!lightboxImages.length) return;
-    lightboxIndex = (lightboxIndex - 1 + lightboxImages.length) % lightboxImages.length;
+    lightboxIndex =
+      (lightboxIndex - 1 + lightboxImages.length) % lightboxImages.length;
     updateLightbox();
   }
 
@@ -1222,7 +1373,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         : [];
 
       renderReviewsState();
-    } catch (error) {
+    } catch {
       renderErrorState("Failed to load reviews");
     }
   }
@@ -1241,12 +1392,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   searchInput?.addEventListener("input", (e) => {
     currentSearch = e.target.value || "";
-    visibleCount = 5;
+    visibleCount = DEFAULT_VISIBLE_COUNT;
     renderVisibleReviews();
   });
 
   loadMoreBtn?.addEventListener("click", () => {
-    visibleCount += 5;
+    visibleCount += LOAD_MORE_STEP;
     renderVisibleReviews();
   });
 
@@ -1254,13 +1405,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      messageEl.className = "pr-message-box";
-      messageEl.textContent = "";
+      if (messageEl) {
+        messageEl.className = "pr-message-box";
+        messageEl.textContent = "";
+      }
 
       const isValid = validateForm(true);
+
       if (!isValid) {
-        messageEl.className = "pr-message-box pr-message-error";
-        messageEl.textContent = "Please fix the highlighted fields.";
+        if (messageEl) {
+          messageEl.className = "pr-message-box pr-message-error";
+          messageEl.textContent = "Please fix the highlighted fields.";
+        }
         showToast("Please fix the highlighted fields.", "error");
         return;
       }
@@ -1302,8 +1458,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         const result = await response.json();
 
         if (!response.ok || !result.success) {
-          messageEl.className = "pr-message-box pr-message-error";
-          messageEl.textContent = result.message || "Failed to submit review";
+          if (messageEl) {
+            messageEl.className = "pr-message-box pr-message-error";
+            messageEl.textContent = result.message || "Failed to submit review";
+          }
+
           showToast(result.message || "Failed to submit review", "error");
 
           if (submitBtn) {
@@ -1313,8 +1472,12 @@ document.addEventListener("DOMContentLoaded", async () => {
           return;
         }
 
-        messageEl.className = "pr-message-box pr-message-success";
-        messageEl.textContent = result.message || "Review submitted successfully.";
+        if (messageEl) {
+          messageEl.className = "pr-message-box pr-message-success";
+          messageEl.textContent =
+            result.message || "Review submitted successfully.";
+        }
+
         showToast("Thanks for sharing your feedback!", "success");
 
         form.reset();
@@ -1323,6 +1486,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (imagePreview) imagePreview.innerHTML = "";
         if (imagePreviewWrap) imagePreviewWrap.hidden = true;
+
         updateStarUI(0);
 
         if (titleCount) titleCount.textContent = "0 / 80";
@@ -1337,9 +1501,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         uploadDropzone?.classList.remove("pr-invalid");
 
         await loadReviews();
-      } catch (error) {
-        messageEl.className = "pr-message-box pr-message-error";
-        messageEl.textContent = "Something went wrong while submitting review.";
+      } catch {
+        if (messageEl) {
+          messageEl.className = "pr-message-box pr-message-error";
+          messageEl.textContent =
+            "Something went wrong while submitting review.";
+        }
+
         showToast("Something went wrong while submitting review.", "error");
       } finally {
         if (submitBtn) {

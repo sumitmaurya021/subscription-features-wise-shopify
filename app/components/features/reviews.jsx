@@ -15,6 +15,7 @@ import {
   Spinner,
   Banner,
   Box,
+  Divider,
 } from "@shopify/polaris";
 
 const GRAPHQL_ENDPOINT = "/graphql";
@@ -219,37 +220,34 @@ function formatDate(dateValue) {
 }
 
 function renderStars(rating) {
-  const safeRating = Number(rating || 0);
+  const safeRating = Math.max(0, Math.min(5, Number(rating || 0)));
   return "★".repeat(safeRating) + "☆".repeat(5 - safeRating);
 }
 
 function getStatusStyles(status) {
   if (status === "approved") {
     return {
-      color: "#166534",
-      background: "linear-gradient(135deg, #ecfdf3 0%, #dcfce7 100%)",
-      border: "1px solid rgba(22, 101, 52, 0.16)",
-      dot: "#22c55e",
-      shadow: "0 8px 18px rgba(34, 197, 94, 0.12)",
+      color: "#065f46",
+      background: "#ecfdf5",
+      border: "1px solid #a7f3d0",
+      dot: "#10b981",
     };
   }
 
   if (status === "rejected") {
     return {
       color: "#991b1b",
-      background: "linear-gradient(135deg, #fff1f2 0%, #fee2e2 100%)",
-      border: "1px solid rgba(153, 27, 27, 0.14)",
+      background: "#fef2f2",
+      border: "1px solid #fecaca",
       dot: "#ef4444",
-      shadow: "0 8px 18px rgba(239, 68, 68, 0.10)",
     };
   }
 
   return {
     color: "#92400e",
-    background: "linear-gradient(135deg, #fffaf0 0%, #fef3c7 100%)",
-    border: "1px solid rgba(146, 64, 14, 0.14)",
+    background: "#fffbeb",
+    border: "1px solid #fde68a",
     dot: "#f59e0b",
-    shadow: "0 8px 18px rgba(245, 158, 11, 0.12)",
   };
 }
 
@@ -261,51 +259,49 @@ function StatusPill({ status }) {
       style={{
         display: "inline-flex",
         alignItems: "center",
-        gap: "8px",
-        padding: "8px 14px",
-        borderRadius: "999px",
+        gap: 8,
+        padding: "6px 12px",
+        borderRadius: 999,
         background: styles.background,
         border: styles.border,
-        boxShadow: styles.shadow,
         color: styles.color,
-        fontSize: "13px",
+        fontSize: 12,
         fontWeight: 700,
         textTransform: "capitalize",
-        letterSpacing: "0.2px",
+        lineHeight: 1,
       }}
     >
       <span
         style={{
-          width: "8px",
-          height: "8px",
-          borderRadius: "999px",
+          width: 8,
+          height: 8,
+          borderRadius: 999,
           background: styles.dot,
           display: "inline-block",
         }}
       />
-      {status}
+      {status || "pending"}
     </div>
   );
 }
 
-function StatCard({ title, value, tone = "base" }) {
+function StatCard({ title, value, helper, tone = "base" }) {
+  const backgroundMap = {
+    base: "#ffffff",
+    success: "#f0fdf4",
+    warning: "#fffbeb",
+    critical: "#fef2f2",
+  };
+
   return (
     <div
       style={{
-        minWidth: "220px",
-        flex: "1 1 220px",
-        borderRadius: "20px",
-        padding: "20px 22px",
-        background:
-          tone === "success"
-            ? "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)"
-            : tone === "warning"
-            ? "linear-gradient(135deg, #fffaf0 0%, #fef3c7 100%)"
-            : tone === "critical"
-            ? "linear-gradient(135deg, #fff5f5 0%, #fee2e2 100%)"
-            : "linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)",
-        border: "1px solid rgba(15, 23, 42, 0.08)",
-        boxShadow: "0 10px 30px rgba(15, 23, 42, 0.06)",
+        background: backgroundMap[tone] || "#ffffff",
+        border: "1px solid #e5e7eb",
+        borderRadius: 16,
+        padding: 18,
+        minHeight: 108,
+        boxShadow: "0 1px 2px rgba(16, 24, 40, 0.04)",
       }}
     >
       <BlockStack gap="100">
@@ -315,16 +311,262 @@ function StatCard({ title, value, tone = "base" }) {
         <Text as="h3" variant="heading2xl">
           {value}
         </Text>
+        {helper ? (
+          <Text as="span" variant="bodySm" tone="subdued">
+            {helper}
+          </Text>
+        ) : null}
       </BlockStack>
     </div>
   );
 }
 
-function TableLabel({ children }) {
+function FieldLabel({ children }) {
   return (
-    <Text as="p" variant="bodySm" tone="subdued">
+    <Text as="span" variant="bodySm" tone="subdued">
       {children}
     </Text>
+  );
+}
+
+function InfoLine({ label, value, breakWord = false }) {
+  return (
+    <div>
+      <FieldLabel>{label}</FieldLabel>
+      <div
+        style={{
+          marginTop: 4,
+          wordBreak: breakWord ? "break-word" : "normal",
+          overflowWrap: breakWord ? "anywhere" : "normal",
+        }}
+      >
+        <Text as="p" variant="bodySm">
+          {value || "-"}
+        </Text>
+      </div>
+    </div>
+  );
+}
+
+function ReviewImageThumb({ src, alt }) {
+  return (
+    <img
+      src={src}
+      alt={alt}
+      style={{
+        width: 52,
+        height: 52,
+        objectFit: "cover",
+        borderRadius: 10,
+        border: "1px solid #e5e7eb",
+        display: "block",
+        background: "#f9fafb",
+      }}
+    />
+  );
+}
+
+function ReviewCard({
+  review,
+  openEditModal,
+  handleApprove,
+  handleReject,
+  handleDelete,
+  handlePin,
+  handleUnpin,
+  approveLoadingId,
+  rejectLoadingId,
+  deleteLoadingId,
+  pinLoadingId,
+}) {
+  return (
+    <div
+      style={{
+        border: "1px solid #e5e7eb",
+        borderRadius: 18,
+        overflow: "hidden",
+        background: "#ffffff",
+        boxShadow: "0 1px 2px rgba(16, 24, 40, 0.04)",
+      }}
+    >
+      <div
+        style={{
+          padding: 18,
+          borderBottom: "1px solid #f1f5f9",
+          background: "#fcfcfd",
+        }}
+      >
+        <InlineStack align="space-between" blockAlign="start" wrap gap="300">
+          <BlockStack gap="050">
+            <InlineStack gap="200" wrap blockAlign="center">
+              <Text as="h3" variant="headingMd">
+                {review.productTitle || "Untitled Product"}
+              </Text>
+              {review.isPinned ? <Badge tone="info">Pinned</Badge> : null}
+            </InlineStack>
+            <Text as="p" variant="bodySm" tone="subdued">
+              Product ID: {review.productId || "-"} · Shop: {review.shop || "-"}
+            </Text>
+          </BlockStack>
+
+          <InlineStack gap="200" wrap blockAlign="center">
+            <StatusPill status={review.status} />
+            <Badge tone={getBadgeTone(review.status)}>
+              {review.rating}/5 · {renderStars(review.rating)}
+            </Badge>
+          </InlineStack>
+        </InlineStack>
+      </div>
+
+      <div style={{ padding: 18 }}>
+        <BlockStack gap="400">
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(220px, 1fr) minmax(220px, 1fr) minmax(220px, 1fr)",
+              gap: 16,
+            }}
+          >
+            <div
+              style={{
+                padding: 14,
+                background: "#f8fafc",
+                border: "1px solid #e5e7eb",
+                borderRadius: 14,
+              }}
+            >
+              <BlockStack gap="200">
+                <Text as="h4" variant="headingSm">
+                  Customer
+                </Text>
+                <InfoLine label="Name" value={review.customerName} breakWord />
+                <InfoLine label="Email" value={review.customerEmail} breakWord />
+              </BlockStack>
+            </div>
+
+            <div
+              style={{
+                padding: 14,
+                background: "#f8fafc",
+                border: "1px solid #e5e7eb",
+                borderRadius: 14,
+              }}
+            >
+              <BlockStack gap="200">
+                <Text as="h4" variant="headingSm">
+                  Review Meta
+                </Text>
+                <InfoLine label="Title" value={review.title} breakWord />
+                <InfoLine
+                  label="Helpful Count"
+                  value={String(Number(review.helpfulCount || 0))}
+                />
+                <InfoLine label="Created" value={formatDate(review.createdAt)} />
+              </BlockStack>
+            </div>
+
+            <div
+              style={{
+                padding: 14,
+                background: "#f8fafc",
+                border: "1px solid #e5e7eb",
+                borderRadius: 14,
+              }}
+            >
+              <BlockStack gap="200">
+                <Text as="h4" variant="headingSm">
+                  Images
+                </Text>
+                {Array.isArray(review.reviewImages) && review.reviewImages.length ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 8,
+                    }}
+                  >
+                    {review.reviewImages.map((img, i) => (
+                      <ReviewImageThumb
+                        key={i}
+                        src={img}
+                        alt={`Review image ${i + 1}`}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    No images uploaded
+                  </Text>
+                )}
+              </BlockStack>
+            </div>
+          </div>
+
+          <div
+            style={{
+              padding: 16,
+              background: "#ffffff",
+              border: "1px solid #e5e7eb",
+              borderRadius: 14,
+            }}
+          >
+            <BlockStack gap="150">
+              <FieldLabel>Review Message</FieldLabel>
+              <Text as="p" variant="bodyMd">
+                {review.message || "-"}
+              </Text>
+            </BlockStack>
+          </div>
+
+          <InlineStack gap="200" wrap>
+            <Button onClick={() => openEditModal(review)}>Edit</Button>
+
+            <Button
+              variant="primary"
+              tone="success"
+              loading={approveLoadingId === review.id}
+              onClick={() => handleApprove(review.id)}
+            >
+              Approve
+            </Button>
+
+            <Button
+              tone="critical"
+              loading={rejectLoadingId === review.id}
+              onClick={() => handleReject(review.id)}
+            >
+              Reject
+            </Button>
+
+            {review.isPinned ? (
+              <Button
+                loading={pinLoadingId === review.id}
+                onClick={() => handleUnpin(review.id)}
+              >
+                Unpin
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                loading={pinLoadingId === review.id}
+                onClick={() => handlePin(review.id)}
+              >
+                Pin
+              </Button>
+            )}
+
+            <Button
+              variant="primary"
+              tone="critical"
+              loading={deleteLoadingId === review.id}
+              onClick={() => handleDelete(review.id)}
+            >
+              Delete
+            </Button>
+          </InlineStack>
+        </BlockStack>
+      </div>
+    </div>
   );
 }
 
@@ -390,6 +632,7 @@ export default function ReviewsPage() {
     const approved = reviews.filter((r) => r.status === "approved").length;
     const pending = reviews.filter((r) => r.status === "pending").length;
     const rejected = reviews.filter((r) => r.status === "rejected").length;
+    const pinned = reviews.filter((r) => Boolean(r.isPinned)).length;
 
     const average =
       total > 0
@@ -398,7 +641,7 @@ export default function ReviewsPage() {
           ).toFixed(1)
         : "0.0";
 
-    return { total, approved, pending, rejected, average };
+    return { total, approved, pending, rejected, pinned, average };
   }, [reviews]);
 
   const resetForm = () => {
@@ -571,7 +814,7 @@ export default function ReviewsPage() {
     }
   };
 
-    const handlePin = async (id) => {
+  const handlePin = async (id) => {
     try {
       setPinLoadingId(id);
       setPageError("");
@@ -613,10 +856,16 @@ export default function ReviewsPage() {
     }
   };
 
+  const resetFilters = () => {
+    setStatusFilter("");
+    setShopFilter("");
+    setProductIdFilter("");
+  };
+
   return (
     <Page
       title="Product Reviews"
-      subtitle="Manage, moderate and maintain customer trust with a beautifully organized review workspace."
+      subtitle="Clean, compact, and professional review moderation dashboard."
       primaryAction={{ content: "Create review", onAction: openCreateModal }}
     >
       <Layout>
@@ -636,22 +885,31 @@ export default function ReviewsPage() {
 
             <Card roundedAbove="sm">
               <BlockStack gap="400">
-                <Text as="h2" variant="headingLg">
-                  Review Overview
-                </Text>
+                <InlineStack align="space-between" wrap gap="300">
+                  <BlockStack gap="050">
+                    <Text as="h2" variant="headingLg">
+                      Review Overview
+                    </Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Quick insight into moderation status and rating quality.
+                    </Text>
+                  </BlockStack>
+
+                  <Badge tone="info">{reviewStats.total} total reviews</Badge>
+                </InlineStack>
 
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                    gap: "16px",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                    gap: 14,
                   }}
                 >
                   <StatCard title="Total Reviews" value={reviewStats.total} />
                   <StatCard
                     title="Average Rating"
-                    value={reviewStats.average}
-                    tone="base"
+                    value={`${reviewStats.average}/5`}
+                    helper={renderStars(Math.round(Number(reviewStats.average)))}
                   />
                   <StatCard
                     title="Approved"
@@ -668,6 +926,7 @@ export default function ReviewsPage() {
                     value={reviewStats.rejected}
                     tone="critical"
                   />
+                  <StatCard title="Pinned" value={reviewStats.pinned} />
                 </div>
               </BlockStack>
             </Card>
@@ -675,29 +934,30 @@ export default function ReviewsPage() {
             <Card roundedAbove="sm">
               <BlockStack gap="400">
                 <InlineStack align="space-between" wrap gap="300">
-                  <Text as="h2" variant="headingMd">
-                    Filters
-                  </Text>
+                  <BlockStack gap="050">
+                    <Text as="h2" variant="headingMd">
+                      Filters
+                    </Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Narrow down reviews by moderation status, shop, or product.
+                    </Text>
+                  </BlockStack>
 
                   <InlineStack gap="200" wrap>
-                    <Button onClick={fetchReviews}>Apply filters</Button>
-                    <Button
-                      onClick={() => {
-                        setStatusFilter("");
-                        setShopFilter("");
-                        setProductIdFilter("");
-                      }}
-                    >
-                      Reset
+                    <Button variant="primary" onClick={fetchReviews}>
+                      Apply filters
                     </Button>
+                    <Button onClick={resetFilters}>Reset</Button>
                   </InlineStack>
                 </InlineStack>
+
+                <Divider />
 
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-                    gap: "16px",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                    gap: 14,
                   }}
                 >
                   <Select
@@ -712,6 +972,7 @@ export default function ReviewsPage() {
                     value={shopFilter}
                     onChange={setShopFilter}
                     autoComplete="off"
+                    placeholder="Enter shop domain"
                   />
 
                   <TextField
@@ -719,385 +980,69 @@ export default function ReviewsPage() {
                     value={productIdFilter}
                     onChange={setProductIdFilter}
                     autoComplete="off"
+                    placeholder="Enter product ID"
                   />
                 </div>
               </BlockStack>
             </Card>
 
-            <Card padding="0" roundedAbove="sm">
+            <Card roundedAbove="sm">
               <BlockStack gap="0">
-                <div
-                  style={{
-                    padding: "20px 20px 0 20px",
-                  }}
-                >
+                <div style={{ padding: 20 }}>
                   <InlineStack align="space-between" wrap gap="300">
-                    <Text as="h2" variant="headingLg">
-                      All Reviews
-                    </Text>
-                    <Badge tone={getBadgeTone(reviews.length ? "approved" : "pending")}>
+                    <BlockStack gap="050">
+                      <Text as="h2" variant="headingLg">
+                        All Reviews
+                      </Text>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        Compact card layout for easier reading and better admin actions.
+                      </Text>
+                    </BlockStack>
+
+                    <Badge tone={reviews.length ? "success" : "attention"}>
                       {reviews.length} items
                     </Badge>
                   </InlineStack>
                 </div>
 
+                <Divider />
+
                 {loading ? (
-                  <Box paddingBlockStart="400" paddingBlockEnd="400">
+                  <Box padding="600">
                     <InlineStack align="center">
                       <Spinner size="large" />
                     </InlineStack>
                   </Box>
                 ) : reviews.length === 0 ? (
-                  <div style={{ padding: "20px" }}>
+                  <div style={{ padding: 20 }}>
                     <EmptyState
                       heading="No reviews found"
                       image="https://cdn.shopify.com/s/files/1/0757/9955/files/empty-state.svg"
                       action={{ content: "Create review", onAction: openCreateModal }}
                     >
-                      <p>Create your first review or adjust the current filters.</p>
+                      <p>Create your first review or change the current filters.</p>
                     </EmptyState>
                   </div>
                 ) : (
-                  <div
-                    style={{
-                      width: "100%",
-                      overflowX: "auto",
-                      padding: "20px",
-                    }}
-                  >
-                    <table
-                      style={{
-                        width: "100%",
-                        borderCollapse: "separate",
-                        borderSpacing: 0,
-                        minWidth: "1450px",
-                        background: "#ffffff",
-                        border: "1px solid rgba(15, 23, 42, 0.08)",
-                        borderRadius: "18px",
-                        overflow: "hidden",
-                      }}
-                    >
-                      <thead>
-                        <tr
-                          style={{
-                            background:
-                              "linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)",
-                          }}
-                        >
-                          {[
-                            "Product",
-                            "Customer",
-                            "Rating",
-                            "Status",
-                            "Pinned",
-                            "Message",
-                            "Images",
-                            "helpfulCount",
-                            "Created",
-                            "Actions",
-                          ].map((heading) => (
-                            <th
-                              key={heading}
-                              style={{
-                                textAlign: "left",
-                                padding: "16px 18px",
-                                fontSize: "13px",
-                                fontWeight: 700,
-                                color: "#334155",
-                                borderBottom: "1px solid rgba(15, 23, 42, 0.08)",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {heading}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-
-                      <tbody>
-                        {reviews.map((review, index) => (
-                          <tr
-                            key={review.id}
-                            style={{
-                              background: index % 2 === 0 ? "#ffffff" : "#fcfdff",
-                            }}
-                          >
-                            <td
-                              style={{
-                                padding: "18px",
-                                verticalAlign: "top",
-                                borderBottom: "1px solid rgba(15, 23, 42, 0.06)",
-                                minWidth: "240px",
-                                maxWidth: "300px",
-                                whiteSpace: "normal",
-                                wordBreak: "break-word",
-                                overflowWrap: "anywhere",
-                              }}
-                            >
-                              <BlockStack gap="100">
-                                <Text as="p" variant="bodyMd" fontWeight="semibold">
-                                  {review.productTitle || "Untitled Product"}
-                                </Text>
-                                <TableLabel>Product ID</TableLabel>
-                                <Text as="p" variant="bodySm">
-                                  {review.productId || "-"}
-                                </Text>
-                                <TableLabel>Shop</TableLabel>
-                                <Text as="p" variant="bodySm">
-                                  {review.shop || "-"}
-                                </Text>
-                              </BlockStack>
-                            </td>
-
-                            <td
-                              style={{
-                                padding: "18px",
-                                verticalAlign: "top",
-                                borderBottom: "1px solid rgba(15, 23, 42, 0.06)",
-                                minWidth: "220px",
-                                maxWidth: "280px",
-                                whiteSpace: "normal",
-                                wordBreak: "break-word",
-                                overflowWrap: "anywhere",
-                              }}
-                            >
-                              <BlockStack gap="100">
-                                <Text as="p" variant="bodyMd" fontWeight="semibold">
-                                  {review.customerName || "-"}
-                                </Text>
-                                <Text as="p" variant="bodySm" tone="subdued">
-                                  {review.customerEmail || "-"}
-                                </Text>
-                                {review.title ? (
-                                  <>
-                                    <TableLabel>Review Title</TableLabel>
-                                    <Text as="p" variant="bodySm">
-                                      {review.title}
-                                    </Text>
-                                  </>
-                                ) : null}
-                              </BlockStack>
-                            </td>
-
-                            <td
-                              style={{
-                                padding: "18px",
-                                verticalAlign: "top",
-                                borderBottom: "1px solid rgba(15, 23, 42, 0.06)",
-                                minWidth: "150px",
-                                whiteSpace: "normal",
-                              }}
-                            >
-                              <BlockStack gap="100">
-                                <Text
-                                  as="p"
-                                  variant="bodyMd"
-                                  fontWeight="semibold"
-                                >
-                                  {review.rating}/5
-                                </Text>
-                                <Text
-                                  as="p"
-                                  variant="bodySm"
-                                  tone="subdued"
-                                >
-                                  {renderStars(review.rating)}
-                                </Text>
-                              </BlockStack>
-                            </td>
-
-                            <td
-                              style={{
-                                padding: "18px",
-                                verticalAlign: "top",
-                                borderBottom: "1px solid rgba(15, 23, 42, 0.06)",
-                                minWidth: "150px",
-                              }}
-                            >
-                              <StatusPill status={review.status} />
-                            </td>
-
-                            <td
-                              style={{
-                                padding: "18px",
-                                verticalAlign: "top",
-                                borderBottom: "1px solid rgba(15, 23, 42, 0.06)",
-                                minWidth: "140px",
-                              }}
-                            >
-                              {review.isPinned ? (
-                                <div
-                                  style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: "8px",
-                                    padding: "8px 14px",
-                                    borderRadius: "999px",
-                                    background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
-                                    border: "1px solid rgba(37, 99, 235, 0.15)",
-                                    color: "#1d4ed8",
-                                    fontSize: "13px",
-                                    fontWeight: 700,
-                                  }}
-                                >
-                                  📌 Pinned
-                                </div>
-                              ) : (
-                                <Text as="p" variant="bodySm" tone="subdued">
-                                  Not pinned
-                                </Text>
-                              )}
-                            </td>
-
-                            <td
-                              style={{
-                                padding: "18px",
-                                verticalAlign: "top",
-                                borderBottom: "1px solid rgba(15, 23, 42, 0.06)",
-                                minWidth: "360px",
-                                maxWidth: "520px",
-                                whiteSpace: "normal",
-                                wordBreak: "break-word",
-                                overflowWrap: "anywhere",
-                                lineHeight: "1.6",
-                              }}
-                            >
-                              <BlockStack gap="100">
-                                <Text as="p" variant="bodyMd">
-                                  {review.message || "-"}
-                                </Text>
-                              </BlockStack>
-                            </td>
-                              <td
-                                style={{
-                                  padding: "18px",
-                                  verticalAlign: "top",
-                                  borderBottom: "1px solid rgba(15, 23, 42, 0.06)",
-                                  minWidth: "220px",
-                                }}
-                              >
-                                {Array.isArray(review.reviewImages) && review.reviewImages.length ? (
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      flexWrap: "wrap",
-                                      gap: "8px",
-                                    }}
-                                  >
-                                    {review.reviewImages.map((img, i) => (
-                                      <img
-                                        key={i}
-                                        src={img}
-                                        alt={`Review ${i + 1}`}
-                                        style={{
-                                          width: "56px",
-                                          height: "56px",
-                                          objectFit: "cover",
-                                          borderRadius: "10px",
-                                          border: "1px solid rgba(15, 23, 42, 0.08)",
-                                        }}
-                                      />
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <Text as="p" variant="bodySm" tone="subdued">
-                                    No images
-                                  </Text>
-                                )}
-                              </td>
-                              <td
-                                style={{
-                                  padding: "18px",
-                                  verticalAlign: "top",
-                                  borderBottom: "1px solid rgba(15, 23, 42, 0.06)",
-                                  minWidth: "120px",
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                <Text as="p" variant="bodyMd" fontWeight="semibold">
-                                  {Number(review.helpfulCount || 0)}
-                                </Text>
-                              </td>
-                            <td
-                              style={{
-                                padding: "18px",
-                                verticalAlign: "top",
-                                borderBottom: "1px solid rgba(15, 23, 42, 0.06)",
-                                minWidth: "140px",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              <Text as="p" variant="bodyMd">
-                                {formatDate(review.createdAt)}
-                              </Text>
-                            </td>
-
-                            <td
-                              style={{
-                                padding: "18px",
-                                verticalAlign: "top",
-                                borderBottom: "1px solid rgba(15, 23, 42, 0.06)",
-                                minWidth: "240px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  display: "flex",
-                                  flexWrap: "wrap",
-                                  gap: "8px",
-                                }}
-                              >
-                                <Button onClick={() => openEditModal(review)}>
-                                  Edit
-                                </Button>
-
-                                <Button
-                                  variant="primary"
-                                  tone="success"
-                                  loading={approveLoadingId === review.id}
-                                  onClick={() => handleApprove(review.id)}
-                                >
-                                  Approve
-                                </Button>
-
-                                <Button
-                                  tone="critical"
-                                  loading={rejectLoadingId === review.id}
-                                  onClick={() => handleReject(review.id)}
-                                >
-                                  Reject
-                                </Button>
-
-                                <Button
-                                  variant="primary"
-                                  tone="critical"
-                                  loading={deleteLoadingId === review.id}
-                                  onClick={() => handleDelete(review.id)}
-                                >
-                                  Delete
-                                </Button>
-                                {review.isPinned ? (
-                                  <Button
-                                    loading={pinLoadingId === review.id}
-                                    onClick={() => handleUnpin(review.id)}
-                                  >
-                                    Unpin
-                                  </Button>
-                                ) : (
-                                  <Button
-                                    variant="primary"
-                                    loading={pinLoadingId === review.id}
-                                    onClick={() => handlePin(review.id)}
-                                  >
-                                    Pin
-                                  </Button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div style={{ padding: 20 }}>
+                    <BlockStack gap="300">
+                      {reviews.map((review) => (
+                        <ReviewCard
+                          key={review.id}
+                          review={review}
+                          openEditModal={openEditModal}
+                          handleApprove={handleApprove}
+                          handleReject={handleReject}
+                          handleDelete={handleDelete}
+                          handlePin={handlePin}
+                          handleUnpin={handleUnpin}
+                          approveLoadingId={approveLoadingId}
+                          rejectLoadingId={rejectLoadingId}
+                          deleteLoadingId={deleteLoadingId}
+                          pinLoadingId={pinLoadingId}
+                        />
+                      ))}
+                    </BlockStack>
                   </div>
                 )}
               </BlockStack>
