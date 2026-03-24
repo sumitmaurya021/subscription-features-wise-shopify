@@ -58,7 +58,7 @@ export default function PlanCard({
             {name}
           </Text>
 
-          <InlineStack align="baseline" gap="100" align="center">
+          <InlineStack gap="100" align="center">
             <Text variant="heading2xl" as="p">
               ₹{price}
             </Text>
