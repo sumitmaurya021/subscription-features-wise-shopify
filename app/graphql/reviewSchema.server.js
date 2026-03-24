@@ -18,12 +18,58 @@ function parseReviewImages(value) {
   }
 }
 
+function normalizeYoutubeUrl(value) {
+  if (!value) return null;
+
+  const url = String(value).trim();
+
+  if (!url) return null;
+
+  try {
+    const parsed = new URL(url);
+
+    if (
+      parsed.hostname.includes("youtube.com") ||
+      parsed.hostname.includes("youtu.be")
+    ) {
+      let videoId = "";
+
+      if (parsed.hostname.includes("youtu.be")) {
+        videoId = parsed.pathname.replace("/", "").trim();
+      } else if (parsed.pathname === "/watch") {
+        videoId = parsed.searchParams.get("v") || "";
+      } else if (parsed.pathname.startsWith("/shorts/")) {
+        videoId = parsed.pathname.split("/shorts/")[1]?.split("/")[0] || "";
+      } else if (parsed.pathname.startsWith("/embed/")) {
+        videoId = parsed.pathname.split("/embed/")[1]?.split("/")[0] || "";
+      }
+
+      if (!videoId) return null;
+
+      return `https://www.youtube.com/embed/${videoId}`;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeVideoUrl(value) {
+  if (!value) return null;
+
+  const url = String(value).trim();
+  return url || null;
+}
+
 function normalizeReview(review) {
   if (!review) return null;
 
   return {
     ...review,
     reviewImages: parseReviewImages(review.reviewImages),
+    reviewVideoUrl: review.reviewVideoUrl || null,
+    reviewYoutubeUrl: review.reviewYoutubeUrl || null,
     helpfulCount: Number(review.helpfulCount || 0),
     isPinned: Boolean(review.isPinned),
     createdAt:
@@ -49,6 +95,8 @@ export const typeDefs = /* GraphQL */ `
     title: String
     message: String!
     reviewImages: [String!]!
+    reviewVideoUrl: String
+    reviewYoutubeUrl: String
     helpfulCount: Int!
     status: String!
     isPinned: Boolean!
@@ -87,6 +135,8 @@ export const typeDefs = /* GraphQL */ `
     title: String
     message: String!
     reviewImages: [String!]
+    reviewVideoUrl: String
+    reviewYoutubeUrl: String
   }
 
   input UpdateReviewInput {
@@ -97,6 +147,8 @@ export const typeDefs = /* GraphQL */ `
     title: String
     message: String
     reviewImages: [String!]
+    reviewVideoUrl: String
+    reviewYoutubeUrl: String
     status: String
     isPinned: Boolean
   }
@@ -131,10 +183,7 @@ export const resolvers = {
 
         const reviews = await prisma.review.findMany({
           where,
-          orderBy: [
-            { isPinned: "desc" },
-            { createdAt: "desc" },
-          ],
+          orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
         });
 
         return {
@@ -194,10 +243,7 @@ export const resolvers = {
 
         const reviews = await prisma.review.findMany({
           where,
-          orderBy: [
-            { isPinned: "desc" },
-            { createdAt: "desc" },
-          ],
+          orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
         });
 
         const totalReviews = reviews.length;
@@ -239,12 +285,15 @@ export const resolvers = {
           title,
           message,
           reviewImages,
+          reviewVideoUrl,
+          reviewYoutubeUrl,
         } = input;
 
         if (!shop || !productId || !customerName || !rating || !message) {
           return {
             success: false,
-            message: "shop, productId, customerName, rating, message are required",
+            message:
+              "shop, productId, customerName, rating, message are required",
             data: null,
           };
         }
@@ -273,6 +322,17 @@ export const resolvers = {
           };
         }
 
+        const normalizedVideoUrl = normalizeVideoUrl(reviewVideoUrl);
+        const normalizedYoutubeUrl = normalizeYoutubeUrl(reviewYoutubeUrl);
+
+        if (reviewYoutubeUrl && !normalizedYoutubeUrl) {
+          return {
+            success: false,
+            message: "Please enter a valid YouTube link",
+            data: null,
+          };
+        }
+
         const review = await prisma.review.create({
           data: {
             shop,
@@ -286,6 +346,8 @@ export const resolvers = {
             reviewImages: normalizedImages.length
               ? JSON.stringify(normalizedImages)
               : null,
+            reviewVideoUrl: normalizedVideoUrl,
+            reviewYoutubeUrl: normalizedYoutubeUrl,
             helpfulCount: 0,
             status: "pending",
           },
@@ -330,6 +392,18 @@ export const resolvers = {
               data: null,
             };
           }
+        }
+
+        if (
+          input.reviewYoutubeUrl !== undefined &&
+          input.reviewYoutubeUrl &&
+          !normalizeYoutubeUrl(input.reviewYoutubeUrl)
+        ) {
+          return {
+            success: false,
+            message: "Please enter a valid YouTube link",
+            data: null,
+          };
         }
 
         if (input.isPinned === true && !existingReview.isPinned) {
@@ -388,6 +462,14 @@ export const resolvers = {
               input.reviewImages !== undefined
                 ? nextReviewImages
                 : existingReview.reviewImages,
+            reviewVideoUrl:
+              input.reviewVideoUrl !== undefined
+                ? normalizeVideoUrl(input.reviewVideoUrl)
+                : existingReview.reviewVideoUrl,
+            reviewYoutubeUrl:
+              input.reviewYoutubeUrl !== undefined
+                ? normalizeYoutubeUrl(input.reviewYoutubeUrl)
+                : existingReview.reviewYoutubeUrl,
             status: input.status ?? existingReview.status,
             isPinned:
               input.isPinned !== undefined
@@ -481,8 +563,8 @@ export const resolvers = {
               eventType: "REVIEW_APPROVED",
               points:
                 Number(LOYALTY_CONFIG.points.reviewApproved || 25) +
-                ((Array.isArray(normalizedReview?.reviewImages) &&
-                  normalizedReview.reviewImages.length > 0)
+                (Array.isArray(normalizedReview?.reviewImages) &&
+                normalizedReview.reviewImages.length > 0
                   ? Number(LOYALTY_CONFIG.points.photoReviewBonus || 10)
                   : 0),
               reviewId: updatedReview.id,

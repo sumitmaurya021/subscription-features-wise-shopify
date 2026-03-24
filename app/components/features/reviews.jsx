@@ -37,6 +37,8 @@ const GET_REVIEWS_QUERY = `
         title
         message
         reviewImages
+        reviewVideoUrl
+        reviewYoutubeUrl
         helpfulCount
         status
         isPinned
@@ -63,6 +65,8 @@ const CREATE_REVIEW_MUTATION = `
         title
         message
         reviewImages
+        reviewVideoUrl
+        reviewYoutubeUrl
         helpfulCount
         status
         isPinned
@@ -89,6 +93,8 @@ const UPDATE_REVIEW_MUTATION = `
         title
         message
         reviewImages
+        reviewVideoUrl
+        reviewYoutubeUrl
         helpfulCount
         status
         isPinned
@@ -251,6 +257,39 @@ function getStatusStyles(status) {
   };
 }
 
+function getYoutubeEmbedUrl(url) {
+  if (!url) return null;
+
+  try {
+    const parsed = new URL(String(url).trim());
+
+    if (
+      parsed.hostname.includes("youtube.com") ||
+      parsed.hostname.includes("youtu.be")
+    ) {
+      let videoId = "";
+
+      if (parsed.hostname.includes("youtu.be")) {
+        videoId = parsed.pathname.replace("/", "").trim();
+      } else if (parsed.pathname === "/watch") {
+        videoId = parsed.searchParams.get("v") || "";
+      } else if (parsed.pathname.startsWith("/shorts/")) {
+        videoId = parsed.pathname.split("/shorts/")[1]?.split("/")[0] || "";
+      } else if (parsed.pathname.startsWith("/embed/")) {
+        videoId = parsed.pathname.split("/embed/")[1]?.split("/")[0] || "";
+      }
+
+      if (!videoId) return null;
+
+      return `https://www.youtube.com/embed/${videoId}`;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function StatusPill({ status }) {
   const styles = getStatusStyles(status);
 
@@ -366,6 +405,97 @@ function ReviewImageThumb({ src, alt }) {
   );
 }
 
+function ReviewMediaCard({ review }) {
+  const youtubeEmbedUrl =
+    getYoutubeEmbedUrl(review.reviewYoutubeUrl) || review.reviewYoutubeUrl;
+
+  return (
+    <div
+      style={{
+        padding: 14,
+        background: "#f8fafc",
+        border: "1px solid #e5e7eb",
+        borderRadius: 14,
+      }}
+    >
+      <BlockStack gap="200">
+        <Text as="h4" variant="headingSm">
+          Media
+        </Text>
+
+        {Array.isArray(review.reviewImages) && review.reviewImages.length ? (
+          <div>
+            <FieldLabel>Images</FieldLabel>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 8,
+                marginTop: 8,
+              }}
+            >
+              {review.reviewImages.map((img, i) => (
+                <ReviewImageThumb key={i} src={img} alt={`Review image ${i + 1}`} />
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {review.reviewVideoUrl ? (
+          <div>
+            <FieldLabel>Uploaded Video</FieldLabel>
+            <div style={{ marginTop: 8 }}>
+              <video
+                src={review.reviewVideoUrl}
+                controls
+                style={{
+                  width: "100%",
+                  maxWidth: 260,
+                  borderRadius: 12,
+                  border: "1px solid #e5e7eb",
+                  background: "#000",
+                  display: "block",
+                }}
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {youtubeEmbedUrl ? (
+          <div>
+            <FieldLabel>YouTube Video</FieldLabel>
+            <div style={{ marginTop: 8 }}>
+              <iframe
+                src={youtubeEmbedUrl}
+                title="Review YouTube video"
+                width="260"
+                height="160"
+                style={{
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 12,
+                  background: "#fff",
+                }}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {!(
+          (Array.isArray(review.reviewImages) && review.reviewImages.length) ||
+          review.reviewVideoUrl ||
+          youtubeEmbedUrl
+        ) ? (
+          <Text as="p" variant="bodySm" tone="subdued">
+            No media added
+          </Text>
+        ) : null}
+      </BlockStack>
+    </div>
+  );
+}
+
 function ReviewCard({
   review,
   openEditModal,
@@ -423,7 +553,8 @@ function ReviewCard({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "minmax(220px, 1fr) minmax(220px, 1fr) minmax(220px, 1fr)",
+              gridTemplateColumns:
+                "minmax(220px, 1fr) minmax(220px, 1fr) minmax(220px, 1fr)",
               gap: 16,
             }}
           >
@@ -440,7 +571,11 @@ function ReviewCard({
                   Customer
                 </Text>
                 <InfoLine label="Name" value={review.customerName} breakWord />
-                <InfoLine label="Email" value={review.customerEmail} breakWord />
+                <InfoLine
+                  label="Email"
+                  value={review.customerEmail}
+                  breakWord
+                />
               </BlockStack>
             </div>
 
@@ -465,41 +600,7 @@ function ReviewCard({
               </BlockStack>
             </div>
 
-            <div
-              style={{
-                padding: 14,
-                background: "#f8fafc",
-                border: "1px solid #e5e7eb",
-                borderRadius: 14,
-              }}
-            >
-              <BlockStack gap="200">
-                <Text as="h4" variant="headingSm">
-                  Images
-                </Text>
-                {Array.isArray(review.reviewImages) && review.reviewImages.length ? (
-                  <div
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: 8,
-                    }}
-                  >
-                    {review.reviewImages.map((img, i) => (
-                      <ReviewImageThumb
-                        key={i}
-                        src={img}
-                        alt={`Review image ${i + 1}`}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    No images uploaded
-                  </Text>
-                )}
-              </BlockStack>
-            </div>
+            <ReviewMediaCard review={review} />
           </div>
 
           <div
@@ -580,6 +681,8 @@ const initialFormState = {
   rating: "5",
   title: "",
   message: "",
+  reviewVideoUrl: "",
+  reviewYoutubeUrl: "",
   status: "pending",
   isPinned: "false",
 };
@@ -664,6 +767,8 @@ export default function ReviewsPage() {
       rating: String(review.rating || "5"),
       title: review.title || "",
       message: review.message || "",
+      reviewVideoUrl: review.reviewVideoUrl || "",
+      reviewYoutubeUrl: review.reviewYoutubeUrl || "",
       status: review.status || "pending",
       isPinned: String(Boolean(review.isPinned)),
     });
@@ -701,6 +806,14 @@ export default function ReviewsPage() {
         return;
       }
 
+      if (
+        formData.reviewYoutubeUrl &&
+        !getYoutubeEmbedUrl(formData.reviewYoutubeUrl)
+      ) {
+        setPageError("Please enter a valid YouTube link.");
+        return;
+      }
+
       if (isEditMode) {
         const data = await graphqlRequest(UPDATE_REVIEW_MUTATION, {
           id: formData.id,
@@ -711,6 +824,8 @@ export default function ReviewsPage() {
             rating: Number(formData.rating),
             title: formData.title || null,
             message: formData.message,
+            reviewVideoUrl: formData.reviewVideoUrl || null,
+            reviewYoutubeUrl: formData.reviewYoutubeUrl || null,
             status: formData.status,
             isPinned: formData.isPinned === "true",
           },
@@ -732,6 +847,8 @@ export default function ReviewsPage() {
             rating: Number(formData.rating),
             title: formData.title || null,
             message: formData.message,
+            reviewVideoUrl: formData.reviewVideoUrl || null,
+            reviewYoutubeUrl: formData.reviewYoutubeUrl || null,
           },
         });
 
@@ -995,7 +1112,8 @@ export default function ReviewsPage() {
                         All Reviews
                       </Text>
                       <Text as="p" variant="bodySm" tone="subdued">
-                        Compact card layout for easier reading and better admin actions.
+                        Compact card layout for easier reading and better admin
+                        actions.
                       </Text>
                     </BlockStack>
 
@@ -1143,6 +1261,22 @@ export default function ReviewsPage() {
               onChange={handleFieldChange("message")}
               multiline={4}
               autoComplete="off"
+            />
+
+            <TextField
+              label="Review video URL"
+              value={formData.reviewVideoUrl}
+              onChange={handleFieldChange("reviewVideoUrl")}
+              autoComplete="off"
+              placeholder="https://...mp4"
+            />
+
+            <TextField
+              label="YouTube URL"
+              value={formData.reviewYoutubeUrl}
+              onChange={handleFieldChange("reviewYoutubeUrl")}
+              autoComplete="off"
+              placeholder="https://www.youtube.com/watch?v=..."
             />
 
             {isEditMode ? (
