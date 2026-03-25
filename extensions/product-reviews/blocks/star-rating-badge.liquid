@@ -1,0 +1,66 @@
+<div
+  id="pr-star-rating-badge-{{ block.id }}"
+  class="pr-star-rating-badge-root"
+  data-badge-type="product"
+  data-product-id="{{ product.id }}"
+  data-product-title="{{ product.title | escape }}"
+  data-shop="{{ shop.permanent_domain }}"
+  data-endpoint="/apps/reviews"
+  data-show-rating-number="{{ block.settings.show_rating_number }}"
+  data-show-review-count="{{ block.settings.show_review_count }}"
+  data-hide-when-no-reviews="{{ block.settings.hide_when_no_reviews }}"
+  data-scroll-to-reviews="{{ block.settings.scroll_to_reviews }}"
+  data-scroll-target="#product-reviews-root"
+  {{ block.shopify_attributes }}
+>
+  <div class="pr-star-badge is-loading">
+    <span class="pr-star-badge__stars" aria-hidden="true">
+      <span class="pr-star-badge__stars-base">★★★★★</span>
+      <span class="pr-star-badge__stars-fill" style="width:0%;">★★★★★</span>
+    </span>
+
+    {% if block.settings.show_rating_number %}
+      <span class="pr-star-badge__rating">0.0</span>
+    {% endif %}
+
+    {% if block.settings.show_review_count %}
+      <span class="pr-star-badge__count">0 reviews</span>
+    {% endif %}
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Star Ratings",
+  "target": "section",
+  "templates": ["product"],
+  "javascript": "star-rating-badge.js",
+  "stylesheet": "star-rating-badge.css",
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "show_rating_number",
+      "label": "Show rating number",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_review_count",
+      "label": "Show review count",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "hide_when_no_reviews",
+      "label": "Hide when no reviews",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "scroll_to_reviews",
+      "label": "Scroll to reviews widget on click",
+      "default": true
+    }
+  ]
+}
+{% endschema %}
