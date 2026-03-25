@@ -44,6 +44,8 @@ model Review {
   title         String?
   message       String
   reviewImages  String?
+  reviewVideoUrl   String?
+  reviewYoutubeUrl String?
   helpfulCount  Int      @default(0) 
   status        String   @default("pending")
   isPinned      Boolean  @default(false)

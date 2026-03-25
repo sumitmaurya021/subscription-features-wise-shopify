@@ -6,6 +6,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const productTitle = root.dataset.productTitle || "";
   const shop = root.dataset.shop || "";
   const endpoint = root.dataset.endpoint || "";
+  const cloudinaryCloudName = root.dataset.cloudinaryCloudName || "";
+  const cloudinaryUploadPreset = root.dataset.cloudinaryUploadPreset || "";
 
   const summaryEl = root.querySelector(".pr-average");
   const listEl = root.querySelector(".pr-list");
@@ -21,6 +23,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   const imagePreview = root.querySelector("#pr-image-preview");
   const imagePreviewWrap = root.querySelector("#pr-image-preview-wrap");
   const uploadDropzone = root.querySelector("#pr-upload-dropzone");
+
+  const youtubeInput = root.querySelector("#pr-youtube-url");
+  const videoInput = root.querySelector("#pr-review-video");
+  const videoDropzone = root.querySelector("#pr-video-dropzone");
+  const videoPreview = root.querySelector("#pr-video-preview");
+  const videoPreviewWrap = root.querySelector("#pr-video-preview-wrap");
 
   const filterChipsWrap = root.querySelector("#pr-filter-chips");
   const filterChips = Array.from(root.querySelectorAll(".pr-filter-chip"));
@@ -48,6 +56,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const lightboxCounter = root.querySelector("#pr-lightbox-counter");
 
   const MAX_REVIEW_IMAGES = 4;
+  const MAX_VIDEO_SIZE_MB = 20;
   const DEFAULT_VISIBLE_COUNT = 4;
   const LOAD_MORE_STEP = 4;
 
@@ -65,6 +74,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let currentSearch = "";
   let visibleCount = DEFAULT_VISIBLE_COUNT;
   let selectedImages = [];
+  let selectedVideoFile = null;
   let activeRating = 0;
 
   let lightboxImages = [];
@@ -146,6 +156,41 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (Array.isArray(review?.images)) return review.images;
     if (Array.isArray(review?.reviewImages)) return review.reviewImages;
     return [];
+  }
+
+  function normalizeYoutubeEmbedUrl(value) {
+    if (!value) return null;
+
+    const url = String(value).trim();
+
+    try {
+      const parsed = new URL(url);
+
+      if (
+        parsed.hostname.includes("youtube.com") ||
+        parsed.hostname.includes("youtu.be")
+      ) {
+        let videoId = "";
+
+        if (parsed.hostname.includes("youtu.be")) {
+          videoId = parsed.pathname.replace("/", "").trim();
+        } else if (parsed.pathname === "/watch") {
+          videoId = parsed.searchParams.get("v") || "";
+        } else if (parsed.pathname.startsWith("/shorts/")) {
+          videoId = parsed.pathname.split("/shorts/")[1]?.split("/")[0] || "";
+        } else if (parsed.pathname.startsWith("/embed/")) {
+          videoId = parsed.pathname.split("/embed/")[1]?.split("/")[0] || "";
+        }
+
+        if (!videoId) return null;
+
+        return `https://www.youtube.com/embed/${videoId}`;
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
   }
 
   function getRatingStats(reviews) {
@@ -595,6 +640,31 @@ document.addEventListener("DOMContentLoaded", async () => {
       `
       : "";
 
+    const reviewVideoUrl = safeText(review.reviewVideoUrl);
+    const reviewYoutubeUrl = safeText(review.reviewYoutubeUrl);
+
+    const videoHtml = reviewVideoUrl
+      ? `
+        <div class="pr-review-video-wrap">
+          <video class="pr-review-video" controls>
+            <source src="${escapeHtml(reviewVideoUrl)}">
+          </video>
+        </div>
+      `
+      : reviewYoutubeUrl
+      ? `
+        <div class="pr-review-youtube-wrap">
+          <iframe
+            class="pr-review-youtube"
+            src="${escapeHtml(reviewYoutubeUrl)}"
+            title="Review video"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen
+          ></iframe>
+        </div>
+      `
+      : "";
+
     const needsClamp = safeText(review.message).length > 180;
     const messageId = `pr-message-${index}-${safeText(review.id || "item")}`;
     const helpfulCount = Number(review.helpfulCount || 0);
@@ -662,6 +732,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         ${galleryHtml}
+        ${videoHtml}
 
         <div class="pr-review-actions">
           <button
@@ -1012,6 +1083,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  function renderVideoPreview(file) {
+    if (!videoPreview || !videoPreviewWrap) return;
+
+    if (!file) {
+      videoPreview.innerHTML = "";
+      videoPreviewWrap.hidden = true;
+      return;
+    }
+
+    videoPreviewWrap.hidden = false;
+    const videoUrl = URL.createObjectURL(file);
+
+    videoPreview.innerHTML = `
+      <div class="pr-video-preview-item">
+        <video src="${videoUrl}" controls></video>
+      </div>
+    `;
+  }
+
   function getFileUniqueKey(file) {
     return [file.name, file.size, file.lastModified, file.type].join("__");
   }
@@ -1065,6 +1155,40 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  function handleSelectedVideo(file) {
+    if (!file) return;
+
+    const allowedTypes = ["video/mp4", "video/webm", "video/quicktime"];
+    const maxVideoSize = MAX_VIDEO_SIZE_MB * 1024 * 1024;
+
+    if (!allowedTypes.includes(file.type)) {
+      setFieldError(
+        "reviewVideo",
+        "Only MP4, WEBM, and MOV videos are allowed.",
+        videoDropzone
+      );
+      videoDropzone?.classList.add("pr-invalid");
+      showToast("Only MP4, WEBM, and MOV videos are allowed.", "error");
+      return;
+    }
+
+    if (file.size > maxVideoSize) {
+      setFieldError(
+        "reviewVideo",
+        `Video size should be ${MAX_VIDEO_SIZE_MB}MB or less.`,
+        videoDropzone
+      );
+      videoDropzone?.classList.add("pr-invalid");
+      showToast(`Video size should be ${MAX_VIDEO_SIZE_MB}MB or less.`, "error");
+      return;
+    }
+
+    selectedVideoFile = file;
+    renderVideoPreview(file);
+    clearFieldError("reviewVideo", videoDropzone);
+    videoDropzone?.classList.remove("pr-invalid");
+  }
+
   function bindImageUploader() {
     imageInput?.addEventListener("change", (e) => {
       handleSelectedFiles(e.target.files);
@@ -1109,6 +1233,51 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  function bindVideoUploader() {
+    videoInput?.addEventListener("change", (e) => {
+      const file = e.target.files?.[0];
+      if (file) handleSelectedVideo(file);
+    });
+
+    videoDropzone?.addEventListener("click", () => {
+      videoInput?.click();
+    });
+
+    videoDropzone?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        videoInput?.click();
+      }
+    });
+
+    ["dragenter", "dragover"].forEach((eventName) => {
+      videoDropzone?.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        videoDropzone.classList.add("is-dragover");
+      });
+    });
+
+    ["dragleave", "dragend"].forEach((eventName) => {
+      videoDropzone?.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        videoDropzone.classList.remove("is-dragover");
+      });
+    });
+
+    videoDropzone?.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      videoDropzone.classList.remove("is-dragover");
+
+      const file = e.dataTransfer?.files?.[0];
+      if (file) {
+        handleSelectedVideo(file);
+      }
+    });
+  }
+
   function fileToDataUrl(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -1116,6 +1285,33 @@ document.addEventListener("DOMContentLoaded", async () => {
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
+  }
+
+  async function uploadVideoToCloudinary(file) {
+    if (!cloudinaryCloudName || !cloudinaryUploadPreset) {
+      throw new Error("Cloudinary is not configured.");
+    }
+
+    const uploadFormData = new FormData();
+    uploadFormData.append("file", file);
+    uploadFormData.append("upload_preset", cloudinaryUploadPreset);
+    uploadFormData.append("folder", `shopify-review-videos/${shop}/${productId}`);
+
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloudinaryCloudName}/video/upload`,
+      {
+        method: "POST",
+        body: uploadFormData,
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok || !result.secure_url) {
+      throw new Error(result.error?.message || "Video upload failed");
+    }
+
+    return result.secure_url;
   }
 
   function validateForm(showErrors = true) {
@@ -1127,6 +1323,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const customerEmail = formData.get("customerEmail")?.toString().trim() || "";
     const title = formData.get("title")?.toString().trim() || "";
     const message = formData.get("message")?.toString().trim() || "";
+    const youtubeUrl = formData.get("reviewYoutubeUrl")?.toString().trim() || "";
     const rating = Number(ratingInput?.value || 0);
 
     const nameInput = root.querySelector("#pr-customer-name");
@@ -1204,6 +1401,24 @@ document.addEventListener("DOMContentLoaded", async () => {
       clearFieldError("reviewImages", uploadDropzone);
     }
 
+    if (youtubeUrl) {
+      const normalizedYoutube = normalizeYoutubeEmbedUrl(youtubeUrl);
+      if (!normalizedYoutube) {
+        isValid = false;
+        if (showErrors) {
+          setFieldError(
+            "reviewYoutubeUrl",
+            "Please enter a valid YouTube link.",
+            youtubeInput
+          );
+        }
+      } else {
+        clearFieldError("reviewYoutubeUrl", youtubeInput);
+      }
+    } else {
+      clearFieldError("reviewYoutubeUrl", youtubeInput);
+    }
+
     return isValid;
   }
 
@@ -1246,6 +1461,19 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (count >= 20) {
         clearFieldError("message", messageInput);
+      }
+    });
+
+    youtubeInput?.addEventListener("input", () => {
+      const value = youtubeInput.value.trim();
+
+      if (!value) {
+        clearFieldError("reviewYoutubeUrl", youtubeInput);
+        return;
+      }
+
+      if (normalizeYoutubeEmbedUrl(value)) {
+        clearFieldError("reviewYoutubeUrl", youtubeInput);
       }
     });
   }
@@ -1433,6 +1661,28 @@ document.addEventListener("DOMContentLoaded", async () => {
         imageUrls = await Promise.all(selectedImages.map(fileToDataUrl));
       }
 
+      let uploadedVideoUrl = null;
+      const youtubeUrl = formData.get("reviewYoutubeUrl")?.toString().trim() || "";
+
+      if (selectedVideoFile) {
+        try {
+          uploadedVideoUrl = await uploadVideoToCloudinary(selectedVideoFile);
+        } catch (error) {
+          if (messageEl) {
+            messageEl.className = "pr-message-box pr-message-error";
+            messageEl.textContent = error.message || "Video upload failed.";
+          }
+
+          showToast(error.message || "Video upload failed.", "error");
+
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Publish Review";
+          }
+          return;
+        }
+      }
+
       const payload = {
         shop,
         productId,
@@ -1443,6 +1693,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         title: formData.get("title")?.toString().trim(),
         message: formData.get("message")?.toString().trim(),
         reviewImages: imageUrls,
+        reviewVideoUrl: uploadedVideoUrl,
+        reviewYoutubeUrl: youtubeUrl,
       };
 
       try {
@@ -1482,10 +1734,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         form.reset();
         selectedImages = [];
+        selectedVideoFile = null;
+
         updateFileInputFromSelectedImages();
+        renderVideoPreview(null);
 
         if (imagePreview) imagePreview.innerHTML = "";
         if (imagePreviewWrap) imagePreviewWrap.hidden = true;
+
+        if (videoInput) videoInput.value = "";
+        if (youtubeInput) youtubeInput.value = "";
 
         updateStarUI(0);
 
@@ -1498,7 +1756,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         clearFieldError("message", messageInput);
         clearFieldError("rating");
         clearFieldError("reviewImages", uploadDropzone);
+        clearFieldError("reviewVideo", videoDropzone);
+        clearFieldError("reviewYoutubeUrl", youtubeInput);
+
         uploadDropzone?.classList.remove("pr-invalid");
+        videoDropzone?.classList.remove("pr-invalid");
 
         await loadReviews();
       } catch {
@@ -1520,6 +1782,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   bindStarSelector();
   bindImageUploader();
+  bindVideoUploader();
   bindRealtimeValidation();
   bindFormToggle();
   bindLightbox();
