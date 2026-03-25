@@ -2,7 +2,7 @@ import prisma from "../db.server";
 
 export const LOYALTY_CONFIG = {
   points: {
-    orderPaidMultiplier: 1, // 1 point per 1 currency unit
+    orderPaidMultiplier: 1,
     reviewApproved: 25,
     photoReviewBonus: 10,
     referralOrderReward: 100,

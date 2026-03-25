@@ -16,7 +16,6 @@ function normalizeYoutubeUrl(value) {
   if (!value) return null;
 
   const url = String(value).trim();
-
   if (!url) return null;
 
   try {
@@ -78,21 +77,40 @@ function normalizeReview(review) {
 export const loader = async ({ request }) => {
   try {
     const url = new URL(request.url);
+
     const productId = url.searchParams.get("productId");
     const shop = url.searchParams.get("shop");
+    const approvedOnly = url.searchParams.get("approvedOnly") === "true";
+    const onlyMedia = url.searchParams.get("onlyMedia") === "true";
+    const reviewType = (url.searchParams.get("reviewType") || "any").trim();
+    const starRatingParam = url.searchParams.get("starRating");
+    const limitParam = url.searchParams.get("limit");
 
-    if (!productId) {
+    const parsedStarRating = starRatingParam ? Number(starRatingParam) : null;
+    const parsedLimit = limitParam ? Number(limitParam) : null;
+
+    if (!productId && !shop) {
       return json(
-        { success: false, message: "productId is required", data: [] },
+        {
+          success: false,
+          message: "productId or shop is required",
+          totalReviews: 0,
+          averageRating: 0,
+          data: [],
+        },
         { status: 400 }
       );
     }
 
-    const where = {
-      productId: String(productId),
-    };
+    const where = {};
 
-    if (shop) where.shop = shop;
+    if (productId) {
+      where.productId = String(productId);
+    }
+
+    if (shop) {
+      where.shop = String(shop);
+    }
 
     const reviews = await prisma.review.findMany({
       where,
@@ -101,27 +119,72 @@ export const loader = async ({ request }) => {
 
     const normalizedReviews = reviews.map(normalizeReview);
 
-    const approvedReviews = normalizedReviews.filter(
-      (review) => review.status === "approved"
-    );
+    let filteredReviews = [...normalizedReviews];
 
-    const totalReviews = approvedReviews.length;
+    if (approvedOnly) {
+      filteredReviews = filteredReviews.filter(
+        (review) => review.status === "approved"
+      );
+    }
+
+    if (
+      parsedStarRating !== null &&
+      !Number.isNaN(parsedStarRating) &&
+      parsedStarRating >= 1 &&
+      parsedStarRating <= 5
+    ) {
+      filteredReviews = filteredReviews.filter(
+        (review) => Number(review.rating) === parsedStarRating
+      );
+    }
+
+    if (reviewType === "uploaded") {
+      filteredReviews = filteredReviews.filter((review) =>
+        Boolean(review.reviewVideoUrl)
+      );
+    } else if (reviewType === "youtube") {
+      filteredReviews = filteredReviews.filter((review) =>
+        Boolean(review.reviewYoutubeUrl)
+      );
+    }
+
+    if (onlyMedia) {
+      filteredReviews = filteredReviews.filter(
+        (review) =>
+          Boolean(review.reviewVideoUrl) || Boolean(review.reviewYoutubeUrl)
+      );
+    }
+
+    if (parsedLimit !== null && !Number.isNaN(parsedLimit) && parsedLimit > 0) {
+      filteredReviews = filteredReviews.slice(0, parsedLimit);
+    }
+
+    const totalReviews = filteredReviews.length;
     const averageRating =
       totalReviews > 0
-        ? approvedReviews.reduce((sum, item) => sum + item.rating, 0) /
-          totalReviews
+        ? filteredReviews.reduce(
+            (sum, item) => sum + (Number(item.rating) || 0),
+            0
+          ) / totalReviews
         : 0;
 
     return json({
       success: true,
+      message: "Reviews fetched successfully",
       totalReviews,
       averageRating: Number(averageRating.toFixed(1)),
-      data: normalizedReviews,
+      data: approvedOnly ? filteredReviews : normalizedReviews,
     });
   } catch (error) {
     console.error("STOREFRONT GET REVIEWS ERROR:", error);
     return json(
-      { success: false, message: "Failed to fetch reviews", data: [] },
+      {
+        success: false,
+        message: "Failed to fetch reviews",
+        totalReviews: 0,
+        averageRating: 0,
+        data: [],
+      },
       { status: 500 }
     );
   }
@@ -159,7 +222,7 @@ export const action = async ({ request }) => {
 
       const parsedRating = Number(rating);
 
-      if (parsedRating < 1 || parsedRating > 5) {
+      if (Number.isNaN(parsedRating) || parsedRating < 1 || parsedRating > 5) {
         return json(
           { success: false, message: "Rating must be between 1 and 5" },
           { status: 400 }
@@ -193,14 +256,14 @@ export const action = async ({ request }) => {
 
       const review = await prisma.review.create({
         data: {
-          shop,
+          shop: String(shop),
           productId: String(productId),
           productTitle: productTitle || null,
-          customerName,
-          customerEmail: customerEmail || null,
+          customerName: String(customerName).trim(),
+          customerEmail: customerEmail ? String(customerEmail).trim() : null,
           rating: parsedRating,
-          title: title || null,
-          message,
+          title: title ? String(title).trim() : null,
+          message: String(message).trim(),
           reviewImages: normalizedImages.length
             ? JSON.stringify(normalizedImages)
             : null,
