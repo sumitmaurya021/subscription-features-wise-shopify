@@ -1,0 +1,42 @@
+{% if template.name == 'collection' %}
+  <div
+    id="pr-collection-star-rating-badges-{{ block.id }}"
+    class="pr-collection-star-rating-badges-root"
+    data-badge-type="collection"
+    data-shop="{{ shop.permanent_domain }}"
+    data-endpoint="/apps/reviews"
+    data-show-rating-number="{{ block.settings.show_rating_number }}"
+    data-show-review-count="{{ block.settings.show_review_count }}"
+    data-hide-when-no-reviews="{{ block.settings.hide_when_no_reviews }}"
+    {{ block.shopify_attributes }}
+  ></div>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Collection Star Ratings",
+  "target": "body",
+  "javascript": "star-rating-badge.js",
+  "stylesheet": "star-rating-badge.css",
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "show_rating_number",
+      "label": "Show rating number",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_review_count",
+      "label": "Show review count",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "hide_when_no_reviews",
+      "label": "Hide when no reviews",
+      "default": true
+    }
+  ]
+}
+{% endschema %}
