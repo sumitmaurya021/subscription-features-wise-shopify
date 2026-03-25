@@ -4,6 +4,8 @@ import prisma from "../db.server";
 function safeParseImages(value) {
   if (!value) return [];
 
+  if (Array.isArray(value)) return value;
+
   try {
     const parsed = JSON.parse(value);
     return Array.isArray(parsed) ? parsed : [];
@@ -74,26 +76,41 @@ function normalizeReview(review) {
   };
 }
 
+function parseCsvIds(value) {
+  return String(value || "")
+    .split(/[,\n]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export const loader = async ({ request }) => {
   try {
     const url = new URL(request.url);
 
     const productId = url.searchParams.get("productId");
+    const productIdsParam = url.searchParams.get("productIds");
     const shop = url.searchParams.get("shop");
+
     const approvedOnly = url.searchParams.get("approvedOnly") === "true";
     const onlyMedia = url.searchParams.get("onlyMedia") === "true";
+    const featuredOnly = url.searchParams.get("featuredOnly") === "true";
+
     const reviewType = (url.searchParams.get("reviewType") || "any").trim();
     const starRatingParam = url.searchParams.get("starRating");
+    const minRatingParam = url.searchParams.get("minRating");
     const limitParam = url.searchParams.get("limit");
 
+    const productIds = parseCsvIds(productIdsParam);
+
     const parsedStarRating = starRatingParam ? Number(starRatingParam) : null;
+    const parsedMinRating = minRatingParam ? Number(minRatingParam) : null;
     const parsedLimit = limitParam ? Number(limitParam) : null;
 
-    if (!productId && !shop) {
+    if (!productId && !productIds.length && !shop) {
       return json(
         {
           success: false,
-          message: "productId or shop is required",
+          message: "productId, productIds, or shop is required",
           totalReviews: 0,
           averageRating: 0,
           data: [],
@@ -104,7 +121,11 @@ export const loader = async ({ request }) => {
 
     const where = {};
 
-    if (productId) {
+    if (productIds.length) {
+      where.productId = {
+        in: productIds.map((id) => String(id)),
+      };
+    } else if (productId) {
       where.productId = String(productId);
     }
 
@@ -112,19 +133,12 @@ export const loader = async ({ request }) => {
       where.shop = String(shop);
     }
 
-    const reviews = await prisma.review.findMany({
-      where,
-      orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
-    });
-
-    const normalizedReviews = reviews.map(normalizeReview);
-
-    let filteredReviews = [...normalizedReviews];
-
     if (approvedOnly) {
-      filteredReviews = filteredReviews.filter(
-        (review) => review.status === "approved"
-      );
+      where.status = "approved";
+    }
+
+    if (featuredOnly) {
+      where.isPinned = true;
     }
 
     if (
@@ -133,10 +147,24 @@ export const loader = async ({ request }) => {
       parsedStarRating >= 1 &&
       parsedStarRating <= 5
     ) {
-      filteredReviews = filteredReviews.filter(
-        (review) => Number(review.rating) === parsedStarRating
-      );
+      where.rating = parsedStarRating;
+    } else if (
+      parsedMinRating !== null &&
+      !Number.isNaN(parsedMinRating) &&
+      parsedMinRating >= 1 &&
+      parsedMinRating <= 5
+    ) {
+      where.rating = {
+        gte: parsedMinRating,
+      };
     }
+
+    const reviews = await prisma.review.findMany({
+      where,
+      orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
+    });
+
+    let filteredReviews = reviews.map(normalizeReview);
 
     if (reviewType === "uploaded") {
       filteredReviews = filteredReviews.filter((review) =>
@@ -151,7 +179,9 @@ export const loader = async ({ request }) => {
     if (onlyMedia) {
       filteredReviews = filteredReviews.filter(
         (review) =>
-          Boolean(review.reviewVideoUrl) || Boolean(review.reviewYoutubeUrl)
+          (Array.isArray(review.reviewImages) && review.reviewImages.length > 0) ||
+          Boolean(review.reviewVideoUrl) ||
+          Boolean(review.reviewYoutubeUrl)
       );
     }
 
@@ -172,8 +202,8 @@ export const loader = async ({ request }) => {
       success: true,
       message: "Reviews fetched successfully",
       totalReviews,
-      averageRating: Number(averageRating.toFixed(1)),
-      data: approvedOnly ? filteredReviews : normalizedReviews,
+      averageRating: Number(averageRating.toFixed(2)),
+      data: filteredReviews,
     });
   } catch (error) {
     console.error("STOREFRONT GET REVIEWS ERROR:", error);
