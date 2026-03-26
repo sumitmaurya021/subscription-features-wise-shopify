@@ -21,14 +21,32 @@ import {
 const GRAPHQL_ENDPOINT = "/graphql";
 
 const GET_REVIEWS_QUERY = `
-  query GetReviews($shop: String, $status: String, $productId: String) {
-    reviews(shop: $shop, status: $status, productId: $productId) {
+  query GetReviews(
+    $shop: String
+    $status: String
+    $productId: String
+    $reviewType: String
+    $targetId: String
+    $targetHandle: String
+  ) {
+    reviews(
+      shop: $shop
+      status: $status
+      productId: $productId
+      reviewType: $reviewType
+      targetId: $targetId
+      targetHandle: $targetHandle
+    ) {
       success
       message
       count
       data {
         id
         shop
+        reviewType
+        targetId
+        targetHandle
+        targetTitle
         productId
         productTitle
         customerName
@@ -57,6 +75,10 @@ const CREATE_REVIEW_MUTATION = `
       data {
         id
         shop
+        reviewType
+        targetId
+        targetHandle
+        targetTitle
         productId
         productTitle
         customerName
@@ -85,6 +107,10 @@ const UPDATE_REVIEW_MUTATION = `
       data {
         id
         shop
+        reviewType
+        targetId
+        targetHandle
+        targetTitle
         productId
         productTitle
         customerName
@@ -187,6 +213,16 @@ async function graphqlRequest(query, variables = {}) {
   return result.data;
 }
 
+function normalizeReviewType(value) {
+  const reviewType = String(value || "product").trim().toLowerCase();
+
+  if (["product", "collection", "store"].includes(reviewType)) {
+    return reviewType;
+  }
+
+  return "product";
+}
+
 function getBadgeTone(status) {
   if (status === "approved") return "success";
   if (status === "rejected") return "critical";
@@ -202,6 +238,20 @@ function getStatusOptions() {
   ];
 }
 
+function getReviewTypeOptions(includeAll = false) {
+  const base = [
+    { label: "Product", value: "product" },
+    { label: "Collection", value: "collection" },
+    { label: "Store", value: "store" },
+  ];
+
+  if (includeAll) {
+    return [{ label: "All", value: "" }, ...base];
+  }
+
+  return base;
+}
+
 function getRatingOptions() {
   return [
     { label: "1 Star", value: "1" },
@@ -210,6 +260,30 @@ function getRatingOptions() {
     { label: "4 Stars", value: "4" },
     { label: "5 Stars", value: "5" },
   ];
+}
+
+function getReviewTypeLabel(reviewType) {
+  const normalized = normalizeReviewType(reviewType);
+
+  if (normalized === "collection") return "Collection Review";
+  if (normalized === "store") return "Store Review";
+  return "Product Review";
+}
+
+function getReviewTypeShortLabel(reviewType) {
+  const normalized = normalizeReviewType(reviewType);
+
+  if (normalized === "collection") return "Collection";
+  if (normalized === "store") return "Store";
+  return "Product";
+}
+
+function getReviewTypeTone(reviewType) {
+  const normalized = normalizeReviewType(reviewType);
+
+  if (normalized === "collection") return "attention";
+  if (normalized === "store") return "info";
+  return "success";
 }
 
 function formatDate(dateValue) {
@@ -288,6 +362,38 @@ function getYoutubeEmbedUrl(url) {
   } catch {
     return null;
   }
+}
+
+function getReviewTargetSummary(review) {
+  const reviewType = normalizeReviewType(review.reviewType);
+  const targetTitle =
+    review.targetTitle ||
+    review.productTitle ||
+    (reviewType === "store" ? review.shop : "");
+
+  if (reviewType === "product") {
+    return {
+      label: "Product",
+      title: targetTitle || "Untitled Product",
+      subText: `Product ID: ${review.targetId || review.productId || "-"}`,
+    };
+  }
+
+  if (reviewType === "collection") {
+    return {
+      label: "Collection",
+      title: targetTitle || "Untitled Collection",
+      subText: `Collection ID: ${review.targetId || "-"}${
+        review.targetHandle ? ` · Handle: ${review.targetHandle}` : ""
+      }`,
+    };
+  }
+
+  return {
+    label: "Store",
+    title: targetTitle || review.shop || "Store",
+    subText: `Shop: ${review.shop || "-"}`,
+  };
 }
 
 function StatusPill({ status }) {
@@ -509,6 +615,8 @@ function ReviewCard({
   deleteLoadingId,
   pinLoadingId,
 }) {
+  const target = getReviewTargetSummary(review);
+
   return (
     <div
       style={{
@@ -530,12 +638,15 @@ function ReviewCard({
           <BlockStack gap="050">
             <InlineStack gap="200" wrap blockAlign="center">
               <Text as="h3" variant="headingMd">
-                {review.productTitle || "Untitled Product"}
+                {target.title}
               </Text>
+              <Badge tone={getReviewTypeTone(review.reviewType)}>
+                {getReviewTypeShortLabel(review.reviewType)}
+              </Badge>
               {review.isPinned ? <Badge tone="info">Pinned</Badge> : null}
             </InlineStack>
             <Text as="p" variant="bodySm" tone="subdued">
-              Product ID: {review.productId || "-"} · Shop: {review.shop || "-"}
+              {target.subText}
             </Text>
           </BlockStack>
 
@@ -568,14 +679,16 @@ function ReviewCard({
             >
               <BlockStack gap="200">
                 <Text as="h4" variant="headingSm">
-                  Customer
+                  Review Target
                 </Text>
-                <InfoLine label="Name" value={review.customerName} breakWord />
                 <InfoLine
-                  label="Email"
-                  value={review.customerEmail}
-                  breakWord
+                  label="Type"
+                  value={getReviewTypeLabel(review.reviewType)}
                 />
+                <InfoLine label="Title" value={review.targetTitle || review.productTitle} breakWord />
+                <InfoLine label="Target ID" value={review.targetId || review.productId} breakWord />
+                <InfoLine label="Target Handle" value={review.targetHandle} breakWord />
+                <InfoLine label="Shop" value={review.shop} breakWord />
               </BlockStack>
             </div>
 
@@ -589,18 +702,49 @@ function ReviewCard({
             >
               <BlockStack gap="200">
                 <Text as="h4" variant="headingSm">
-                  Review Meta
+                  Customer
                 </Text>
-                <InfoLine label="Title" value={review.title} breakWord />
+                <InfoLine label="Name" value={review.customerName} breakWord />
+                <InfoLine
+                  label="Email"
+                  value={review.customerEmail}
+                  breakWord
+                />
                 <InfoLine
                   label="Helpful Count"
                   value={String(Number(review.helpfulCount || 0))}
                 />
-                <InfoLine label="Created" value={formatDate(review.createdAt)} />
               </BlockStack>
             </div>
 
             <ReviewMediaCard review={review} />
+          </div>
+
+          <div
+            style={{
+              padding: 14,
+              background: "#f8fafc",
+              border: "1px solid #e5e7eb",
+              borderRadius: 14,
+            }}
+          >
+            <BlockStack gap="200">
+              <Text as="h4" variant="headingSm">
+                Review Meta
+              </Text>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                  gap: 14,
+                }}
+              >
+                <InfoLine label="Title" value={review.title} breakWord />
+                <InfoLine label="Created" value={formatDate(review.createdAt)} />
+                <InfoLine label="Updated" value={formatDate(review.updatedAt)} />
+                <InfoLine label="Status" value={review.status} />
+              </div>
+            </BlockStack>
           </div>
 
           <div
@@ -674,6 +818,10 @@ function ReviewCard({
 const initialFormState = {
   id: null,
   shop: "",
+  reviewType: "product",
+  targetId: "",
+  targetHandle: "",
+  targetTitle: "",
   productId: "",
   productTitle: "",
   customerName: "",
@@ -694,8 +842,11 @@ export default function ReviewsPage() {
   const [pageMessage, setPageMessage] = useState("");
 
   const [statusFilter, setStatusFilter] = useState("");
+  const [reviewTypeFilter, setReviewTypeFilter] = useState("");
   const [shopFilter, setShopFilter] = useState("");
   const [productIdFilter, setProductIdFilter] = useState("");
+  const [targetIdFilter, setTargetIdFilter] = useState("");
+  const [targetHandleFilter, setTargetHandleFilter] = useState("");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteLoadingId, setDeleteLoadingId] = useState(null);
@@ -716,6 +867,9 @@ export default function ReviewsPage() {
         shop: shopFilter || null,
         status: statusFilter || null,
         productId: productIdFilter || null,
+        reviewType: reviewTypeFilter || null,
+        targetId: targetIdFilter || null,
+        targetHandle: targetHandleFilter || null,
       });
 
       setReviews(data.reviews?.data || []);
@@ -724,7 +878,14 @@ export default function ReviewsPage() {
     } finally {
       setLoading(false);
     }
-  }, [shopFilter, statusFilter, productIdFilter]);
+  }, [
+    shopFilter,
+    statusFilter,
+    productIdFilter,
+    reviewTypeFilter,
+    targetIdFilter,
+    targetHandleFilter,
+  ]);
 
   useEffect(() => {
     fetchReviews();
@@ -737,6 +898,16 @@ export default function ReviewsPage() {
     const rejected = reviews.filter((r) => r.status === "rejected").length;
     const pinned = reviews.filter((r) => Boolean(r.isPinned)).length;
 
+    const productReviews = reviews.filter(
+      (r) => normalizeReviewType(r.reviewType) === "product"
+    ).length;
+    const collectionReviews = reviews.filter(
+      (r) => normalizeReviewType(r.reviewType) === "collection"
+    ).length;
+    const storeReviews = reviews.filter(
+      (r) => normalizeReviewType(r.reviewType) === "store"
+    ).length;
+
     const average =
       total > 0
         ? (
@@ -744,7 +915,17 @@ export default function ReviewsPage() {
           ).toFixed(1)
         : "0.0";
 
-    return { total, approved, pending, rejected, pinned, average };
+    return {
+      total,
+      approved,
+      pending,
+      rejected,
+      pinned,
+      average,
+      productReviews,
+      collectionReviews,
+      storeReviews,
+    };
   }, [reviews]);
 
   const resetForm = () => {
@@ -757,9 +938,15 @@ export default function ReviewsPage() {
   };
 
   const openEditModal = (review) => {
+    const reviewType = normalizeReviewType(review.reviewType);
+
     setFormData({
       id: review.id,
       shop: review.shop || "",
+      reviewType,
+      targetId: review.targetId || review.productId || "",
+      targetHandle: review.targetHandle || "",
+      targetTitle: review.targetTitle || review.productTitle || "",
       productId: review.productId || "",
       productTitle: review.productTitle || "",
       customerName: review.customerName || "",
@@ -781,10 +968,34 @@ export default function ReviewsPage() {
   };
 
   const handleFieldChange = (field) => (value) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setFormData((prev) => {
+      const next = {
+        ...prev,
+        [field]: value,
+      };
+
+      if (field === "reviewType") {
+        const nextType = normalizeReviewType(value);
+
+        if (nextType === "store") {
+          next.targetId = "";
+          next.targetHandle = "";
+          next.productId = "";
+          next.productTitle = "";
+        }
+
+        if (nextType === "collection") {
+          next.productId = "";
+          next.productTitle = "";
+        }
+
+        if (nextType === "product") {
+          next.targetHandle = "";
+        }
+      }
+
+      return next;
+    });
   };
 
   const handleSave = async () => {
@@ -793,39 +1004,66 @@ export default function ReviewsPage() {
       setPageError("");
       setPageMessage("");
 
-      if (
-        !formData.shop ||
-        !formData.productId ||
-        !formData.customerName ||
-        !formData.rating ||
-        !formData.message
-      ) {
+      const reviewType = normalizeReviewType(formData.reviewType);
+      const cleanShop = formData.shop.trim();
+      const cleanTargetId = formData.targetId.trim();
+      const cleanTargetHandle = formData.targetHandle.trim();
+      const cleanTargetTitle = formData.targetTitle.trim();
+      const cleanCustomerName = formData.customerName.trim();
+      const cleanCustomerEmail = formData.customerEmail.trim();
+      const cleanTitle = formData.title.trim();
+      const cleanMessage = formData.message.trim();
+      const cleanReviewVideoUrl = formData.reviewVideoUrl.trim();
+      const cleanReviewYoutubeUrl = formData.reviewYoutubeUrl.trim();
+
+      if (!cleanShop || !cleanCustomerName || !formData.rating || !cleanMessage) {
         setPageError(
-          "Shop, Product ID, Customer name, Rating, and Message are required."
+          "Shop, Customer name, Rating, and Message are required."
+        );
+        return;
+      }
+
+      if (reviewType === "product" && !cleanTargetId) {
+        setPageError("Product review ke liye Target ID / Product ID required hai.");
+        return;
+      }
+
+      if (reviewType === "collection" && !cleanTargetId && !cleanTargetHandle) {
+        setPageError(
+          "Collection review ke liye Target ID ya Target Handle required hai."
         );
         return;
       }
 
       if (
-        formData.reviewYoutubeUrl &&
-        !getYoutubeEmbedUrl(formData.reviewYoutubeUrl)
+        cleanReviewYoutubeUrl &&
+        !getYoutubeEmbedUrl(cleanReviewYoutubeUrl)
       ) {
         setPageError("Please enter a valid YouTube link.");
         return;
       }
 
+      const sharedInput = {
+        reviewType,
+        targetId: cleanTargetId || null,
+        targetHandle: cleanTargetHandle || null,
+        targetTitle: cleanTargetTitle || null,
+        customerName: cleanCustomerName,
+        customerEmail: cleanCustomerEmail || null,
+        rating: Number(formData.rating),
+        title: cleanTitle || null,
+        message: cleanMessage,
+        reviewVideoUrl: cleanReviewVideoUrl || null,
+        reviewYoutubeUrl: cleanReviewYoutubeUrl || null,
+      };
+
       if (isEditMode) {
         const data = await graphqlRequest(UPDATE_REVIEW_MUTATION, {
           id: formData.id,
           input: {
-            productTitle: formData.productTitle || null,
-            customerName: formData.customerName,
-            customerEmail: formData.customerEmail || null,
-            rating: Number(formData.rating),
-            title: formData.title || null,
-            message: formData.message,
-            reviewVideoUrl: formData.reviewVideoUrl || null,
-            reviewYoutubeUrl: formData.reviewYoutubeUrl || null,
+            ...sharedInput,
+            productId: reviewType === "product" ? cleanTargetId || null : null,
+            productTitle: reviewType === "product" ? cleanTargetTitle || null : null,
             status: formData.status,
             isPinned: formData.isPinned === "true",
           },
@@ -839,16 +1077,10 @@ export default function ReviewsPage() {
       } else {
         const data = await graphqlRequest(CREATE_REVIEW_MUTATION, {
           input: {
-            shop: formData.shop,
-            productId: formData.productId,
-            productTitle: formData.productTitle || null,
-            customerName: formData.customerName,
-            customerEmail: formData.customerEmail || null,
-            rating: Number(formData.rating),
-            title: formData.title || null,
-            message: formData.message,
-            reviewVideoUrl: formData.reviewVideoUrl || null,
-            reviewYoutubeUrl: formData.reviewYoutubeUrl || null,
+            shop: cleanShop,
+            ...sharedInput,
+            productId: reviewType === "product" ? cleanTargetId || null : null,
+            productTitle: reviewType === "product" ? cleanTargetTitle || null : null,
           },
         });
 
@@ -975,14 +1207,19 @@ export default function ReviewsPage() {
 
   const resetFilters = () => {
     setStatusFilter("");
+    setReviewTypeFilter("");
     setShopFilter("");
     setProductIdFilter("");
+    setTargetIdFilter("");
+    setTargetHandleFilter("");
   };
+
+  const currentReviewType = normalizeReviewType(formData.reviewType);
 
   return (
     <Page
       title="Product Reviews"
-      subtitle="Clean, compact, and professional review moderation dashboard."
+      subtitle="Manage product, collection, and store reviews from one place."
       primaryAction={{ content: "Create review", onAction: openCreateModal }}
     >
       <Layout>
@@ -1008,7 +1245,7 @@ export default function ReviewsPage() {
                       Review Overview
                     </Text>
                     <Text as="p" variant="bodySm" tone="subdued">
-                      Quick insight into moderation status and rating quality.
+                      Quick insight into product, collection, and store review moderation.
                     </Text>
                   </BlockStack>
 
@@ -1044,6 +1281,9 @@ export default function ReviewsPage() {
                     tone="critical"
                   />
                   <StatCard title="Pinned" value={reviewStats.pinned} />
+                  <StatCard title="Product Reviews" value={reviewStats.productReviews} />
+                  <StatCard title="Collection Reviews" value={reviewStats.collectionReviews} />
+                  <StatCard title="Store Reviews" value={reviewStats.storeReviews} />
                 </div>
               </BlockStack>
             </Card>
@@ -1056,7 +1296,7 @@ export default function ReviewsPage() {
                       Filters
                     </Text>
                     <Text as="p" variant="bodySm" tone="subdued">
-                      Narrow down reviews by moderation status, shop, or product.
+                      Filter by type, status, shop, target id, handle, or legacy product id.
                     </Text>
                   </BlockStack>
 
@@ -1084,6 +1324,13 @@ export default function ReviewsPage() {
                     onChange={setStatusFilter}
                   />
 
+                  <Select
+                    label="Review Type"
+                    options={getReviewTypeOptions(true)}
+                    value={reviewTypeFilter}
+                    onChange={setReviewTypeFilter}
+                  />
+
                   <TextField
                     label="Shop"
                     value={shopFilter}
@@ -1093,11 +1340,27 @@ export default function ReviewsPage() {
                   />
 
                   <TextField
-                    label="Product ID"
+                    label="Target ID"
+                    value={targetIdFilter}
+                    onChange={setTargetIdFilter}
+                    autoComplete="off"
+                    placeholder="Product / Collection target id"
+                  />
+
+                  <TextField
+                    label="Target Handle"
+                    value={targetHandleFilter}
+                    onChange={setTargetHandleFilter}
+                    autoComplete="off"
+                    placeholder="Collection handle"
+                  />
+
+                  <TextField
+                    label="Legacy Product ID"
                     value={productIdFilter}
                     onChange={setProductIdFilter}
                     autoComplete="off"
-                    placeholder="Enter product ID"
+                    placeholder="Old product id filter"
                   />
                 </div>
               </BlockStack>
@@ -1112,8 +1375,7 @@ export default function ReviewsPage() {
                         All Reviews
                       </Text>
                       <Text as="p" variant="bodySm" tone="subdued">
-                        Compact card layout for easier reading and better admin
-                        actions.
+                        One dashboard for product, collection, and store reviews.
                       </Text>
                     </BlockStack>
 
@@ -1203,28 +1465,66 @@ export default function ReviewsPage() {
               />
             )}
 
-            {!isEditMode ? (
-              <TextField
-                label="Product ID"
-                value={formData.productId}
-                onChange={handleFieldChange("productId")}
-                autoComplete="off"
-              />
-            ) : (
-              <TextField
-                label="Product ID"
-                value={formData.productId}
-                disabled
-                autoComplete="off"
-              />
-            )}
-
-            <TextField
-              label="Product title"
-              value={formData.productTitle}
-              onChange={handleFieldChange("productTitle")}
-              autoComplete="off"
+            <Select
+              label="Review Type"
+              options={getReviewTypeOptions(false)}
+              value={formData.reviewType}
+              onChange={handleFieldChange("reviewType")}
             />
+
+            {currentReviewType === "product" ? (
+              <>
+                <TextField
+                  label="Product ID / Target ID"
+                  value={formData.targetId}
+                  onChange={handleFieldChange("targetId")}
+                  autoComplete="off"
+                />
+
+                <TextField
+                  label="Product Title / Target Title"
+                  value={formData.targetTitle}
+                  onChange={handleFieldChange("targetTitle")}
+                  autoComplete="off"
+                />
+              </>
+            ) : null}
+
+            {currentReviewType === "collection" ? (
+              <>
+                <TextField
+                  label="Collection ID / Target ID"
+                  value={formData.targetId}
+                  onChange={handleFieldChange("targetId")}
+                  autoComplete="off"
+                />
+
+                <TextField
+                  label="Collection Handle"
+                  value={formData.targetHandle}
+                  onChange={handleFieldChange("targetHandle")}
+                  autoComplete="off"
+                  placeholder="summer-shirts"
+                />
+
+                <TextField
+                  label="Collection Title / Target Title"
+                  value={formData.targetTitle}
+                  onChange={handleFieldChange("targetTitle")}
+                  autoComplete="off"
+                />
+              </>
+            ) : null}
+
+            {currentReviewType === "store" ? (
+              <TextField
+                label="Store Title"
+                value={formData.targetTitle}
+                onChange={handleFieldChange("targetTitle")}
+                autoComplete="off"
+                placeholder="Optional store display title"
+              />
+            ) : null}
 
             <TextField
               label="Customer name"

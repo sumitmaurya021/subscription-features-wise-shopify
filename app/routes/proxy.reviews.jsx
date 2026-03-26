@@ -57,9 +57,178 @@ function normalizeVideoUrl(value) {
   return url || null;
 }
 
+function normalizeReviewType(value) {
+  const reviewType = String(value || "product").trim().toLowerCase();
+
+  if (["product", "collection", "store"].includes(reviewType)) {
+    return reviewType;
+  }
+
+  return "product";
+}
+
+function normalizeNullableString(value) {
+  if (value === undefined || value === null) return null;
+
+  const parsed = String(value).trim();
+  return parsed || null;
+}
+
+function parseCsvIds(value) {
+  return String(value || "")
+    .split(/[,\n]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function inferReviewType({
+  explicitReviewType,
+  productId,
+  productIds,
+  targetId,
+  targetIds,
+  targetHandle,
+  collectionId,
+  collectionHandle,
+  shop,
+}) {
+  if (explicitReviewType) {
+    return normalizeReviewType(explicitReviewType);
+  }
+
+  if (productId || (Array.isArray(productIds) && productIds.length)) {
+    return "product";
+  }
+
+  if (targetHandle || collectionHandle) {
+    return "collection";
+  }
+
+  if (!productId && !targetId && !collectionId && !targetHandle && !collectionHandle) {
+    if (shop) return "store";
+  }
+
+  if (targetId || collectionId || (Array.isArray(targetIds) && targetIds.length)) {
+    return "product";
+  }
+
+  return "product";
+}
+
+function buildReviewTargetFields(input = {}) {
+  const inferredReviewType = inferReviewType({
+    explicitReviewType: input.reviewType,
+    productId: input.productId,
+    productIds: input.productIds,
+    targetId: input.targetId,
+    targetIds: input.targetIds,
+    targetHandle: input.targetHandle,
+    collectionId: input.collectionId,
+    collectionHandle: input.collectionHandle,
+    shop: input.shop,
+  });
+
+  const reviewType = normalizeReviewType(inferredReviewType);
+
+  const resolvedTargetId =
+    normalizeNullableString(input.targetId) ??
+    normalizeNullableString(input.productId) ??
+    normalizeNullableString(input.collectionId);
+
+  const resolvedTargetHandle =
+    normalizeNullableString(input.targetHandle) ??
+    normalizeNullableString(input.collectionHandle);
+
+  const resolvedTargetTitle =
+    normalizeNullableString(input.targetTitle) ??
+    normalizeNullableString(input.productTitle) ??
+    normalizeNullableString(input.collectionTitle) ??
+    normalizeNullableString(input.storeTitle);
+
+  let targetId = resolvedTargetId;
+  let targetHandle = resolvedTargetHandle;
+  let targetTitle = resolvedTargetTitle;
+
+  let productId = null;
+  let productTitle = null;
+
+  if (reviewType === "product") {
+    productId = resolvedTargetId;
+    productTitle = resolvedTargetTitle;
+  }
+
+  if (reviewType === "store") {
+    targetId = null;
+    targetHandle = null;
+    targetTitle = targetTitle || normalizeNullableString(input.shop);
+  }
+
+  return {
+    reviewType,
+    targetId,
+    targetHandle,
+    targetTitle,
+    productId,
+    productTitle,
+  };
+}
+
+function validateReviewTarget({
+  reviewType,
+  targetId,
+  targetHandle,
+  shop,
+}) {
+  if (reviewType === "product") {
+    if (!targetId) {
+      return "For product reviews, productId or targetId is required";
+    }
+    return null;
+  }
+
+  if (reviewType === "collection") {
+    if (!targetId && !targetHandle) {
+      return "For collection reviews, targetId or targetHandle is required";
+    }
+    return null;
+  }
+
+  if (reviewType === "store") {
+    if (!shop) {
+      return "Shop is required for store reviews";
+    }
+    return null;
+  }
+
+  return "Invalid review target";
+}
+
 function normalizeReview(review) {
+  if (!review) return null;
+
+  const reviewType = normalizeReviewType(review.reviewType || "product");
+
+  const targetId =
+    review.targetId !== undefined && review.targetId !== null
+      ? String(review.targetId)
+      : review.productId
+      ? String(review.productId)
+      : null;
+
+  const targetTitle =
+    review.targetTitle ||
+    review.productTitle ||
+    (reviewType === "store" ? review.shop : null) ||
+    null;
+
   return {
     ...review,
+    reviewType,
+    targetId,
+    targetHandle: review.targetHandle || null,
+    targetTitle,
+    productId: review.productId || null,
+    productTitle: review.productTitle || null,
     reviewImages: safeParseImages(review.reviewImages),
     reviewVideoUrl: review.reviewVideoUrl || null,
     reviewYoutubeUrl: review.reviewYoutubeUrl || null,
@@ -76,11 +245,101 @@ function normalizeReview(review) {
   };
 }
 
-function parseCsvIds(value) {
-  return String(value || "")
-    .split(/[,\n]+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
+function buildLoaderWhere({
+  reviewType,
+  shop,
+  productId,
+  productIds,
+  targetId,
+  targetIds,
+  targetHandle,
+  approvedOnly,
+  featuredOnly,
+  parsedStarRating,
+  parsedMinRating,
+}) {
+  const where = {};
+
+  if (shop) {
+    where.shop = String(shop);
+  }
+
+  if (approvedOnly) {
+    where.status = "approved";
+  }
+
+  if (featuredOnly) {
+    where.isPinned = true;
+  }
+
+  if (
+    parsedStarRating !== null &&
+    !Number.isNaN(parsedStarRating) &&
+    parsedStarRating >= 1 &&
+    parsedStarRating <= 5
+  ) {
+    where.rating = parsedStarRating;
+  } else if (
+    parsedMinRating !== null &&
+    !Number.isNaN(parsedMinRating) &&
+    parsedMinRating >= 1 &&
+    parsedMinRating <= 5
+  ) {
+    where.rating = {
+      gte: parsedMinRating,
+    };
+  }
+
+  if (reviewType === "product") {
+    where.reviewType = "product";
+
+    const allIds = [
+      ...productIds.map((id) => String(id)),
+      ...targetIds.map((id) => String(id)),
+    ];
+
+    const singleId =
+      normalizeNullableString(productId) ?? normalizeNullableString(targetId);
+
+    if (allIds.length) {
+      where.OR = [
+        { targetId: { in: allIds } },
+        { productId: { in: allIds } },
+      ];
+    } else if (singleId) {
+      where.OR = [{ targetId: singleId }, { productId: singleId }];
+    }
+  } else if (reviewType === "collection") {
+    where.reviewType = "collection";
+
+    const allIds = [...targetIds.map((id) => String(id))];
+    const normalizedTargetId = normalizeNullableString(targetId);
+    const normalizedTargetHandle = normalizeNullableString(targetHandle);
+
+    const orConditions = [];
+
+    if (allIds.length) {
+      orConditions.push({ targetId: { in: allIds } });
+    }
+
+    if (normalizedTargetId) {
+      orConditions.push({ targetId: normalizedTargetId });
+    }
+
+    if (normalizedTargetHandle) {
+      orConditions.push({ targetHandle: normalizedTargetHandle });
+    }
+
+    if (orConditions.length === 1) {
+      Object.assign(where, orConditions[0]);
+    } else if (orConditions.length > 1) {
+      where.OR = orConditions;
+    }
+  } else if (reviewType === "store") {
+    where.reviewType = "store";
+  }
+
+  return where;
 }
 
 export const loader = async ({ request }) => {
@@ -89,28 +348,86 @@ export const loader = async ({ request }) => {
 
     const productId = url.searchParams.get("productId");
     const productIdsParam = url.searchParams.get("productIds");
+
+    const targetId = url.searchParams.get("targetId");
+    const targetIdsParam = url.searchParams.get("targetIds");
+    const targetHandle = url.searchParams.get("targetHandle");
+
+    const collectionId = url.searchParams.get("collectionId");
+    const collectionHandle = url.searchParams.get("collectionHandle");
+
     const shop = url.searchParams.get("shop");
+    const explicitReviewType = url.searchParams.get("reviewType");
 
     const approvedOnly = url.searchParams.get("approvedOnly") === "true";
     const onlyMedia = url.searchParams.get("onlyMedia") === "true";
     const featuredOnly = url.searchParams.get("featuredOnly") === "true";
 
-    const reviewType = (url.searchParams.get("reviewType") || "any").trim();
+    const mediaType = (url.searchParams.get("reviewTypeMedia") || "").trim();
+    const reviewTypeFilter = (url.searchParams.get("reviewTypeFilter") || "").trim();
+
     const starRatingParam = url.searchParams.get("starRating");
     const minRatingParam = url.searchParams.get("minRating");
     const limitParam = url.searchParams.get("limit");
 
     const productIds = parseCsvIds(productIdsParam);
+    const targetIds = parseCsvIds(targetIdsParam);
+
+    if (collectionId) {
+      targetIds.push(String(collectionId));
+    }
 
     const parsedStarRating = starRatingParam ? Number(starRatingParam) : null;
     const parsedMinRating = minRatingParam ? Number(minRatingParam) : null;
     const parsedLimit = limitParam ? Number(limitParam) : null;
 
-    if (!productId && !productIds.length && !shop) {
+    const reviewType = inferReviewType({
+      explicitReviewType,
+      productId,
+      productIds,
+      targetId,
+      targetIds,
+      targetHandle,
+      collectionId,
+      collectionHandle,
+      shop,
+    });
+
+    if (reviewType === "product") {
+      if (!productId && !productIds.length && !targetId && !targetIds.length) {
+        return json(
+          {
+            success: false,
+            message: "productId, productIds, targetId, or targetIds is required for product reviews",
+            totalReviews: 0,
+            averageRating: 0,
+            data: [],
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (reviewType === "collection") {
+      if (!targetId && !targetIds.length && !targetHandle && !collectionHandle) {
+        return json(
+          {
+            success: false,
+            message: "targetId, targetIds, targetHandle, or collectionHandle is required for collection reviews",
+            totalReviews: 0,
+            averageRating: 0,
+            data: [],
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (reviewType === "store" && !shop) {
       return json(
         {
           success: false,
-          message: "productId, productIds, or shop is required",
+          message: "shop is required for store reviews",
           totalReviews: 0,
           averageRating: 0,
           data: [],
@@ -119,45 +436,19 @@ export const loader = async ({ request }) => {
       );
     }
 
-    const where = {};
-
-    if (productIds.length) {
-      where.productId = {
-        in: productIds.map((id) => String(id)),
-      };
-    } else if (productId) {
-      where.productId = String(productId);
-    }
-
-    if (shop) {
-      where.shop = String(shop);
-    }
-
-    if (approvedOnly) {
-      where.status = "approved";
-    }
-
-    if (featuredOnly) {
-      where.isPinned = true;
-    }
-
-    if (
-      parsedStarRating !== null &&
-      !Number.isNaN(parsedStarRating) &&
-      parsedStarRating >= 1 &&
-      parsedStarRating <= 5
-    ) {
-      where.rating = parsedStarRating;
-    } else if (
-      parsedMinRating !== null &&
-      !Number.isNaN(parsedMinRating) &&
-      parsedMinRating >= 1 &&
-      parsedMinRating <= 5
-    ) {
-      where.rating = {
-        gte: parsedMinRating,
-      };
-    }
+    const where = buildLoaderWhere({
+      reviewType,
+      shop,
+      productId,
+      productIds,
+      targetId,
+      targetIds,
+      targetHandle: targetHandle || collectionHandle,
+      approvedOnly,
+      featuredOnly,
+      parsedStarRating,
+      parsedMinRating,
+    });
 
     const reviews = await prisma.review.findMany({
       where,
@@ -166,11 +457,18 @@ export const loader = async ({ request }) => {
 
     let filteredReviews = reviews.map(normalizeReview);
 
-    if (reviewType === "uploaded") {
+    if (reviewTypeFilter) {
+      const normalizedTypeFilter = normalizeReviewType(reviewTypeFilter);
+      filteredReviews = filteredReviews.filter(
+        (review) => review.reviewType === normalizedTypeFilter
+      );
+    }
+
+    if (mediaType === "uploaded") {
       filteredReviews = filteredReviews.filter((review) =>
         Boolean(review.reviewVideoUrl)
       );
-    } else if (reviewType === "youtube") {
+    } else if (mediaType === "youtube") {
       filteredReviews = filteredReviews.filter((review) =>
         Boolean(review.reviewYoutubeUrl)
       );
@@ -227,8 +525,6 @@ export const action = async ({ request }) => {
 
       const {
         shop,
-        productId,
-        productTitle,
         customerName,
         customerEmail,
         rating,
@@ -239,12 +535,11 @@ export const action = async ({ request }) => {
         reviewYoutubeUrl,
       } = body;
 
-      if (!shop || !productId || !customerName || !rating || !message) {
+      if (!shop || !customerName || !rating || !message) {
         return json(
           {
             success: false,
-            message:
-              "shop, productId, customerName, rating and message are required",
+            message: "shop, customerName, rating and message are required",
           },
           { status: 400 }
         );
@@ -284,11 +579,37 @@ export const action = async ({ request }) => {
         );
       }
 
+      const targetFields = buildReviewTargetFields(body);
+
+      const targetValidationError = validateReviewTarget({
+        reviewType: targetFields.reviewType,
+        targetId: targetFields.targetId,
+        targetHandle: targetFields.targetHandle,
+        shop,
+      });
+
+      if (targetValidationError) {
+        return json(
+          {
+            success: false,
+            message: targetValidationError,
+          },
+          { status: 400 }
+        );
+      }
+
       const review = await prisma.review.create({
         data: {
           shop: String(shop),
-          productId: String(productId),
-          productTitle: productTitle || null,
+
+          reviewType: targetFields.reviewType,
+          targetId: targetFields.targetId,
+          targetHandle: targetFields.targetHandle,
+          targetTitle: targetFields.targetTitle,
+
+          productId: targetFields.productId,
+          productTitle: targetFields.productTitle,
+
           customerName: String(customerName).trim(),
           customerEmail: customerEmail ? String(customerEmail).trim() : null,
           rating: parsedRating,
