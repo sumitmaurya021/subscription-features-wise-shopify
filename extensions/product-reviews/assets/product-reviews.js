@@ -2,6 +2,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const root = document.getElementById("product-reviews-root");
   if (!root) return;
 
+  const reviewType = (root.dataset.reviewType || "product").trim().toLowerCase();
+  const targetId = root.dataset.targetId || "";
+  const targetHandle = root.dataset.targetHandle || "";
+  const targetTitle = root.dataset.targetTitle || "";
   const productId = root.dataset.productId || "";
   const productTitle = root.dataset.productTitle || "";
   const shop = root.dataset.shop || "";
@@ -266,6 +270,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       { keys: ["comfortable", "comfort"], tag: "Comfortable" },
       { keys: ["fit", "perfect fit"], tag: "Great fit" },
       { keys: ["recommended", "recommend"], tag: "Recommended" },
+      { keys: ["service", "support", "store"], tag: "Great service" },
+      { keys: ["collection", "range", "options"], tag: "Nice collection" },
     ];
 
     rules.forEach((rule) => {
@@ -300,8 +306,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     }, 3000);
   }
 
+  function getStorageTargetKey() {
+    const fallbackTargetId = reviewType === "store" ? "store" : targetId || targetHandle || "unknown";
+    return `${shop}_${reviewType}_${fallbackTargetId}`;
+  }
+
   function getHelpfulStorageKey(reviewId) {
-    return `pr_helpful_${shop}_${productId}_${reviewId}`;
+    return `pr_helpful_${getStorageTargetKey()}_${reviewId}`;
   }
 
   function hasMarkedHelpful(reviewId) {
@@ -409,7 +420,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         </div>
 
         <div class="pr-recommend-box">
-          <div class="pr-recommend-title">${recommendationPercent}% customers recommend this product</div>
+          <div class="pr-recommend-title">${recommendationPercent}% customers recommend this</div>
           <div class="pr-recommend-text">
             Customers mostly liked the quality, value, and overall experience.
           </div>
@@ -425,16 +436,28 @@ document.addEventListener("DOMContentLoaded", async () => {
   function renderEmptyState() {
     if (!listEl) return;
 
+    let emptyTitle = "No reviews yet";
+    let emptyText = "Be the first to share your experience.";
+    let emptyButton = "Write the first review";
+
+    if (reviewType === "collection") {
+      emptyText = "Be the first to share your experience with this collection.";
+    } else if (reviewType === "store") {
+      emptyText = "Be the first to share your experience with this store.";
+    } else {
+      emptyText = "Be the first to share your experience with this product.";
+    }
+
     listEl.innerHTML = `
       <div class="pr-empty">
         <div class="pr-empty-icon-wrap">
           <div class="pr-empty-icon">⭐</div>
           <div class="pr-empty-icon">💬</div>
         </div>
-        <h4 class="pr-empty-title">No reviews yet</h4>
-        <p>Be the first to share your experience with this product.</p>
+        <h4 class="pr-empty-title">${emptyTitle}</h4>
+        <p>${emptyText}</p>
         <div class="pr-empty-action">
-          <button type="button" class="pr-empty-btn" id="pr-empty-review-btn">Write the first review</button>
+          <button type="button" class="pr-empty-btn" id="pr-empty-review-btn">${emptyButton}</button>
         </div>
       </div>
     `;
@@ -1295,7 +1318,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     const uploadFormData = new FormData();
     uploadFormData.append("file", file);
     uploadFormData.append("upload_preset", cloudinaryUploadPreset);
-    uploadFormData.append("folder", `shopify-review-videos/${shop}/${productId}`);
+    uploadFormData.append(
+      "folder",
+      `shopify-review-videos/${shop}/${reviewType}/${targetId || targetHandle || "store"}`
+    );
 
     const response = await fetch(
       `https://api.cloudinary.com/v1_1/${cloudinaryCloudName}/video/upload`,
@@ -1417,6 +1443,30 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     } else {
       clearFieldError("reviewYoutubeUrl", youtubeInput);
+    }
+
+    if (reviewType === "product" && !targetId) {
+      isValid = false;
+      if (showErrors && messageEl) {
+        messageEl.className = "pr-message-box pr-message-error";
+        messageEl.textContent = "Product target is missing.";
+      }
+    }
+
+    if (reviewType === "collection" && !targetId && !targetHandle) {
+      isValid = false;
+      if (showErrors && messageEl) {
+        messageEl.className = "pr-message-box pr-message-error";
+        messageEl.textContent = "Collection target is missing.";
+      }
+    }
+
+    if (reviewType === "store" && !shop) {
+      isValid = false;
+      if (showErrors && messageEl) {
+        messageEl.className = "pr-message-box pr-message-error";
+        messageEl.textContent = "Store target is missing.";
+      }
     }
 
     return isValid;
@@ -1575,19 +1625,34 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  function buildReviewsUrl() {
+    const params = new URLSearchParams();
+    params.set("shop", shop);
+    params.set("approvedOnly", "true");
+    params.set("reviewType", reviewType);
+
+    if (reviewType === "product") {
+      params.set("targetId", targetId || productId);
+    } else if (reviewType === "collection") {
+      if (targetId) params.set("targetId", targetId);
+      if (targetHandle) params.set("targetHandle", targetHandle);
+    } else if (reviewType === "store") {
+      // only shop and reviewType needed
+    }
+
+    return `${endpoint}?${params.toString()}`;
+  }
+
   async function loadReviews() {
     renderLoadingState();
 
     try {
-      const response = await fetch(
-        `${endpoint}?productId=${encodeURIComponent(productId)}&shop=${encodeURIComponent(shop)}`,
-        {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-          },
-        }
-      );
+      const response = await fetch(buildReviewsUrl(), {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+      });
 
       const result = await response.json();
 
@@ -1596,10 +1661,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
 
-      allReviews = Array.isArray(result?.data)
-        ? result.data.filter((review) => review?.status === "approved")
-        : [];
-
+      allReviews = Array.isArray(result?.data) ? result.data : [];
       renderReviewsState();
     } catch {
       renderErrorState("Failed to load reviews");
@@ -1641,7 +1703,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const isValid = validateForm(true);
 
       if (!isValid) {
-        if (messageEl) {
+        if (messageEl && !messageEl.textContent) {
           messageEl.className = "pr-message-box pr-message-error";
           messageEl.textContent = "Please fix the highlighted fields.";
         }
@@ -1685,8 +1747,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const payload = {
         shop,
-        productId,
-        productTitle,
+        reviewType,
+        targetId: reviewType !== "store" ? (targetId || productId || "") : null,
+        targetHandle: reviewType === "collection" ? targetHandle || null : null,
+        targetTitle: targetTitle || productTitle || null,
+        productId: reviewType === "product" ? (productId || targetId || "") : null,
+        productTitle: reviewType === "product" ? (productTitle || targetTitle || null) : null,
         customerName: formData.get("customerName")?.toString().trim(),
         customerEmail: formData.get("customerEmail")?.toString().trim(),
         rating: Number(ratingInput?.value),

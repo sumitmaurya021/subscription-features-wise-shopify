@@ -1,12 +1,45 @@
 <head>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
 </head>
+
+{% liquid
+  assign review_type = 'store'
+  assign target_id = ''
+  assign target_handle = ''
+  assign target_title = shop.name
+  assign context_label = 'Store'
+  assign context_subheading = 'See what customers are saying about our store'
+  assign form_subtext = 'Tell other shoppers about your experience with our store'
+
+  if template.name == 'product' and product
+    assign review_type = 'product'
+    assign target_id = product.id
+    assign target_handle = product.handle
+    assign target_title = product.title
+    assign context_label = 'Product'
+    assign context_subheading = 'See what other buyers are saying about this product'
+    assign form_subtext = 'Tell other shoppers about your experience with this product'
+  elsif template.name == 'collection' and collection
+    assign review_type = 'collection'
+    assign target_id = collection.id
+    assign target_handle = collection.handle
+    assign target_title = collection.title
+    assign context_label = 'Collection'
+    assign context_subheading = 'See what shoppers are saying about this collection'
+    assign form_subtext = 'Tell other shoppers about your experience with this collection'
+  endif
+%}
+
 <div
   id="product-reviews-root"
-  data-product-id="{{ product.id }}"
-  data-product-title="{{ product.title | escape }}"
+  data-review-type="{{ review_type }}"
+  data-target-id="{{ target_id }}"
+  data-target-handle="{{ target_handle }}"
+  data-target-title="{{ target_title | escape }}"
+  data-product-id="{% if review_type == 'product' %}{{ product.id }}{% endif %}"
+  data-product-title="{% if review_type == 'product' %}{{ product.title | escape }}{% endif %}"
   data-shop="{{ shop.permanent_domain }}"
   data-endpoint="/apps/reviews"
   data-cloudinary-cloud-name="{{ block.settings.cloudinary_cloud_name }}"
@@ -18,10 +51,15 @@
         <div>
           <div class="pr-title-row">
             <h3 class="pr-heading">Customer Reviews</h3>
-            <span class="pr-top-badge">Top Rated</span>
+            <span class="pr-top-badge">
+              {{ context_label }} Reviews
+            </span>
           </div>
-          <p class="pr-subheading">See what other buyers are saying about this product</p>
-          <p class="pr-product-context">Reviewing: <strong>{{ product.title }}</strong></p>
+          <p class="pr-subheading">{{ context_subheading }}</p>
+          <p class="pr-product-context">
+            Reviewing {{ context_label }}:
+            <strong>{{ target_title }}</strong>
+          </p>
         </div>
       </div>
     </div>
@@ -31,7 +69,7 @@
         <div class="pr-form-collapsed-bar">
           <div>
             <h4 class="pr-form-heading">Write a review</h4>
-            <p class="pr-form-subtext">Tell other shoppers about your experience</p>
+            <p class="pr-form-subtext">{{ form_subtext }}</p>
           </div>
 
           <button
@@ -46,6 +84,13 @@
 
         <div id="pr-form-container" class="pr-form-container is-open">
           <form id="product-review-form" class="pr-form" novalidate>
+            <input type="hidden" name="reviewType" value="{{ review_type }}">
+            <input type="hidden" name="targetId" value="{{ target_id }}">
+            <input type="hidden" name="targetHandle" value="{{ target_handle }}">
+            <input type="hidden" name="targetTitle" value="{{ target_title | escape }}">
+            <input type="hidden" name="productId" value="{% if review_type == 'product' %}{{ product.id }}{% endif %}">
+            <input type="hidden" name="productTitle" value="{% if review_type == 'product' %}{{ product.title | escape }}{% endif %}">
+
             <div class="pr-field-row">
               <div class="pr-field">
                 <label for="pr-customer-name">Name <span class="pr-required">*</span></label>
@@ -352,7 +397,7 @@
 {
   "name": "Product Reviews",
   "target": "section",
-  "templates": ["product"],
+  "templates": ["product", "collection", "index"],
   "javascript": "product-reviews.js",
   "stylesheet": "product-reviews.css",
   "settings": [

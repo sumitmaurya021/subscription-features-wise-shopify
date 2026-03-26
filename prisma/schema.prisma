@@ -34,23 +34,31 @@ model Session {
 }
 
 model Review {
-  id            String   @id @default(cuid())
-  shop          String
-  productId     String
-  productTitle  String?
-  customerName  String
-  customerEmail String?
-  rating        Int
-  title         String?
-  message       String
-  reviewImages  String?
+  id               String   @id @default(cuid())
+  shop             String
+  reviewType       String   @default("product")
+  targetId         String?
+  targetHandle     String?
+  targetTitle      String?
+  productId        String?
+  productTitle     String?
+  customerName     String
+  customerEmail    String?
+  rating           Int
+  title            String?
+  message          String
+  reviewImages     String?
   reviewVideoUrl   String?
   reviewYoutubeUrl String?
-  helpfulCount  Int      @default(0) 
-  status        String   @default("pending")
-  isPinned      Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  helpfulCount     Int      @default(0)
+  status           String   @default("pending")
+  isPinned         Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  @@index([shop, reviewType])
+  @@index([shop, reviewType, targetId])
+  @@index([shop, reviewType, targetHandle])
+  @@index([shop, productId])
 }
 
 model WishlistItem {
