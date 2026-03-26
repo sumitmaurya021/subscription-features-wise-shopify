@@ -1,0 +1,452 @@
+{% liquid
+  assign review_selection = block.settings.review_selection | default: 'all'
+  assign star_rating_filter = block.settings.star_rating_filter | default: 'all'
+  assign max_reviews = block.settings.max_reviews | default: 20
+  assign quote_mark_size = block.settings.quote_mark_size | default: 'small'
+  assign product_name_text_size = block.settings.product_name_text_size | default: 'small'
+  assign verified_reviewer_style = block.settings.verified_reviewer_style | default: 'badge'
+  assign card_height = block.settings.card_height | default: 'medium'
+  assign text_size = block.settings.text_size | default: 'small'
+  assign stars_size = block.settings.stars_size | default: 'medium'
+  assign arrows_position = block.settings.arrows_position | default: 'bottom'
+  assign maximum_width = block.settings.maximum_width | default: 1100
+  assign corner_styling = block.settings.corner_styling | default: 'soft'
+  assign quote_marks_style = block.settings.quote_marks_style | default: 'serif'
+  assign card_color = block.settings.card_color | default: '#F9F9F9'
+  assign accent_color = block.settings.accent_color | default: '#108474'
+  assign text_color = block.settings.text_color | default: '#000000'
+  assign arrows_color = block.settings.arrows_color | default: '#000000'
+  assign show_border = block.settings.show_border
+  assign show_drop_shadow = block.settings.show_drop_shadow
+  assign transition_speed = block.settings.transition_speed | default: 60
+  assign header_text = block.settings.header_text | default: 'Customers are saying'
+  assign show_average_rating_text = block.settings.show_average_rating_text
+  assign show_sample_reviews = block.settings.show_sample_reviews
+%}
+
+{% capture selected_product_ids %}
+  {% if block.settings.selected_products != blank %}
+    {% for selected_product in block.settings.selected_products %}
+      {{ selected_product.id }}{% unless forloop.last %},{% endunless %}
+    {% endfor %}
+  {% endif %}
+{% endcapture %}
+
+<div
+  id="tc-root-{{ block.id }}"
+  class="tc-root"
+  data-block-id="{{ block.id }}"
+  data-endpoint="/apps/reviews"
+  data-shop="{{ shop.permanent_domain }}"
+  data-review-selection="{{ review_selection }}"
+  data-star-rating-filter="{{ star_rating_filter }}"
+  data-max-reviews="{{ max_reviews }}"
+  data-show-sample-reviews="{{ show_sample_reviews }}"
+  data-product-id="{{ product.id }}"
+  data-product-handle="{{ product.handle }}"
+  data-collection-id="{{ collection.id }}"
+  data-collection-handle="{{ collection.handle }}"
+  data-selected-product-ids="{{ selected_product_ids | strip }}"
+  data-verified-reviewer-style="{{ verified_reviewer_style }}"
+  data-transition-speed="{{ transition_speed }}"
+  data-arrows-position="{{ arrows_position }}"
+  style="
+    --tc-max-width: {{ maximum_width }}px;
+    --tc-card-color: {{ card_color }};
+    --tc-accent-color: {{ accent_color }};
+    --tc-text-color: {{ text_color }};
+    --tc-arrows-color: {{ arrows_color }};
+  "
+>
+  <div
+    class="
+      tc-widget
+      tc-corner--{{ corner_styling }}
+      tc-quote-size--{{ quote_mark_size }}
+      tc-quote-style--{{ quote_marks_style }}
+      tc-product-size--{{ product_name_text_size }}
+      tc-card-height--{{ card_height }}
+      tc-text-size--{{ text_size }}
+      tc-stars-size--{{ stars_size }}
+      tc-arrows-position--{{ arrows_position }}
+      {% if show_border %} tc-has-border{% endif %}
+      {% if show_drop_shadow %} tc-has-shadow{% endif %}
+    "
+  >
+    {% if header_text != blank or show_average_rating_text %}
+      <div class="tc-header">
+        {% if header_text != blank %}
+          <h2 class="tc-heading">{{ header_text }}</h2>
+        {% endif %}
+
+        <div class="tc-header-rating" {% unless show_average_rating_text %}hidden{% endunless %}>
+          <span class="tc-header-stars" aria-hidden="true">★★★★★</span>
+          <span class="tc-header-rating-value">4.00</span>
+          <span class="tc-header-rating-count">(0)</span>
+          <span class="tc-header-rating-separator">•</span>
+          <span class="tc-header-rating-verified">
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+              <path d="M10 1.7l2.2 1.2 2.5-.2 1.2 2.2 2 1.5-.7 2.4.7 2.4-2 1.5-1.2 2.2-2.5-.2L10 18.3l-2.2-1.2-2.5.2-1.2-2.2-2-1.5.7-2.4-.7-2.4 2-1.5 1.2-2.2 2.5.2L10 1.7zm-1 10.5l5-5-1.1-1.1L9 9.9 7.2 8.1 6.1 9.2 9 12.2z" fill="currentColor"/>
+            </svg>
+            <span>Verified</span>
+          </span>
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="tc-stage">
+      <button
+        type="button"
+        class="tc-arrow tc-arrow--prev"
+        aria-label="Previous testimonial"
+      >
+        <span aria-hidden="true">‹</span>
+      </button>
+
+      <div class="tc-viewport">
+        <div class="tc-track">
+          <div class="tc-loading">
+            <div class="tc-card tc-card--loading">
+              <div class="tc-quote-mark">”</div>
+
+              <div class="tc-card-content">
+                <div class="tc-loading-line tc-loading-line--lg"></div>
+                <div class="tc-loading-line"></div>
+                <div class="tc-loading-line"></div>
+                <div class="tc-loading-line tc-loading-line--md"></div>
+
+                <div class="tc-loading-stars">★★★★★</div>
+                <div class="tc-loading-line tc-loading-line--sm"></div>
+                <div class="tc-loading-line tc-loading-line--xs"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        class="tc-arrow tc-arrow--next"
+        aria-label="Next testimonial"
+      >
+        <span aria-hidden="true">›</span>
+      </button>
+    </div>
+
+    <div class="tc-bottom-arrows" {% if arrows_position != 'bottom' %}hidden{% endif %}>
+      <button
+        type="button"
+        class="tc-arrow tc-arrow--prev-bottom"
+        aria-label="Previous testimonial"
+      >
+        <span aria-hidden="true">‹</span>
+      </button>
+      <button
+        type="button"
+        class="tc-arrow tc-arrow--next-bottom"
+        aria-label="Next testimonial"
+      >
+        <span aria-hidden="true">›</span>
+      </button>
+    </div>
+
+    <div class="tc-empty" hidden>
+      <div class="tc-empty-inner">
+        <div class="tc-empty-icon">★</div>
+        <h3 class="tc-empty-title">No testimonials available</h3>
+        <p class="tc-empty-text">
+          Approved reviews will appear here once they are available for the selected source.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <template class="tc-card-template">
+    <article class="tc-card">
+      <div class="tc-quote-mark">”</div>
+
+      <div class="tc-card-content">
+        <div class="tc-review-message"></div>
+
+        <div class="tc-review-stars" aria-hidden="true">★★★★★</div>
+
+        <div class="tc-review-author-row">
+          <div class="tc-review-author"></div>
+
+          <div class="tc-review-verified" hidden>
+            <span class="tc-review-verified-badge">Verified</span>
+            <span class="tc-review-verified-text">Verified reviewer</span>
+          </div>
+        </div>
+
+        <div class="tc-review-product"></div>
+      </div>
+    </article>
+  </template>
+</div>
+
+{% schema %}
+{
+  "name": "Testimonials Carousel",
+  "target": "section",
+  "stylesheet": "testimonials-carousel.css",
+  "javascript": "testimonials-carousel.js",
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Display customer quotes to build trust and social proof. Add this block anywhere from the theme editor."
+    },
+
+    {
+      "type": "header",
+      "content": "Reviews selection"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_sample_reviews",
+      "label": "Show sample reviews (Preview only)",
+      "default": false
+    },
+    {
+      "type": "select",
+      "id": "review_selection",
+      "label": "Reviews selection",
+      "default": "all",
+      "options": [
+        { "value": "all", "label": "All" },
+        { "value": "product_reviews", "label": "Product reviews" },
+        { "value": "store_reviews", "label": "Store reviews" },
+        { "value": "current_product", "label": "Current product" },
+        { "value": "current_collection", "label": "Current collection" },
+        { "value": "featured", "label": "Featured" },
+        { "value": "custom_products", "label": "Custom products" }
+      ]
+    },
+    {
+      "type": "product_list",
+      "id": "selected_products",
+      "label": "Select products for custom selection"
+    },
+    {
+      "type": "select",
+      "id": "star_rating_filter",
+      "label": "Star rating",
+      "default": "all",
+      "options": [
+        { "value": "all", "label": "All" },
+        { "value": "5", "label": "5-star only" },
+        { "value": "4-5", "label": "4 to 5-star only" },
+        { "value": "3-5", "label": "3 to 5-star only" }
+      ]
+    },
+    {
+      "type": "range",
+      "id": "max_reviews",
+      "label": "Maximum review number",
+      "min": 2,
+      "max": 40,
+      "step": 1,
+      "default": 20
+    },
+
+    {
+      "type": "header",
+      "content": "Layout"
+    },
+    {
+      "type": "select",
+      "id": "quote_mark_size",
+      "label": "Quote mark size",
+      "default": "small",
+      "options": [
+        { "value": "small", "label": "Small" },
+        { "value": "medium", "label": "Medium" },
+        { "value": "large", "label": "Large" },
+        { "value": "extra-large", "label": "Extra large" },
+        { "value": "hidden", "label": "Hidden" }
+      ]
+    },
+    {
+      "type": "select",
+      "id": "product_name_text_size",
+      "label": "Product name text size",
+      "default": "small",
+      "options": [
+        { "value": "small", "label": "Small" },
+        { "value": "medium", "label": "Medium" },
+        { "value": "large", "label": "Large" },
+        { "value": "extra-large", "label": "Extra large" },
+        { "value": "hidden", "label": "Hidden" }
+      ]
+    },
+    {
+      "type": "select",
+      "id": "verified_reviewer_style",
+      "label": "Verified reviewer",
+      "default": "badge",
+      "options": [
+        { "value": "badge", "label": "Badge" },
+        { "value": "text", "label": "Text" }
+      ]
+    },
+    {
+      "type": "select",
+      "id": "card_height",
+      "label": "Card height",
+      "default": "medium",
+      "options": [
+        { "value": "compact", "label": "Compact" },
+        { "value": "medium", "label": "Medium" },
+        { "value": "tall", "label": "Tall" },
+        { "value": "extra-tall", "label": "Extra tall" }
+      ]
+    },
+    {
+      "type": "select",
+      "id": "text_size",
+      "label": "Text size",
+      "default": "small",
+      "options": [
+        { "value": "extra-small", "label": "Extra small" },
+        { "value": "small", "label": "Small" },
+        { "value": "medium", "label": "Medium" },
+        { "value": "large", "label": "Large" },
+        { "value": "extra-large", "label": "Extra large" },
+        { "value": "huge", "label": "Huge" }
+      ]
+    },
+    {
+      "type": "select",
+      "id": "stars_size",
+      "label": "Stars size",
+      "default": "medium",
+      "options": [
+        { "value": "small", "label": "Small" },
+        { "value": "medium", "label": "Medium" },
+        { "value": "large", "label": "Large" },
+        { "value": "hidden", "label": "Hidden" }
+      ]
+    },
+    {
+      "type": "select",
+      "id": "arrows_position",
+      "label": "Arrows position",
+      "default": "bottom",
+      "options": [
+        { "value": "sides", "label": "Sides" },
+        { "value": "bottom", "label": "Bottom" },
+        { "value": "hidden", "label": "Hidden" }
+      ]
+    },
+    {
+      "type": "range",
+      "id": "maximum_width",
+      "label": "Maximum width",
+      "min": 400,
+      "max": 1600,
+      "step": 20,
+      "unit": "px",
+      "default": 1100
+    },
+
+    {
+      "type": "header",
+      "content": "Styling"
+    },
+    {
+      "type": "select",
+      "id": "corner_styling",
+      "label": "Corner styling",
+      "default": "soft",
+      "options": [
+        { "value": "square", "label": "Square" },
+        { "value": "soft", "label": "Soft" },
+        { "value": "round", "label": "Round" },
+        { "value": "extra-round", "label": "Extra round" }
+      ]
+    },
+    {
+      "type": "select",
+      "id": "quote_marks_style",
+      "label": "Quote marks",
+      "default": "serif",
+      "options": [
+        { "value": "serif", "label": "Serif" },
+        { "value": "typewritten", "label": "Typewrited" },
+        { "value": "basic", "label": "Basic" },
+        { "value": "bold", "label": "Bold" },
+        { "value": "cartoon", "label": "Cartoon" },
+        { "value": "sans-serif", "label": "Sans serif" }
+      ]
+    },
+    {
+      "type": "color",
+      "id": "card_color",
+      "label": "Card color",
+      "default": "#F9F9F9"
+    },
+    {
+      "type": "color",
+      "id": "accent_color",
+      "label": "Stars and quote marks color",
+      "default": "#108474"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Text color",
+      "default": "#000000"
+    },
+    {
+      "type": "color",
+      "id": "arrows_color",
+      "label": "Arrows color",
+      "default": "#000000"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_border",
+      "label": "Show border",
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "show_drop_shadow",
+      "label": "Show drop shadow",
+      "default": false
+    },
+
+    {
+      "type": "header",
+      "content": "Behavior"
+    },
+    {
+      "type": "range",
+      "id": "transition_speed",
+      "label": "Transition speed",
+      "min": 2,
+      "max": 60,
+      "step": 1,
+      "unit": "s",
+      "default": 60
+    },
+
+    {
+      "type": "header",
+      "content": "Header"
+    },
+    {
+      "type": "text",
+      "id": "header_text",
+      "label": "Header text",
+      "default": "Customers are saying"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_average_rating_text",
+      "label": "Average rating text",
+      "default": false
+    }
+  ]
+}
+{% endschema %}
