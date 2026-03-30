@@ -191,7 +191,7 @@ function normalizeReview(review) {
     targetHandle: review.targetHandle || null,
     targetTitle,
     productId: review.productId || null,
-    productTitle: review.productTitle || null,
+    productTitle: review.productTitle || review.targetTitle || null,
     reviewImages: parseReviewImages(review.reviewImages),
     reviewVideoUrl: review.reviewVideoUrl || null,
     reviewYoutubeUrl: review.reviewYoutubeUrl || null,

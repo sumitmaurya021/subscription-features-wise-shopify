@@ -1,9 +1,3 @@
-<head>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
-</head>
-
 {% liquid
   assign review_type = 'store'
   assign target_id = ''
@@ -12,6 +6,8 @@
   assign context_label = 'Store'
   assign context_subheading = 'See what customers are saying about our store'
   assign form_subtext = 'Tell other shoppers about your experience with our store'
+  assign review_subject_text = 'store'
+  assign context_image = ''
 
   if template.name == 'product' and product
     assign review_type = 'product'
@@ -21,6 +17,10 @@
     assign context_label = 'Product'
     assign context_subheading = 'See what other buyers are saying about this product'
     assign form_subtext = 'Tell other shoppers about your experience with this product'
+    assign review_subject_text = 'product'
+    if product.featured_image
+      assign context_image = product.featured_image | image_url: width: 800
+    endif
   elsif template.name == 'collection' and collection
     assign review_type = 'collection'
     assign target_id = collection.id
@@ -29,6 +29,10 @@
     assign context_label = 'Collection'
     assign context_subheading = 'See what shoppers are saying about this collection'
     assign form_subtext = 'Tell other shoppers about your experience with this collection'
+    assign review_subject_text = 'collection'
+    if collection.image
+      assign context_image = collection.image | image_url: width: 800
+    endif
   endif
 %}
 
@@ -38,359 +42,24 @@
   data-target-id="{{ target_id }}"
   data-target-handle="{{ target_handle }}"
   data-target-title="{{ target_title | escape }}"
+  data-context-label="{{ context_label | escape }}"
+  data-context-subheading="{{ context_subheading | escape }}"
+  data-form-subtext="{{ form_subtext | escape }}"
+  data-review-subject="{{ review_subject_text | escape }}"
+  data-context-image="{{ context_image }}"
   data-product-id="{% if review_type == 'product' %}{{ product.id }}{% endif %}"
   data-product-title="{% if review_type == 'product' %}{{ product.title | escape }}{% endif %}"
   data-shop="{{ shop.permanent_domain }}"
   data-endpoint="/apps/reviews"
   data-cloudinary-cloud-name="{{ block.settings.cloudinary_cloud_name }}"
   data-cloudinary-upload-preset="{{ block.settings.cloudinary_upload_preset }}"
+  data-main-script="{{ 'product-reviews-main.js' | asset_url }}"
 >
   <div class="pr-widget">
-    <div class="pr-header">
-      <div class="pr-header-top pr-form-section-card">
-        <div>
-          <div class="pr-title-row">
-            <h3 class="pr-heading">Customer Reviews</h3>
-            <span class="pr-top-badge">
-              {{ context_label }} Reviews
-            </span>
-          </div>
-          <p class="pr-subheading">{{ context_subheading }}</p>
-          <p class="pr-product-context">
-            Reviewing {{ context_label }}:
-            <strong>{{ target_title }}</strong>
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <div class="pr-main-sections">
-      <div class="pr-form-section-card">
-        <div class="pr-form-collapsed-bar">
-          <div>
-            <h4 class="pr-form-heading">Write a review</h4>
-            <p class="pr-form-subtext">{{ form_subtext }}</p>
-          </div>
-
-          <button
-            type="button"
-            id="pr-toggle-form-btn"
-            class="pr-toggle-form-btn"
-            aria-expanded="true"
-          >
-            Hide form
-          </button>
-        </div>
-
-        <div id="pr-form-container" class="pr-form-container is-open">
-          <form id="product-review-form" class="pr-form" novalidate>
-            <input type="hidden" name="reviewType" value="{{ review_type }}">
-            <input type="hidden" name="targetId" value="{{ target_id }}">
-            <input type="hidden" name="targetHandle" value="{{ target_handle }}">
-            <input type="hidden" name="targetTitle" value="{{ target_title | escape }}">
-            <input type="hidden" name="productId" value="{% if review_type == 'product' %}{{ product.id }}{% endif %}">
-            <input type="hidden" name="productTitle" value="{% if review_type == 'product' %}{{ product.title | escape }}{% endif %}">
-
-            <div class="pr-field-row">
-              <div class="pr-field">
-                <label for="pr-customer-name">Name <span class="pr-required">*</span></label>
-                <input
-                  id="pr-customer-name"
-                  type="text"
-                  name="customerName"
-                  placeholder="Enter your name"
-                  required
-                >
-                <div class="pr-inline-error" data-error-for="customerName"></div>
-              </div>
-
-              <div class="pr-field">
-                <label for="pr-customer-email">Email</label>
-                <input
-                  id="pr-customer-email"
-                  type="email"
-                  name="customerEmail"
-                  placeholder="Enter your email"
-                >
-                <div class="pr-inline-error" data-error-for="customerEmail"></div>
-              </div>
-            </div>
-
-            <div class="pr-field-row">
-              <div class="pr-field">
-                <label>Rating <span class="pr-required">*</span></label>
-
-                <div class="pr-rating-selector-wrap">
-                  <input type="hidden" id="pr-rating" name="rating" value="" required>
-
-                  <div class="pr-star-selector" aria-label="Choose rating">
-                    <button type="button" class="pr-star-btn" data-value="1" aria-label="1 star">★</button>
-                    <button type="button" class="pr-star-btn" data-value="2" aria-label="2 stars">★</button>
-                    <button type="button" class="pr-star-btn" data-value="3" aria-label="3 stars">★</button>
-                    <button type="button" class="pr-star-btn" data-value="4" aria-label="4 stars">★</button>
-                    <button type="button" class="pr-star-btn" data-value="5" aria-label="5 stars">★</button>
-                  </div>
-
-                  <div id="pr-rating-live-text" class="pr-rating-live-text">Select rating</div>
-                  <div class="pr-inline-error" data-error-for="rating"></div>
-                </div>
-              </div>
-
-              <div class="pr-field">
-                <label for="pr-title">Review title</label>
-                <input
-                  id="pr-title"
-                  type="text"
-                  name="title"
-                  placeholder="Give your review a title"
-                  maxlength="80"
-                >
-                <div class="pr-field-helper">
-                  <span>Keep it short and clear</span>
-                  <span id="pr-title-count">0 / 80</span>
-                </div>
-                <div class="pr-inline-error" data-error-for="title"></div>
-              </div>
-            </div>
-
-            <div class="pr-field">
-              <label for="pr-message">Message <span class="pr-required">*</span></label>
-              <textarea
-                id="pr-message"
-                name="message"
-                rows="4"
-                placeholder="Write your review here..."
-                required
-                maxlength="1000"
-              ></textarea>
-              <div class="pr-field-helper">
-                <span>Minimum 20 characters recommended</span>
-                <span id="pr-message-count">0 / 1000</span>
-              </div>
-              <div class="pr-inline-error" data-error-for="message"></div>
-            </div>
-
-            <div class="pr-field">
-              <label for="pr-review-images">Add photos</label>
-
-              <div
-                id="pr-upload-dropzone"
-                class="pr-upload-dropzone"
-                tabindex="0"
-                role="button"
-                aria-label="Upload review images"
-              >
-                <input
-                  id="pr-review-images"
-                  class="pr-file-input"
-                  type="file"
-                  name="reviewImages"
-                  accept="image/png,image/jpeg,image/jpg"
-                  multiple
-                >
-
-                <div class="pr-upload-icon-wrap">
-                  <svg class="pr-upload-icon" viewBox="0 0 64 64" aria-hidden="true">
-                    <defs>
-                      <linearGradient id="prUploadGradientA" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#93c5fd"></stop>
-                        <stop offset="100%" stop-color="#2563eb"></stop>
-                      </linearGradient>
-                      <linearGradient id="prUploadGradientB" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#e2e8f0"></stop>
-                        <stop offset="100%" stop-color="#7dd3fc"></stop>
-                      </linearGradient>
-                    </defs>
-
-                    <circle cx="32" cy="16" r="5" fill="#60a5fa"></circle>
-                    <path d="M12 44c0-6 4-10 10-10 3 0 6 1 8 4l4-5c2-3 5-5 9-5 6 0 11 5 11 11v1c4 1 6 4 6 8 0 5-4 9-9 9H20c-5 0-8-3-8-8 0-2 0-3 0-5z" fill="url(#prUploadGradientB)"></path>
-                    <path d="M19 48l11-12 8 8 6-6 10 10H19z" fill="url(#prUploadGradientA)"></path>
-                  </svg>
-                </div>
-
-                <div class="pr-upload-title">
-                  Drop your image here, or <span>browse</span>
-                </div>
-                <div class="pr-upload-subtext">Supports: JPG, PNG</div>
-              </div>
-
-              <div id="pr-image-preview-wrap" class="pr-image-preview-wrap" hidden>
-                <div class="pr-image-preview-label">Selected photos</div>
-                <div id="pr-image-preview" class="pr-image-preview"></div>
-              </div>
-
-              <div class="pr-inline-error" data-error-for="reviewImages"></div>
-            </div>
-
-            <div class="pr-field-row">
-              <div class="pr-field">
-                <label for="pr-youtube-url">YouTube video link</label>
-                <input
-                  id="pr-youtube-url"
-                  type="url"
-                  name="reviewYoutubeUrl"
-                  placeholder="https://www.youtube.com/watch?v=..."
-                >
-                <div class="pr-inline-error" data-error-for="reviewYoutubeUrl"></div>
-              </div>
-
-              <div class="pr-field">
-                <label for="pr-review-video">Upload video</label>
-
-                <div
-                  id="pr-video-dropzone"
-                  class="pr-upload-dropzone"
-                  tabindex="0"
-                  role="button"
-                  aria-label="Upload review video"
-                >
-                  <input
-                    id="pr-review-video"
-                    class="pr-file-input"
-                    type="file"
-                    name="reviewVideo"
-                    accept="video/mp4,video/webm,video/quicktime"
-                  >
-
-                  <div class="pr-upload-icon-wrap">
-                    <svg class="pr-upload-icon" viewBox="0 0 64 64" aria-hidden="true">
-                      <defs>
-                        <linearGradient id="prVideoGradientA" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stop-color="#c4b5fd"></stop>
-                          <stop offset="100%" stop-color="#2563eb"></stop>
-                        </linearGradient>
-                        <linearGradient id="prVideoGradientB" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stop-color="#e2e8f0"></stop>
-                          <stop offset="100%" stop-color="#bfdbfe"></stop>
-                        </linearGradient>
-                      </defs>
-
-                      <rect x="10" y="16" width="34" height="28" rx="8" fill="url(#prVideoGradientB)"></rect>
-                      <path d="M28 30l-8-5v10l8-5z" fill="#2563eb"></path>
-                      <path d="M47 24l8-5v22l-8-5V24z" fill="url(#prVideoGradientA)"></path>
-                    </svg>
-                  </div>
-
-                  <div class="pr-upload-title">
-                    Drop your video here, or <span>browse</span>
-                  </div>
-                  <div class="pr-upload-subtext">Supports: MP4, WEBM, MOV</div>
-                </div>
-
-                <div id="pr-video-preview-wrap" class="pr-video-preview-wrap" hidden>
-                  <div class="pr-image-preview-label">Selected video</div>
-                  <div id="pr-video-preview" class="pr-video-preview"></div>
-                </div>
-
-                <div class="pr-inline-error" data-error-for="reviewVideo"></div>
-              </div>
-            </div>
-
-            <div class="pr-form-actions">
-              <button type="submit" class="pr-submit-btn">Publish Review</button>
-            </div>
-          </form>
-
-          <p id="product-review-message" class="pr-message-box"></p>
-        </div>
-      </div>
-
-      <div class="pr-section-divider"></div>
-
-      <div class="pr-reviews-section-card">
-        <div class="pr-reviews-section">
-          <div class="pr-summary-column">
-            <div class="pr-average">Loading reviews...</div>
-          </div>
-
-          <div class="pr-list-column">
-            <div class="pr-toolbar">
-              <div class="pr-toolbar-top">
-                <div class="pr-toolbar-search">
-                  <input
-                    type="text"
-                    id="pr-search-input"
-                    class="pr-search-input"
-                    placeholder="Search reviews..."
-                  >
-                </div>
-
-                <div id="pr-filter-chips" class="pr-filter-chips">
-                  <button type="button" class="pr-filter-chip is-active" data-rating="all">All Reviews</button>
-                  <button type="button" class="pr-filter-chip" data-rating="pinned">Pinned Reviews</button>
-                  <button type="button" class="pr-filter-chip" data-rating="5">5★</button>
-                  <button type="button" class="pr-filter-chip" data-rating="4">4★</button>
-                  <button type="button" class="pr-filter-chip" data-rating="3">3★</button>
-                  <button type="button" class="pr-filter-chip" data-rating="2">2★</button>
-                  <button type="button" class="pr-filter-chip" data-rating="1">1★</button>
-                </div>
-              </div>
-
-              <div class="pr-toolbar-bottom">
-                <div class="pr-sort-segment" id="pr-sort-segment">
-                  <button type="button" class="pr-sort-btn is-active" data-sort="newest">Newest</button>
-                  <button type="button" class="pr-sort-btn" data-sort="highest">Highest</button>
-                  <button type="button" class="pr-sort-btn" data-sort="lowest">Lowest</button>
-                  <button type="button" class="pr-sort-btn" data-sort="oldest">Oldest</button>
-                </div>
-
-                <div id="pr-results-meta" class="pr-results-meta"></div>
-              </div>
-            </div>
-
-            <div class="pr-list"></div>
-
-            <div class="pr-load-more-wrap">
-              <button type="button" id="pr-load-more-btn" class="pr-load-more-btn">
-                Load more reviews
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div class="pr-shell">
+      <div class="pr-skeleton-card" style="min-height: 220px;"></div>
     </div>
   </div>
-
-  <div id="pr-lightbox" class="pr-lightbox" hidden>
-    <div class="pr-lightbox-overlay" data-close-lightbox="true"></div>
-
-    <div class="pr-lightbox-dialog" role="dialog" aria-modal="true" aria-label="Review image gallery">
-      <button
-        type="button"
-        class="pr-lightbox-close"
-        id="pr-lightbox-close"
-        aria-label="Close"
-      >
-        ×
-      </button>
-
-      <button
-        type="button"
-        class="pr-lightbox-nav pr-lightbox-prev"
-        id="pr-lightbox-prev"
-        aria-label="Previous image"
-      >
-        ‹
-      </button>
-
-      <div class="pr-lightbox-image-wrap">
-        <img id="pr-lightbox-image" class="pr-lightbox-image" src="" alt="Review image">
-      </div>
-
-      <button
-        type="button"
-        class="pr-lightbox-nav pr-lightbox-next"
-        id="pr-lightbox-next"
-        aria-label="Next image"
-      >
-        ›
-      </button>
-
-      <div id="pr-lightbox-counter" class="pr-lightbox-counter"></div>
-    </div>
-  </div>
-
-  <div id="pr-toast" class="pr-toast" hidden></div>
 </div>
 
 {% schema %}

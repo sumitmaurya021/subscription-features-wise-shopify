@@ -104,11 +104,21 @@ function inferReviewType({
     return "collection";
   }
 
-  if (!productId && !targetId && !collectionId && !targetHandle && !collectionHandle) {
+  if (
+    !productId &&
+    !targetId &&
+    !collectionId &&
+    !targetHandle &&
+    !collectionHandle
+  ) {
     if (shop) return "store";
   }
 
-  if (targetId || collectionId || (Array.isArray(targetIds) && targetIds.length)) {
+  if (
+    targetId ||
+    collectionId ||
+    (Array.isArray(targetIds) && targetIds.length)
+  ) {
     return "product";
   }
 
@@ -173,12 +183,7 @@ function buildReviewTargetFields(input = {}) {
   };
 }
 
-function validateReviewTarget({
-  reviewType,
-  targetId,
-  targetHandle,
-  shop,
-}) {
+function validateReviewTarget({ reviewType, targetId, targetHandle, shop }) {
   if (reviewType === "product") {
     if (!targetId) {
       return "For product reviews, productId or targetId is required";
@@ -228,7 +233,7 @@ function normalizeReview(review) {
     targetHandle: review.targetHandle || null,
     targetTitle,
     productId: review.productId || null,
-    productTitle: review.productTitle || null,
+    productTitle: review.productTitle || review.targetTitle || null,
     reviewImages: safeParseImages(review.reviewImages),
     reviewVideoUrl: review.reviewVideoUrl || null,
     reviewYoutubeUrl: review.reviewYoutubeUrl || null,
@@ -302,10 +307,7 @@ function buildLoaderWhere({
       normalizeNullableString(productId) ?? normalizeNullableString(targetId);
 
     if (allIds.length) {
-      where.OR = [
-        { targetId: { in: allIds } },
-        { productId: { in: allIds } },
-      ];
+      where.OR = [{ targetId: { in: allIds } }, { productId: { in: allIds } }];
     } else if (singleId) {
       where.OR = [{ targetId: singleId }, { productId: singleId }];
     }
@@ -364,11 +366,14 @@ export const loader = async ({ request }) => {
     const featuredOnly = url.searchParams.get("featuredOnly") === "true";
 
     const mediaType = (url.searchParams.get("reviewTypeMedia") || "").trim();
-    const reviewTypeFilter = (url.searchParams.get("reviewTypeFilter") || "").trim();
+    const reviewTypeFilter = (
+      url.searchParams.get("reviewTypeFilter") || ""
+    ).trim();
 
     const starRatingParam = url.searchParams.get("starRating");
     const minRatingParam = url.searchParams.get("minRating");
     const limitParam = url.searchParams.get("limit");
+    const pageParam = url.searchParams.get("page");
 
     const productIds = parseCsvIds(productIdsParam);
     const targetIds = parseCsvIds(targetIdsParam);
@@ -380,6 +385,7 @@ export const loader = async ({ request }) => {
     const parsedStarRating = starRatingParam ? Number(starRatingParam) : null;
     const parsedMinRating = minRatingParam ? Number(minRatingParam) : null;
     const parsedLimit = limitParam ? Number(limitParam) : null;
+    const parsedPage = Math.max(1, Number(pageParam) || 1);
 
     const reviewType = inferReviewType({
       explicitReviewType,
@@ -393,12 +399,19 @@ export const loader = async ({ request }) => {
       shop,
     });
 
+    const hasProductScope =
+      Boolean(productId) ||
+      productIds.length > 0 ||
+      Boolean(targetId) ||
+      targetIds.length > 0;
+
     if (reviewType === "product") {
-      if (!productId && !productIds.length && !targetId && !targetIds.length) {
+      if (!hasProductScope && !shop) {
         return json(
           {
             success: false,
-            message: "productId, productIds, targetId, or targetIds is required for product reviews",
+            message:
+              "For product reviews, shop or productId/targetId/productIds/targetIds is required",
             totalReviews: 0,
             averageRating: 0,
             data: [],
@@ -413,7 +426,8 @@ export const loader = async ({ request }) => {
         return json(
           {
             success: false,
-            message: "targetId, targetIds, targetHandle, or collectionHandle is required for collection reviews",
+            message:
+              "targetId, targetIds, targetHandle, or collectionHandle is required for collection reviews",
             totalReviews: 0,
             averageRating: 0,
             data: [],
@@ -477,14 +491,11 @@ export const loader = async ({ request }) => {
     if (onlyMedia) {
       filteredReviews = filteredReviews.filter(
         (review) =>
-          (Array.isArray(review.reviewImages) && review.reviewImages.length > 0) ||
+          (Array.isArray(review.reviewImages) &&
+            review.reviewImages.length > 0) ||
           Boolean(review.reviewVideoUrl) ||
           Boolean(review.reviewYoutubeUrl)
       );
-    }
-
-    if (parsedLimit !== null && !Number.isNaN(parsedLimit) && parsedLimit > 0) {
-      filteredReviews = filteredReviews.slice(0, parsedLimit);
     }
 
     const totalReviews = filteredReviews.length;
@@ -495,6 +506,11 @@ export const loader = async ({ request }) => {
             0
           ) / totalReviews
         : 0;
+
+    if (parsedLimit !== null && !Number.isNaN(parsedLimit) && parsedLimit > 0) {
+      const start = (parsedPage - 1) * parsedLimit;
+      filteredReviews = filteredReviews.slice(start, start + parsedLimit);
+    }
 
     return json({
       success: true,
