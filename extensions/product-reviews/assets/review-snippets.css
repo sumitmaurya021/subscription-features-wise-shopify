@@ -1,0 +1,449 @@
+.rsn-root {
+  --rsn-card-bg: #ffffff;
+  --rsn-text-color: #111111;
+  --rsn-star-color: #178b7a;
+  --rsn-arrow-bg: #ffffff;
+  --rsn-arrow-color: #111111;
+  --rsn-border-color: #e7ecea;
+  --rsn-card-radius: 24px;
+  --rsn-card-padding: 24px;
+  --rsn-card-max-width: 650px;
+  --rsn-card-min-height: 180px;
+  --rsn-name-size: 22px;
+  --rsn-text-size: 18px;
+  --rsn-section-pad-top: 0px;
+  --rsn-section-pad-bottom: 0px;
+  --rsn-card-shadow: 0 16px 40px rgba(0, 0, 0, 0.1);
+  --rsn-button-bg: #111111;
+  --rsn-button-text: #ffffff;
+  --rsn-button-radius: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.rsn-root,
+.rsn-root *,
+.rsn-root *::before,
+.rsn-root *::after {
+  box-sizing: border-box;
+}
+
+.rsn-root .rsn-shell {
+  width: 100%;
+}
+
+.rsn-root .rsn-slider {
+  position: relative;
+  width: 100%;
+  max-width: calc(var(--rsn-card-max-width) + 96px);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rsn-root .rsn-card-wrap {
+  width: 100%;
+  max-width: var(--rsn-card-max-width);
+  margin: 0 auto;
+}
+
+.rsn-root .rsn-card {
+  position: relative;
+  width: 100%;
+  min-height: var(--rsn-card-min-height);
+  background: var(--rsn-card-bg);
+  border: 1px solid var(--rsn-border-color);
+  border-radius: var(--rsn-card-radius);
+  box-shadow: var(--rsn-card-shadow);
+  overflow: hidden;
+  transform: translateZ(0);
+}
+
+.rsn-root .rsn-card-inner {
+  padding: var(--rsn-card-padding);
+  min-height: var(--rsn-card-min-height);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.rsn-root .rsn-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.rsn-root .rsn-stars {
+  flex: 0 0 auto;
+  color: var(--rsn-star-color);
+  font-size: 34px;
+  line-height: 1;
+  letter-spacing: 2px;
+  white-space: nowrap;
+}
+
+.rsn-root .rsn-author-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.rsn-root .rsn-author {
+  margin: 0;
+  color: var(--rsn-text-color);
+  font-size: var(--rsn-name-size);
+  line-height: 1.15;
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.rsn-root .rsn-verified-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(23, 139, 122, 0.2);
+  background: rgba(23, 139, 122, 0.08);
+  color: #178b7a;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.rsn-root .rsn-body {
+  width: 100%;
+}
+
+.rsn-root .rsn-message {
+  margin: 0;
+  color: var(--rsn-text-color);
+  font-size: var(--rsn-text-size);
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.rsn-root .rsn-actions {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.rsn-root .rsn-add-to-cart-btn {
+  appearance: none;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  background: var(--rsn-button-bg);
+  color: var(--rsn-button-text);
+  min-height: 46px;
+  padding: 12px 20px;
+  border-radius: var(--rsn-button-radius);
+  font-size: 15px;
+  line-height: 1;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
+}
+
+.rsn-root .rsn-add-to-cart-btn:hover {
+  transform: translateY(-1px);
+  opacity: 0.96;
+}
+
+.rsn-root .rsn-add-to-cart-btn:active {
+  transform: translateY(0);
+}
+
+.rsn-root .rsn-add-to-cart-btn:focus-visible {
+  outline: 2px solid var(--rsn-star-color);
+  outline-offset: 2px;
+}
+
+.rsn-root .rsn-add-to-cart-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.rsn-root .rsn-add-to-cart-btn.is-loading {
+  opacity: 0.8;
+}
+
+.rsn-root .rsn-inline-notice {
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.rsn-root .rsn-inline-notice.is-success {
+  color: #0f766e;
+}
+
+.rsn-root .rsn-inline-notice.is-error {
+  color: #b91c1c;
+}
+
+.rsn-root .rsn-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 1px solid var(--rsn-border-color);
+  border-radius: 999px;
+  background: var(--rsn-arrow-bg);
+  color: var(--rsn-arrow-color);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 30px;
+  line-height: 1;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    opacity 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.rsn-root .rsn-nav:hover {
+  transform: translateY(-50%) scale(1.04);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.12);
+}
+
+.rsn-root .rsn-nav:active {
+  transform: translateY(-50%) scale(0.98);
+}
+
+.rsn-root .rsn-nav:focus-visible {
+  outline: 2px solid var(--rsn-star-color);
+  outline-offset: 2px;
+}
+
+.rsn-root .rsn-nav[hidden] {
+  display: none !important;
+}
+
+.rsn-root .rsn-nav--prev {
+  left: 0;
+}
+
+.rsn-root .rsn-nav--next {
+  right: 0;
+}
+
+.rsn-root .rsn-card.is-animating .rsn-card-inner {
+  animation: rsnFadeSlide 0.28s ease;
+}
+
+.rsn-root .rsn-card--loading {
+  padding: var(--rsn-card-padding);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+}
+
+.rsn-root .rsn-card--empty .rsn-card-inner {
+  align-items: center;
+  text-align: center;
+}
+
+.rsn-root .rsn-empty-text {
+  margin: 0;
+  color: var(--rsn-text-color);
+  font-size: var(--rsn-text-size);
+  line-height: 1.6;
+}
+
+.rsn-root .rsn-skeleton {
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.06) 0%,
+    rgba(0, 0, 0, 0.12) 50%,
+    rgba(0, 0, 0, 0.06) 100%
+  );
+  background-size: 200% 100%;
+  animation: rsnShimmer 1.2s linear infinite;
+}
+
+.rsn-root .rsn-skeleton--stars {
+  width: 170px;
+  height: 32px;
+}
+
+.rsn-root .rsn-skeleton--name {
+  width: 220px;
+  height: 26px;
+  border-radius: 10px;
+}
+
+.rsn-root .rsn-skeleton--line {
+  width: 100%;
+  height: 20px;
+  border-radius: 10px;
+}
+
+.rsn-root .rsn-skeleton--line-short {
+  width: 75%;
+}
+
+@keyframes rsnShimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes rsnFadeSlide {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media screen and (max-width: 989px) {
+  .rsn-root .rsn-slider {
+    max-width: calc(var(--rsn-card-max-width) + 56px);
+  }
+
+  .rsn-root .rsn-nav {
+    width: 42px;
+    height: 42px;
+    font-size: 28px;
+  }
+}
+
+@media screen and (max-width: 749px) {
+  .rsn-root .rsn-slider {
+    max-width: 100%;
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .rsn-root .rsn-card-wrap {
+    max-width: 100%;
+  }
+
+  .rsn-root .rsn-card {
+    min-height: auto;
+  }
+
+  .rsn-root .rsn-card-inner {
+    min-height: auto;
+    padding: 20px;
+  }
+
+  .rsn-root .rsn-head {
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .rsn-root .rsn-stars {
+    font-size: 24px;
+    letter-spacing: 1px;
+  }
+
+  .rsn-root .rsn-author {
+    font-size: calc(var(--rsn-name-size) - 4px);
+  }
+
+  .rsn-root .rsn-message {
+    font-size: calc(var(--rsn-text-size) - 2px);
+    line-height: 1.5;
+  }
+
+  .rsn-root .rsn-actions {
+    margin-top: 16px;
+    align-items: stretch;
+  }
+
+  .rsn-root .rsn-add-to-cart-btn {
+    width: 100%;
+  }
+
+  .rsn-root .rsn-nav {
+    width: 40px;
+    height: 40px;
+    font-size: 26px;
+  }
+
+  .rsn-root .rsn-nav--prev {
+    left: -2px;
+  }
+
+  .rsn-root .rsn-nav--next {
+    right: -2px;
+  }
+
+  .rsn-root .rsn-skeleton--stars {
+    width: 120px;
+    height: 24px;
+  }
+
+  .rsn-root .rsn-skeleton--name {
+    width: 160px;
+    height: 22px;
+  }
+
+  .rsn-root .rsn-skeleton--line {
+    height: 16px;
+  }
+}
+
+@media screen and (max-width: 479px) {
+  .rsn-root .rsn-slider {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .rsn-root .rsn-card-inner {
+    padding: 18px;
+  }
+
+  .rsn-root .rsn-stars {
+    font-size: 22px;
+  }
+
+  .rsn-root .rsn-author {
+    font-size: 17px;
+  }
+
+  .rsn-root .rsn-message {
+    font-size: 15px;
+  }
+
+  .rsn-root .rsn-nav {
+    width: 36px;
+    height: 36px;
+    font-size: 22px;
+  }
+}
