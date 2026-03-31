@@ -36,6 +36,9 @@
   assign card_background = block.settings.card_background | default: '#ffffff'
   assign section_background = block.settings.section_background | default: '#ffffff'
   assign border_color = block.settings.border_color | default: '#e5e7eb'
+
+  assign cloudinary_cloud_name = block.settings.cloudinary_cloud_name
+  assign cloudinary_upload_preset = block.settings.cloudinary_upload_preset
 %}
 
 <div
@@ -44,6 +47,7 @@
   data-section-id="{{ block.id }}"
   data-endpoint="/apps/reviews"
   data-shop="{{ shop.permanent_domain }}"
+  data-shop-name="{{ shop.name | escape }}"
   data-default-tab="{{ default_tab }}"
   data-reviews-per-page="{{ reviews_per_page }}"
   data-default-sort="{{ default_sort }}"
@@ -58,6 +62,14 @@
   data-review-text-size="{{ review_text_size }}"
   data-review-text-length="{{ review_text_length }}"
   data-reviewer-name-format="{{ reviewer_name_format }}"
+  data-cloudinary-cloud-name="{{ cloudinary_cloud_name }}"
+  data-cloudinary-upload-preset="{{ cloudinary_upload_preset }}"
+  data-review-flow-script="{{ 'happy-customers-review-form.js' | asset_url }}"
+  data-root-url="{{ routes.root_url }}"
+  data-products-json-url="{{ routes.root_url }}products.json"
+  data-predictive-search-url="{{ routes.predictive_search_url }}"
+  data-search-url="{{ routes.search_url }}"
+  data-fallback-write-review-url="{{ write_review_url }}"
   style="
     --hcr-accent: {{ accent_color }};
     --hcr-button-bg: {{ button_color }};
@@ -125,22 +137,15 @@
           </div>
 
           <div class="hcr-write-review-wrap">
-            {% if write_review_url != blank %}
-              <a
-                href="{{ write_review_url }}"
-                class="hcr-write-review-btn"
-              >
-                {{ write_review_label }}
-              </a>
-            {% else %}
-              <button
-                type="button"
-                class="hcr-write-review-btn hcr-write-review-btn--disabled"
-                disabled
-              >
-                {{ write_review_label }}
-              </button>
-            {% endif %}
+            <button
+              type="button"
+              class="hcr-write-review-btn"
+              data-hcr-open-review-flow
+              aria-haspopup="dialog"
+              aria-expanded="false"
+            >
+              {{ write_review_label }}
+            </button>
           </div>
         </div>
       </div>
@@ -295,77 +300,7 @@
     </article>
   </template>
 
-  <template id="hcr-media-thumb-template-{{ block.id }}">
-    <button type="button" class="hcr-media-thumb">
-      <img src="" alt="" loading="lazy" width="120" height="120">
-    </button>
-  </template>
-
-  <div class="hcr-media-modal" hidden>
-    <div class="hcr-media-modal-backdrop" data-hcr-modal-close></div>
-
-    <div
-      class="hcr-media-dialog"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Review media preview"
-      tabindex="-1"
-    >
-      <button
-        type="button"
-        class="hcr-media-close"
-        aria-label="Close"
-        data-hcr-modal-close
-      >
-        ×
-      </button>
-
-      <div class="hcr-media-dialog-body">
-        <div class="hcr-media-dialog-gallery">
-          <button
-            type="button"
-            class="hcr-media-modal-nav hcr-media-modal-nav--prev"
-            aria-label="Previous review"
-          >
-            ‹
-          </button>
-
-          <div class="hcr-media-modal-stage"></div>
-
-          <button
-            type="button"
-            class="hcr-media-modal-nav hcr-media-modal-nav--next"
-            aria-label="Next review"
-          >
-            ›
-          </button>
-
-          <div class="hcr-media-modal-thumbs"></div>
-        </div>
-
-        <div class="hcr-media-dialog-content">
-          <div class="hcr-media-review-stars">★★★★★</div>
-
-          <div class="hcr-media-reviewer-row">
-            <div class="hcr-media-reviewer-avatar">A</div>
-
-            <div class="hcr-media-reviewer-meta">
-              <div class="hcr-media-reviewer-name">Anonymous</div>
-              <div class="hcr-media-reviewer-verified"></div>
-            </div>
-          </div>
-
-          <h4 class="hcr-media-review-title"></h4>
-          <div class="hcr-media-review-text"></div>
-
-          <div class="hcr-media-review-footer">
-            <div class="hcr-media-review-source"></div>
-            <div class="hcr-media-review-date"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+  <div class="hcr-review-flow-host" data-hcr-review-flow-host></div>
 </div>
 
 {% schema %}
@@ -412,7 +347,21 @@
     {
       "type": "url",
       "id": "write_review_url",
-      "label": "Write review button link"
+      "label": "Fallback review link (optional)"
+    },
+    {
+      "type": "header",
+      "content": "Review form uploads"
+    },
+    {
+      "type": "text",
+      "id": "cloudinary_cloud_name",
+      "label": "Cloudinary cloud name"
+    },
+    {
+      "type": "text",
+      "id": "cloudinary_upload_preset",
+      "label": "Cloudinary upload preset"
     },
     {
       "type": "header",

@@ -2,6 +2,68 @@
   const FETCH_LIMIT = 50;
   const MAX_FETCH_PAGES = 40;
 
+  const reviewFlowScriptPromises = new Map();
+  const reviewFlowInstances = new WeakMap();
+
+  function loadReviewFlowScript(src) {
+    if (!src) {
+      return Promise.reject(new Error("Review flow script URL is missing."));
+    }
+
+    if (window.HappyCustomersReviewFlow) {
+      return Promise.resolve(window.HappyCustomersReviewFlow);
+    }
+
+    if (reviewFlowScriptPromises.has(src)) {
+      return reviewFlowScriptPromises.get(src);
+    }
+
+    const promise = new Promise((resolve, reject) => {
+      const existingScript = document.querySelector(
+        `script[data-hcr-review-flow-script="${src}"]`
+      );
+
+      if (existingScript) {
+        existingScript.addEventListener("load", () => {
+          if (window.HappyCustomersReviewFlow) {
+            resolve(window.HappyCustomersReviewFlow);
+          } else {
+            reject(new Error("Review flow script loaded but module not found."));
+          }
+        });
+
+        existingScript.addEventListener("error", () => {
+          reject(new Error("Failed to load review flow script."));
+        });
+
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.src = src;
+      script.async = true;
+      script.defer = true;
+      script.dataset.hcrReviewFlowScript = src;
+
+      script.onload = () => {
+        if (window.HappyCustomersReviewFlow) {
+          resolve(window.HappyCustomersReviewFlow);
+        } else {
+          reject(new Error("Review flow script loaded but module not found."));
+        }
+      };
+
+      script.onerror = () => {
+        reject(new Error("Failed to load review flow script."));
+      };
+
+      document.head.appendChild(script);
+    });
+
+    reviewFlowScriptPromises.set(src, promise);
+    return promise;
+  }
+
   function initAllHappyCustomersReviews(scope = document) {
     const roots = Array.from(scope.querySelectorAll(".hcr-root"));
     if (!roots.length) return;
@@ -24,6 +86,7 @@
   function initHappyCustomersReviews(root) {
     const endpoint = root.dataset.endpoint || "";
     const shop = root.dataset.shop || "";
+    const shopName = root.dataset.shopName || "";
     const defaultTab = safeLower(root.dataset.defaultTab || "product");
     const reviewsPerPage = Math.max(1, Number(root.dataset.reviewsPerPage || 5));
     const defaultSort = safeLower(root.dataset.defaultSort || "most_recent");
@@ -38,6 +101,18 @@
     const reviewerNameFormat = safeLower(
       root.dataset.reviewerNameFormat || "full_name"
     );
+
+    const reviewFlowScript = root.dataset.reviewFlowScript || "";
+    const reviewFlowHost =
+      root.querySelector("[data-hcr-review-flow-host]") || root;
+    const openReviewFlowBtn = root.querySelector("[data-hcr-open-review-flow]");
+    const fallbackWriteReviewUrl = root.dataset.fallbackWriteReviewUrl || "";
+    const cloudinaryCloudName = root.dataset.cloudinaryCloudName || "";
+    const cloudinaryUploadPreset = root.dataset.cloudinaryUploadPreset || "";
+    const productsJsonUrl = root.dataset.productsJsonUrl || "";
+    const predictiveSearchUrl = root.dataset.predictiveSearchUrl || "";
+    const searchUrl = root.dataset.searchUrl || "";
+    const rootUrl = root.dataset.rootUrl || "/";
 
     const summaryAverageEl = root.querySelector(".hcr-summary-average");
     const summaryCountEl = root.querySelector(".hcr-summary-count");
@@ -121,6 +196,79 @@
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
+    }
+
+    async function ensureReviewFlowInstance() {
+      if (reviewFlowInstances.has(root)) {
+        return reviewFlowInstances.get(root);
+      }
+
+      const ReviewFlowModule = await loadReviewFlowScript(reviewFlowScript);
+
+      if (!ReviewFlowModule || typeof ReviewFlowModule.create !== "function") {
+        throw new Error("Review flow module is invalid.");
+      }
+
+      const instance = await ReviewFlowModule.create({
+        root,
+        host: reviewFlowHost,
+        config: {
+          endpoint,
+          shop,
+          shopName,
+          cloudinaryCloudName,
+          cloudinaryUploadPreset,
+          productsJsonUrl,
+          predictiveSearchUrl,
+          searchUrl,
+          rootUrl,
+          fallbackWriteReviewUrl,
+        },
+        onSubmitted: async (payload = {}) => {
+          await loadReviews();
+
+          if (payload.reviewType === "store") {
+            setActiveTab("store");
+          } else if (payload.reviewType === "product") {
+            setActiveTab("product");
+          }
+        },
+      });
+
+      reviewFlowInstances.set(root, instance);
+      return instance;
+    }
+
+    async function handleOpenReviewFlow() {
+      if (!openReviewFlowBtn) return;
+
+      const originalLabel = openReviewFlowBtn.textContent;
+      openReviewFlowBtn.disabled = true;
+      openReviewFlowBtn.classList.add("is-loading");
+      openReviewFlowBtn.textContent = "Loading...";
+
+      try {
+        const instance = await ensureReviewFlowInstance();
+
+        if (!instance || typeof instance.open !== "function") {
+          throw new Error("Review flow instance is missing open().");
+        }
+
+        instance.open();
+      } catch (error) {
+        console.error("Happy Customers Review Flow Error:", error);
+
+        if (fallbackWriteReviewUrl) {
+          window.location.href = fallbackWriteReviewUrl;
+          return;
+        }
+
+        window.alert("Review form load nahi ho paya. Please try again.");
+      } finally {
+        openReviewFlowBtn.disabled = false;
+        openReviewFlowBtn.classList.remove("is-loading");
+        openReviewFlowBtn.textContent = originalLabel;
+      }
     }
 
     function getReviewId(review, index) {
@@ -234,9 +382,7 @@
 
       if (reviewerNameFormat === "first_initial_last_name") {
         if (parts.length === 1) return parts[0];
-        return `${parts[0].charAt(0).toUpperCase()}. ${
-          parts[parts.length - 1]
-        }`;
+        return `${parts[0].charAt(0).toUpperCase()}. ${parts[parts.length - 1]}`;
       }
 
       return clean;
@@ -1503,6 +1649,21 @@
 
         openMediaModal(reviewIndex);
       });
+    }
+
+    if (openReviewFlowBtn) {
+      openReviewFlowBtn.addEventListener("click", handleOpenReviewFlow);
+
+      const preloadFlow = () => {
+        if (!reviewFlowScript || reviewFlowInstances.has(root)) return;
+        loadReviewFlowScript(reviewFlowScript).catch(() => {});
+      };
+
+      if ("requestIdleCallback" in window) {
+        window.requestIdleCallback(preloadFlow, { timeout: 1500 });
+      } else {
+        window.setTimeout(preloadFlow, 1200);
+      }
     }
 
     loadReviews();
