@@ -15,13 +15,22 @@
   endif
 %}
 
+{% capture selected_product_ids %}
+  {% if block.settings.selected_products != blank %}
+    {% for selected_product in block.settings.selected_products %}
+      {{ selected_product.id }}{% unless forloop.last %},{% endunless %}
+    {% endfor %}
+  {% endif %}
+{% endcapture %}
+
 <div
   class="prcc-root"
   data-endpoint="/apps/reviews"
   data-shop="{{ shop.permanent_domain }}"
+  data-app-script="{{ 'review-cards-carousel-main.js' | asset_url }}"
   data-show-sample-reviews="{{ block.settings.show_sample_reviews }}"
   data-reviews-selection="{{ block.settings.reviews_selection }}"
-  data-custom-product-ids="{{ block.settings.custom_product_ids | escape }}"
+  data-custom-product-ids="{{ selected_product_ids | strip | escape }}"
   data-current-product-id="{{ product.id }}"
   data-current-collection-product-ids="{{ current_collection_ids | escape }}"
   data-current-product-image="{{ current_product_image }}"
@@ -81,6 +90,8 @@
         </button>
       </div>
     </div>
+
+    <div class="prcc-empty" hidden></div>
   </div>
 </div>
 
@@ -114,10 +125,10 @@
       ]
     },
     {
-    "type": "product_list",
-    "id": "selected_products",
-    "label": "Select products (when \"Reviews selection\": Custom products)",
-    "limit": 50
+      "type": "product_list",
+      "id": "selected_products",
+      "label": "Select products (when \"Reviews selection\": Custom products)",
+      "limit": 50
     },
     {
       "type": "select",

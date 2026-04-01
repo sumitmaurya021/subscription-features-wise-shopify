@@ -33,6 +33,7 @@
   data-block-id="{{ block.id }}"
   data-endpoint="/apps/reviews"
   data-shop="{{ shop.permanent_domain }}"
+  data-app-script="{{ 'popup-reviews-main.js' | asset_url }}"
   data-review-source="{{ review_source }}"
   data-max-reviews="{{ max_reviews }}"
   data-popup-position="{{ popup_position }}"
@@ -78,7 +79,6 @@
       <div class="prp-media" hidden>
         <img
           class="prp-media-image"
-          src=""
           alt=""
           loading="lazy"
           width="96"
