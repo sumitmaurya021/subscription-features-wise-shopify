@@ -1,6 +1,5 @@
 {% liquid
   assign review_selection = block.settings.review_selection | default: 'current_product'
-
   assign resolved_review_type = 'store'
   assign resolved_target_id = ''
   assign resolved_target_handle = ''
@@ -8,56 +7,63 @@
   assign resolved_context_image = ''
   assign add_to_cart_variant_id = ''
 
-  if review_selection == 'store_reviews'
-    assign resolved_review_type = 'store'
-    assign resolved_target_title = shop.name
+  case review_selection
+    when 'store_reviews'
+      assign resolved_review_type = 'store'
+      assign resolved_target_title = shop.name
 
-  elsif review_selection == 'custom_product' and block.settings.custom_product != blank
-    assign resolved_review_type = 'product'
-    assign resolved_target_id = block.settings.custom_product.id
-    assign resolved_target_handle = block.settings.custom_product.handle
-    assign resolved_target_title = block.settings.custom_product.title
+    when 'custom_product'
+      if block.settings.custom_product != blank
+        assign resolved_review_type = 'product'
+        assign resolved_target_id = block.settings.custom_product.id
+        assign resolved_target_handle = block.settings.custom_product.handle
+        assign resolved_target_title = block.settings.custom_product.title
 
-    if block.settings.custom_product.featured_image
-      assign resolved_context_image = block.settings.custom_product.featured_image | image_url: width: 500
-    endif
+        if block.settings.custom_product.featured_image
+          assign resolved_context_image = block.settings.custom_product.featured_image | image_url: width: 500
+        endif
 
-    if block.settings.custom_product.selected_or_first_available_variant
-      assign add_to_cart_variant_id = block.settings.custom_product.selected_or_first_available_variant.id
-    endif
+        if block.settings.custom_product.selected_or_first_available_variant
+          assign add_to_cart_variant_id = block.settings.custom_product.selected_or_first_available_variant.id
+        endif
+      endif
 
-  elsif review_selection == 'current_collection' and collection
-    assign resolved_review_type = 'collection'
-    assign resolved_target_id = collection.id
-    assign resolved_target_handle = collection.handle
-    assign resolved_target_title = collection.title
+    when 'current_collection'
+      if collection
+        assign resolved_review_type = 'collection'
+        assign resolved_target_id = collection.id
+        assign resolved_target_handle = collection.handle
+        assign resolved_target_title = collection.title
 
-    if collection.image
-      assign resolved_context_image = collection.image | image_url: width: 500
-    endif
+        if collection.image
+          assign resolved_context_image = collection.image | image_url: width: 500
+        endif
+      endif
+  endcase
 
-  elsif template.name == 'product' and product
-    assign resolved_review_type = 'product'
-    assign resolved_target_id = product.id
-    assign resolved_target_handle = product.handle
-    assign resolved_target_title = product.title
+  if resolved_target_id == ''
+    if template.name == 'product' and product
+      assign resolved_review_type = 'product'
+      assign resolved_target_id = product.id
+      assign resolved_target_handle = product.handle
+      assign resolved_target_title = product.title
 
-    if product.featured_image
-      assign resolved_context_image = product.featured_image | image_url: width: 500
-    endif
+      if product.featured_image
+        assign resolved_context_image = product.featured_image | image_url: width: 500
+      endif
 
-    if product.selected_or_first_available_variant
-      assign add_to_cart_variant_id = product.selected_or_first_available_variant.id
-    endif
+      if product.selected_or_first_available_variant
+        assign add_to_cart_variant_id = product.selected_or_first_available_variant.id
+      endif
+    elsif template.name == 'collection' and collection
+      assign resolved_review_type = 'collection'
+      assign resolved_target_id = collection.id
+      assign resolved_target_handle = collection.handle
+      assign resolved_target_title = collection.title
 
-  elsif template.name == 'collection' and collection
-    assign resolved_review_type = 'collection'
-    assign resolved_target_id = collection.id
-    assign resolved_target_handle = collection.handle
-    assign resolved_target_title = collection.title
-
-    if collection.image
-      assign resolved_context_image = collection.image | image_url: width: 500
+      if collection.image
+        assign resolved_context_image = collection.image | image_url: width: 500
+      endif
     endif
   endif
 
@@ -72,8 +78,10 @@
   endif
 %}
 
-<style>
-  #rsn-root-{{ block.id }} {
+<div
+  id="rsn-root-{{ block.id }}"
+  class="rsn-root"
+  style="
     --rsn-card-bg: {{ block.settings.card_bg }};
     --rsn-text-color: {{ block.settings.text_color }};
     --rsn-star-color: {{ block.settings.star_color }};
@@ -91,165 +99,7 @@
     --rsn-button-bg: {{ block.settings.button_bg }};
     --rsn-button-text: {{ block.settings.button_text_color }};
     --rsn-button-radius: {{ block.settings.button_radius }}px;
-  }
-
-  #rsn-root-{{ block.id }}.rsn-root {
-    padding-top: var(--rsn-section-pad-top);
-    padding-bottom: var(--rsn-section-pad-bottom);
-  }
-
-  #rsn-root-{{ block.id }} .rsn-preview-wrap {
-    position: relative;
-    max-width: var(--rsn-card-max-width);
-    margin: 0 auto;
-    min-height: var(--rsn-card-min-height);
-  }
-
-  #rsn-root-{{ block.id }} .rsn-preview-card {
-    position: relative;
-    background: var(--rsn-card-bg);
-    color: var(--rsn-text-color);
-    border: 1px solid var(--rsn-border-color);
-    border-radius: var(--rsn-card-radius);
-    padding: var(--rsn-card-padding);
-    min-height: var(--rsn-card-min-height);
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-  }
-
-  #rsn-root-{{ block.id }} .rsn-preview-top {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    flex-wrap: wrap;
-    margin-bottom: 14px;
-  }
-
-  #rsn-root-{{ block.id }} .rsn-preview-stars {
-    color: var(--rsn-star-color);
-    font-size: 34px;
-    line-height: 1;
-    letter-spacing: 2px;
-    white-space: nowrap;
-  }
-
-  #rsn-root-{{ block.id }} .rsn-preview-name {
-    margin: 0;
-    font-size: var(--rsn-name-size);
-    line-height: 1.15;
-    font-weight: 700;
-    color: var(--rsn-text-color);
-  }
-
-  #rsn-root-{{ block.id }} .rsn-preview-text {
-    margin: 0;
-    font-size: var(--rsn-text-size);
-    line-height: 1.55;
-    color: var(--rsn-text-color);
-  }
-
-  #rsn-root-{{ block.id }} .rsn-preview-actions {
-    margin-top: 18px;
-    display: flex;
-    justify-content: flex-start;
-  }
-
-  #rsn-root-{{ block.id }} .rsn-preview-add-btn {
-    appearance: none;
-    border: none;
-    cursor: pointer;
-    background: var(--rsn-button-bg);
-    color: var(--rsn-button-text);
-    min-height: 46px;
-    padding: 12px 20px;
-    border-radius: var(--rsn-button-radius);
-    font-size: 15px;
-    line-height: 1;
-    font-weight: 700;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  #rsn-root-{{ block.id }} .rsn-preview-arrow {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 48px;
-    height: 48px;
-    border: 1px solid var(--rsn-border-color);
-    border-radius: 999px;
-    background: var(--rsn-arrow-bg);
-    color: var(--rsn-arrow-color);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
-    z-index: 2;
-    pointer-events: none;
-    font-size: 30px;
-    line-height: 1;
-  }
-
-  #rsn-root-{{ block.id }} .rsn-preview-arrow--prev {
-    left: -24px;
-  }
-
-  #rsn-root-{{ block.id }} .rsn-preview-arrow--next {
-    right: -24px;
-  }
-
-  @media screen and (max-width: 749px) {
-    #rsn-root-{{ block.id }} .rsn-preview-wrap {
-      max-width: 100%;
-    }
-
-    #rsn-root-{{ block.id }} .rsn-preview-card {
-      min-height: auto;
-      padding: 20px;
-    }
-
-    #rsn-root-{{ block.id }} .rsn-preview-stars {
-      font-size: 26px;
-    }
-
-    #rsn-root-{{ block.id }} .rsn-preview-name {
-      font-size: calc(var(--rsn-name-size) - 4px);
-    }
-
-    #rsn-root-{{ block.id }} .rsn-preview-text {
-      font-size: calc(var(--rsn-text-size) - 2px);
-    }
-
-    #rsn-root-{{ block.id }} .rsn-preview-arrow {
-      width: 42px;
-      height: 42px;
-      font-size: 28px;
-    }
-
-    #rsn-root-{{ block.id }} .rsn-preview-arrow--prev {
-      left: -10px;
-    }
-
-    #rsn-root-{{ block.id }} .rsn-preview-arrow--next {
-      right: -10px;
-    }
-
-    #rsn-root-{{ block.id }} .rsn-preview-actions {
-      margin-top: 16px;
-    }
-
-    #rsn-root-{{ block.id }} .rsn-preview-add-btn {
-      width: 100%;
-    }
-  }
-</style>
-
-<div
-  id="rsn-root-{{ block.id }}"
-  class="rsn-root"
+  "
   data-block-id="{{ block.id }}"
   data-shop="{{ shop.permanent_domain }}"
   data-endpoint="/apps/reviews"
@@ -268,19 +118,7 @@
   data-show-reviewer-name="{{ block.settings.show_reviewer_name }}"
   data-show-verified-badge="{{ block.settings.show_verified_badge }}"
   data-excerpt-length="{{ block.settings.excerpt_length }}"
-  data-card-max-width="{{ block.settings.card_max_width }}"
-  data-card-min-height="{{ block.settings.card_min_height }}"
-  data-card-padding="{{ block.settings.card_padding }}"
-  data-card-radius="{{ block.settings.card_radius }}"
-  data-card-bg="{{ block.settings.card_bg }}"
-  data-text-color="{{ block.settings.text_color }}"
-  data-star-color="{{ block.settings.star_color }}"
-  data-arrow-bg="{{ block.settings.arrow_bg }}"
-  data-arrow-color="{{ block.settings.arrow_color }}"
-  data-border-color="{{ block.settings.border_color }}"
   data-shadow-strength="{{ block.settings.shadow_strength }}"
-  data-reviewer-name-size="{{ block.settings.reviewer_name_size }}"
-  data-review-text-size="{{ block.settings.review_text_size }}"
   data-empty-text="{{ block.settings.empty_text | escape }}"
   data-show-add-to-cart="{{ can_show_add_to_cart }}"
   data-add-to-cart-label="{{ block.settings.add_to_cart_label | escape }}"
@@ -288,36 +126,7 @@
   data-redirect-to-cart="{{ block.settings.redirect_to_cart }}"
   data-main-script="{{ 'review-snippets-main.js' | asset_url }}"
   {{ block.shopify_attributes }}
->
-  <div class="rsn-preview-wrap">
-    {% if block.settings.show_arrows %}
-      <span class="rsn-preview-arrow rsn-preview-arrow--prev" aria-hidden="true">‹</span>
-    {% endif %}
-
-    <div class="rsn-preview-card">
-      <div class="rsn-preview-top">
-        <div class="rsn-preview-stars">★★★★★</div>
-        <h3 class="rsn-preview-name">Darlene Robertson</h3>
-      </div>
-
-      <p class="rsn-preview-text">
-        The USB smoothie blender is incredibly convenient for on-the-go use, blending fruits and veggies effortlessly in seconds….
-      </p>
-
-      {% if can_show_add_to_cart %}
-        <div class="rsn-preview-actions">
-          <button type="button" class="rsn-preview-add-btn">
-            {{ block.settings.add_to_cart_label }}
-          </button>
-        </div>
-      {% endif %}
-    </div>
-
-    {% if block.settings.show_arrows %}
-      <span class="rsn-preview-arrow rsn-preview-arrow--next" aria-hidden="true">›</span>
-    {% endif %}
-  </div>
-</div>
+></div>
 
 {% schema %}
 {
@@ -384,7 +193,6 @@
       "label": "Empty state text",
       "default": "No reviews available right now."
     },
-
     {
       "type": "header",
       "content": "Slider behavior"
@@ -428,7 +236,6 @@
       "label": "Show verified badge",
       "default": false
     },
-
     {
       "type": "header",
       "content": "Add to cart button"
@@ -472,7 +279,6 @@
       "step": 2,
       "default": 12
     },
-
     {
       "type": "header",
       "content": "Card layout"
@@ -542,7 +348,6 @@
       "step": 4,
       "default": 0
     },
-
     {
       "type": "header",
       "content": "Typography"
@@ -565,7 +370,6 @@
       "step": 1,
       "default": 18
     },
-
     {
       "type": "header",
       "content": "Colors"

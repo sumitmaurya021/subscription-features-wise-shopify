@@ -1,9 +1,9 @@
-#product-loyalty-root {
+.product-loyalty-root {
   width: 100%;
   margin: 16px 0;
 }
 
-#product-loyalty-root * {
+.product-loyalty-root * {
   box-sizing: border-box;
 }
 

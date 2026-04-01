@@ -1,5 +1,7 @@
 <div
-  id="product-loyalty-root"
+  id="product-loyalty-root-{{ block.id }}"
+  class="product-loyalty-root pl-root"
+  data-app-script="{{ 'product-loyalty-main.js' | asset_url }}"
   data-shop="{{ shop.permanent_domain }}"
   data-endpoint="/apps/reviews/loyalty"
   data-customer-id="{% if customer %}{{ customer.id }}{% endif %}"

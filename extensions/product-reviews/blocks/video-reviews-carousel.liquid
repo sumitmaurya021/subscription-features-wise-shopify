@@ -4,6 +4,7 @@
   data-block-id="{{ block.id }}"
   data-shop="{{ shop.permanent_domain }}"
   data-endpoint="/apps/reviews"
+  data-app-script="{{ 'video-reviews-carousel-main.js' | asset_url }}"
   data-product-id="{{ product.id | default: '' }}"
   data-selected-product-id="{% if block.settings.custom_product != blank %}{{ block.settings.custom_product.id }}{% endif %}"
   data-show-sample="{{ block.settings.show_sample_reviews }}"
