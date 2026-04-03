@@ -1,36 +1,3 @@
-{% liquid
-  assign tab_position = block.settings.tab_position | default: 'right'
-  assign tab_label = block.settings.tab_label | default: 'Store Reviews'
-  assign panel_title = block.settings.panel_title | default: 'What customers say about our store'
-  assign max_reviews = block.settings.max_reviews | default: 12
-
-  assign badge_top = block.settings.badge_top | default: 50
-  assign mobile_bottom = block.settings.mobile_bottom | default: 18
-
-  assign badge_width = block.settings.badge_width | default: 72
-  assign badge_height = block.settings.badge_height | default: 214
-  assign badge_radius = block.settings.badge_radius | default: 18
-
-  assign badge_padding_y = block.settings.badge_padding_y | default: 14
-  assign badge_padding_x = block.settings.badge_padding_x | default: 10
-
-  assign badge_font_family = block.settings.badge_font_family | default: 'Open Sans, sans-serif'
-  assign badge_star_size = block.settings.badge_star_size | default: 18
-  assign badge_rating_size = block.settings.badge_rating_size | default: 28
-  assign badge_count_size = block.settings.badge_count_size | default: 11
-
-  assign panel_width = block.settings.panel_width | default: 420
-
-  assign badge_bg_start = block.settings.badge_bg_start | default: '#0b3b66'
-  assign badge_bg_end = block.settings.badge_bg_end | default: '#123f6d'
-  assign badge_text_color = block.settings.badge_text_color | default: '#ffffff'
-  assign badge_count_color = block.settings.badge_count_color | default: '#dbeafe'
-  assign badge_star_active_color = block.settings.badge_star_active_color | default: '#ffffff'
-  assign badge_star_inactive_color = block.settings.badge_star_inactive_color | default: '#8eb4d6'
-
-  assign hide_badge_on_open = block.settings.hide_badge_on_open
-%}
-
 <div
   id="frt-root-{{ block.id }}"
   class="frt-root"
@@ -39,38 +6,38 @@
   data-shop="{{ shop.permanent_domain }}"
   data-endpoint="/apps/reviews"
   data-review-type="store"
-  data-position="{{ tab_position }}"
-  data-tab-label="{{ tab_label | escape }}"
-  data-panel-title="{{ panel_title | escape }}"
-  data-max-reviews="{{ max_reviews }}"
-  data-hide-trigger-when-open="{{ hide_badge_on_open }}"
+  data-position="{{ block.settings.tab_position }}"
+  data-tab-label="{{ block.settings.tab_label | escape }}"
+  data-panel-title="{{ block.settings.panel_title | escape }}"
+  data-max-reviews="{{ block.settings.max_reviews }}"
+  data-hide-trigger-when-open="{{ block.settings.hide_badge_on_open }}"
   style="
-    --frt-badge-top: {{ badge_top }}%;
-    --frt-mobile-bottom: {{ mobile_bottom }}px;
-    --frt-badge-width: {{ badge_width }}px;
-    --frt-badge-height: {{ badge_height }}px;
-    --frt-badge-radius: {{ badge_radius }}px;
-    --frt-badge-padding-y: {{ badge_padding_y }}px;
-    --frt-badge-padding-x: {{ badge_padding_x }}px;
-    --frt-badge-font-family: {{ badge_font_family }};
-    --frt-badge-star-size: {{ badge_star_size }}px;
-    --frt-badge-rating-size: {{ badge_rating_size }}px;
-    --frt-badge-count-size: {{ badge_count_size }}px;
-    --frt-panel-width: {{ panel_width }}px;
-    --frt-badge-bg-start: {{ badge_bg_start }};
-    --frt-badge-bg-end: {{ badge_bg_end }};
-    --frt-badge-text: {{ badge_text_color }};
-    --frt-badge-count: {{ badge_count_color }};
-    --frt-star-active: {{ badge_star_active_color }};
-    --frt-star-inactive: {{ badge_star_inactive_color }};
+    --frt-badge-top: {{ block.settings.badge_top }}%;
+    --frt-mobile-bottom: {{ block.settings.mobile_bottom }}px;
+    --frt-badge-width: {{ block.settings.badge_width }}px;
+    --frt-badge-height: {{ block.settings.badge_height }}px;
+    --frt-badge-radius: {{ block.settings.badge_radius }}px;
+    --frt-badge-padding-y: {{ block.settings.badge_padding_y }}px;
+    --frt-badge-padding-x: {{ block.settings.badge_padding_x }}px;
+    --frt-badge-font-family: {{ block.settings.badge_font_family }};
+    --frt-badge-star-size: {{ block.settings.badge_star_size }}px;
+    --frt-badge-rating-size: {{ block.settings.badge_rating_size }}px;
+    --frt-badge-count-size: {{ block.settings.badge_count_size }}px;
+    --frt-panel-width: {{ block.settings.panel_width }}px;
+    --frt-badge-bg-start: {{ block.settings.badge_bg_start }};
+    --frt-badge-bg-end: {{ block.settings.badge_bg_end }};
+    --frt-badge-text: {{ block.settings.badge_text_color }};
+    --frt-badge-count: {{ block.settings.badge_count_color }};
+    --frt-star-active: {{ block.settings.badge_star_active_color }};
+    --frt-star-inactive: {{ block.settings.badge_star_inactive_color }};
   "
 >
   <button
     type="button"
-    class="frt-trigger frt-trigger--{{ tab_position }}"
+    class="frt-trigger frt-trigger--{{ block.settings.tab_position }}"
     aria-expanded="false"
     aria-controls="frt-panel-{{ block.id }}"
-    aria-label="{{ tab_label | escape }}"
+    aria-label="{{ block.settings.tab_label | escape }}"
   >
     <span class="frt-trigger-inner">
       <span class="frt-trigger-gloss"></span>
@@ -90,23 +57,14 @@
     </span>
   </button>
 
-  <div
-    id="frt-panel-{{ block.id }}"
-    class="frt-panel frt-panel--{{ tab_position }}"
-    hidden
-  >
+  <div id="frt-panel-{{ block.id }}" class="frt-panel frt-panel--{{ block.settings.tab_position }}" hidden>
     <div class="frt-overlay" data-frt-close="true"></div>
 
-    <div
-      class="frt-dialog"
-      role="dialog"
-      aria-modal="true"
-      aria-label="{{ panel_title | escape }}"
-    >
+    <div class="frt-dialog" role="dialog" aria-modal="true" aria-label="{{ block.settings.panel_title | escape }}">
       <div class="frt-header">
         <div class="frt-header-content">
-          <div class="frt-eyebrow">{{ tab_label }}</div>
-          <h3 class="frt-title">{{ panel_title }}</h3>
+          <div class="frt-eyebrow">{{ block.settings.tab_label }}</div>
+          <h3 class="frt-title">{{ block.settings.panel_title }}</h3>
 
           <div class="frt-summary">
             <span class="frt-summary-stars" aria-hidden="true">
@@ -119,13 +77,7 @@
           </div>
         </div>
 
-        <button
-          type="button"
-          class="frt-close"
-          aria-label="Close reviews panel"
-        >
-          ×
-        </button>
+        <button type="button" class="frt-close" aria-label="Close reviews panel">×</button>
       </div>
 
       <div class="frt-body">
@@ -144,228 +96,12 @@
           <p>Once approved store reviews are available, they will appear here.</p>
         </div>
 
-        <div class="frt-error" hidden>
-          Failed to load store reviews.
-        </div>
+        <div class="frt-error" hidden>Failed to load store reviews.</div>
       </div>
     </div>
   </div>
 </div>
 
 {% schema %}
-{
-  "name": "Floating Reviews Tab",
-  "target": "body",
-  "stylesheet": "floating-reviews-tab.css",
-  "javascript": "floating-reviews-tab.js",
-  "settings": [
-    {
-      "type": "paragraph",
-      "content": "Enable this app embed from the theme customizer to show a floating store-reviews tab across the site."
-    },
-
-    {
-      "type": "header",
-      "content": "Content"
-    },
-    {
-      "type": "text",
-      "id": "tab_label",
-      "label": "Tab label",
-      "default": "Store Reviews"
-    },
-    {
-      "type": "text",
-      "id": "panel_title",
-      "label": "Panel title",
-      "default": "What customers say about our store"
-    },
-    {
-      "type": "range",
-      "id": "max_reviews",
-      "label": "Maximum reviews to show",
-      "min": 3,
-      "max": 20,
-      "step": 1,
-      "default": 12
-    },
-    {
-      "type": "checkbox",
-      "id": "hide_badge_on_open",
-      "label": "Hide badge when panel opens",
-      "default": true
-    },
-
-    {
-      "type": "header",
-      "content": "Position"
-    },
-    {
-      "type": "select",
-      "id": "tab_position",
-      "label": "Tab position",
-      "default": "right",
-      "options": [
-        { "value": "left", "label": "Left" },
-        { "value": "right", "label": "Right" }
-      ]
-    },
-    {
-      "type": "range",
-      "id": "badge_top",
-      "label": "Desktop vertical position (%)",
-      "min": 10,
-      "max": 90,
-      "step": 1,
-      "default": 50
-    },
-    {
-      "type": "range",
-      "id": "mobile_bottom",
-      "label": "Mobile bottom spacing",
-      "min": 0,
-      "max": 80,
-      "step": 1,
-      "default": 18
-    },
-
-    {
-      "type": "header",
-      "content": "Badge size"
-    },
-    {
-      "type": "range",
-      "id": "badge_width",
-      "label": "Badge width",
-      "min": 54,
-      "max": 120,
-      "step": 1,
-      "default": 72
-    },
-    {
-      "type": "range",
-      "id": "badge_height",
-      "label": "Badge height",
-      "min": 160,
-      "max": 300,
-      "step": 2,
-      "default": 214
-    },
-    {
-      "type": "range",
-      "id": "badge_radius",
-      "label": "Badge corner radius",
-      "min": 8,
-      "max": 30,
-      "step": 1,
-      "default": 18
-    },
-    {
-      "type": "range",
-      "id": "badge_padding_y",
-      "label": "Badge vertical padding",
-      "min": 6,
-      "max": 24,
-      "step": 1,
-      "default": 14
-    },
-    {
-      "type": "range",
-      "id": "badge_padding_x",
-      "label": "Badge horizontal padding",
-      "min": 6,
-      "max": 20,
-      "step": 1,
-      "default": 10
-    },
-    {
-      "type": "range",
-      "id": "panel_width",
-      "label": "Panel width",
-      "min": 320,
-      "max": 520,
-      "step": 4,
-      "default": 420
-    },
-
-    {
-      "type": "header",
-      "content": "Typography"
-    },
-    {
-      "type": "text",
-      "id": "badge_font_family",
-      "label": "Badge font family",
-      "default": "Open Sans, sans-serif"
-    },
-    {
-      "type": "range",
-      "id": "badge_star_size",
-      "label": "Star size",
-      "min": 12,
-      "max": 28,
-      "step": 1,
-      "default": 18
-    },
-    {
-      "type": "range",
-      "id": "badge_rating_size",
-      "label": "Rating font size",
-      "min": 16,
-      "max": 36,
-      "step": 1,
-      "default": 28
-    },
-    {
-      "type": "range",
-      "id": "badge_count_size",
-      "label": "Review count font size",
-      "min": 9,
-      "max": 16,
-      "step": 1,
-      "default": 11
-    },
-
-    {
-      "type": "header",
-      "content": "Colors"
-    },
-    {
-      "type": "color",
-      "id": "badge_bg_start",
-      "label": "Badge background start",
-      "default": "#0b3b66"
-    },
-    {
-      "type": "color",
-      "id": "badge_bg_end",
-      "label": "Badge background end",
-      "default": "#123f6d"
-    },
-    {
-      "type": "color",
-      "id": "badge_text_color",
-      "label": "Badge text color",
-      "default": "#ffffff"
-    },
-    {
-      "type": "color",
-      "id": "badge_count_color",
-      "label": "Badge count text color",
-      "default": "#dbeafe"
-    },
-    {
-      "type": "color",
-      "id": "badge_star_active_color",
-      "label": "Filled star color",
-      "default": "#ffffff"
-    },
-    {
-      "type": "color",
-      "id": "badge_star_inactive_color",
-      "label": "Empty star color",
-      "default": "#8eb4d6"
-    }
-  ]
-}
+{"name":"Floating Reviews Tab","target":"body","stylesheet":"floating-reviews-tab.css","javascript":"floating-reviews-tab.js","settings":[{"type":"paragraph","content":"Enable this app embed from the theme customizer to show a floating store-reviews tab across the site."},{"type":"header","content":"Content"},{"type":"text","id":"tab_label","label":"Tab label","default":"Store Reviews"},{"type":"text","id":"panel_title","label":"Panel title","default":"What customers say about our store"},{"type":"range","id":"max_reviews","label":"Maximum reviews to show","min":3,"max":20,"step":1,"default":12},{"type":"checkbox","id":"hide_badge_on_open","label":"Hide badge when panel opens","default":true},{"type":"header","content":"Position"},{"type":"select","id":"tab_position","label":"Tab position","default":"right","options":[{"value":"left","label":"Left"},{"value":"right","label":"Right"}]},{"type":"range","id":"badge_top","label":"Desktop vertical position (%)","min":10,"max":90,"step":1,"default":50},{"type":"range","id":"mobile_bottom","label":"Mobile bottom spacing","min":0,"max":80,"step":1,"default":18},{"type":"header","content":"Badge size"},{"type":"range","id":"badge_width","label":"Badge width","min":54,"max":120,"step":1,"default":72},{"type":"range","id":"badge_height","label":"Badge height","min":160,"max":300,"step":2,"default":214},{"type":"range","id":"badge_radius","label":"Badge corner radius","min":8,"max":30,"step":1,"default":18},{"type":"range","id":"badge_padding_y","label":"Badge vertical padding","min":6,"max":24,"step":1,"default":14},{"type":"range","id":"badge_padding_x","label":"Badge horizontal padding","min":6,"max":20,"step":1,"default":10},{"type":"range","id":"panel_width","label":"Panel width","min":320,"max":520,"step":4,"default":420},{"type":"header","content":"Typography"},{"type":"text","id":"badge_font_family","label":"Badge font family","default":"Open Sans, sans-serif"},{"type":"range","id":"badge_star_size","label":"Star size","min":12,"max":28,"step":1,"default":18},{"type":"range","id":"badge_rating_size","label":"Rating font size","min":16,"max":36,"step":1,"default":28},{"type":"range","id":"badge_count_size","label":"Review count font size","min":9,"max":16,"step":1,"default":11},{"type":"header","content":"Colors"},{"type":"color","id":"badge_bg_start","label":"Badge background start","default":"#0b3b66"},{"type":"color","id":"badge_bg_end","label":"Badge background end","default":"#123f6d"},{"type":"color","id":"badge_text_color","label":"Badge text color","default":"#ffffff"},{"type":"color","id":"badge_count_color","label":"Badge count text color","default":"#dbeafe"},{"type":"color","id":"badge_star_active_color","label":"Filled star color","default":"#ffffff"},{"type":"color","id":"badge_star_inactive_color","label":"Empty star color","default":"#8eb4d6"}]}
 {% endschema %}
