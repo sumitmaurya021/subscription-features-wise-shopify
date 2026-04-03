@@ -1,46 +1,3 @@
-{% liquid
-  assign show_widget_title = block.settings.show_widget_title
-  assign widget_title = block.settings.widget_title | default: 'Customer reviews'
-  assign no_reviews_text = block.settings.no_reviews_text | default: 'Be the first to write a review'
-  assign store_summary_title = block.settings.store_summary_title | default: 'Customers say about this store'
-  assign write_review_label = block.settings.write_review_label | default: 'Write a review'
-  assign write_review_url = block.settings.write_review_url
-
-  assign default_tab = block.settings.default_tab | default: 'product'
-  assign reviews_per_page = block.settings.reviews_per_page | default: '5'
-  assign default_sort = block.settings.default_sort | default: 'most_recent'
-
-  assign show_bar_chart = block.settings.show_bar_chart
-  assign show_media_gallery = block.settings.show_media_gallery
-  assign show_filters = block.settings.show_filters
-  assign show_sort = block.settings.show_sort
-
-  assign image_style = block.settings.image_style | default: 'thumbnails'
-  assign stars_size = block.settings.stars_size | default: 'medium'
-  assign verified_badge_style = block.settings.verified_badge_style | default: 'standard_text'
-  assign review_title_text_size = block.settings.review_title_text_size | default: 'medium'
-  assign review_text_size = block.settings.review_text_size | default: 'medium'
-  assign review_text_length = block.settings.review_text_length | default: 'medium'
-  assign reviewer_name_format = block.settings.reviewer_name_format | default: 'full_name'
-
-  assign corner_styling = block.settings.corner_styling | default: 'soft'
-  assign header_text_size = block.settings.header_text_size | default: 'medium'
-  assign header_text_weight = block.settings.header_text_weight | default: 'regular'
-  assign average_rating_style = block.settings.average_rating_style | default: 'compact'
-
-  assign accent_color = block.settings.accent_color | default: '#108474'
-  assign button_color = block.settings.button_color | default: '#108474'
-  assign button_text_color = block.settings.button_text_color | default: '#ffffff'
-  assign text_color = block.settings.text_color | default: '#000000'
-  assign lighter_text_color = block.settings.lighter_text_color | default: '#7b7b7b'
-  assign card_background = block.settings.card_background | default: '#ffffff'
-  assign section_background = block.settings.section_background | default: '#ffffff'
-  assign border_color = block.settings.border_color | default: '#e5e7eb'
-
-  assign cloudinary_cloud_name = block.settings.cloudinary_cloud_name
-  assign cloudinary_upload_preset = block.settings.cloudinary_upload_preset
-%}
-
 <div
   id="hcr-root-{{ block.id }}"
   class="hcr-root"
@@ -48,104 +5,67 @@
   data-endpoint="/apps/reviews"
   data-shop="{{ shop.permanent_domain }}"
   data-shop-name="{{ shop.name | escape }}"
-  data-default-tab="{{ default_tab }}"
-  data-reviews-per-page="{{ reviews_per_page }}"
-  data-default-sort="{{ default_sort }}"
-  data-show-bar-chart="{{ show_bar_chart }}"
-  data-show-media-gallery="{{ show_media_gallery }}"
-  data-show-filters="{{ show_filters }}"
-  data-show-sort="{{ show_sort }}"
-  data-image-style="{{ image_style }}"
-  data-stars-size="{{ stars_size }}"
-  data-verified-badge-style="{{ verified_badge_style }}"
-  data-review-title-size="{{ review_title_text_size }}"
-  data-review-text-size="{{ review_text_size }}"
-  data-review-text-length="{{ review_text_length }}"
-  data-reviewer-name-format="{{ reviewer_name_format }}"
-  data-cloudinary-cloud-name="{{ cloudinary_cloud_name }}"
-  data-cloudinary-upload-preset="{{ cloudinary_upload_preset }}"
+  data-default-tab="{{ block.settings.default_tab }}"
+  data-reviews-per-page="{{ block.settings.reviews_per_page }}"
+  data-default-sort="{{ block.settings.default_sort }}"
+  data-show-bar-chart="{{ block.settings.show_bar_chart }}"
+  data-show-media-gallery="{{ block.settings.show_media_gallery }}"
+  data-show-filters="{{ block.settings.show_filters }}"
+  data-show-sort="{{ block.settings.show_sort }}"
+  data-image-style="{{ block.settings.image_style }}"
+  data-stars-size="{{ block.settings.stars_size }}"
+  data-verified-badge-style="{{ block.settings.verified_badge_style }}"
+  data-review-title-size="{{ block.settings.review_title_text_size }}"
+  data-review-text-size="{{ block.settings.review_text_size }}"
+  data-review-text-length="{{ block.settings.review_text_length }}"
+  data-reviewer-name-format="{{ block.settings.reviewer_name_format }}"
+  data-cloudinary-cloud-name="{{ block.settings.cloudinary_cloud_name }}"
+  data-cloudinary-upload-preset="{{ block.settings.cloudinary_upload_preset }}"
   data-app-script="{{ 'happy-customers-reviews-main.js' | asset_url }}"
   data-review-flow-script="{{ 'happy-customers-review-form.js' | asset_url }}"
   data-root-url="{{ routes.root_url }}"
   data-products-json-url="{{ routes.root_url }}products.json"
   data-predictive-search-url="{{ routes.predictive_search_url }}"
   data-search-url="{{ routes.search_url }}"
-  data-fallback-write-review-url="{{ write_review_url }}"
-  style="
-    --hcr-accent: {{ accent_color }};
-    --hcr-button-bg: {{ button_color }};
-    --hcr-button-text: {{ button_text_color }};
-    --hcr-text: {{ text_color }};
-    --hcr-subtext: {{ lighter_text_color }};
-    --hcr-card-bg: {{ card_background }};
-    --hcr-section-bg: {{ section_background }};
-    --hcr-border: {{ border_color }};
-  "
+  data-fallback-write-review-url="{{ block.settings.write_review_url }}"
+  style="--hcr-accent:{{ block.settings.accent_color }};--hcr-button-bg:{{ block.settings.button_color }};--hcr-button-text:{{ block.settings.button_text_color }};--hcr-text:{{ block.settings.text_color }};--hcr-subtext:{{ block.settings.lighter_text_color }};--hcr-card-bg:{{ block.settings.card_background }};--hcr-section-bg:{{ block.settings.section_background }};--hcr-border:{{ block.settings.border_color }};"
 >
-  <div
-    class="
-      hcr-widget
-      hcr-corner--{{ corner_styling }}
-      hcr-header-size--{{ header_text_size }}
-      hcr-header-weight--{{ header_text_weight }}
-      hcr-rating-style--{{ average_rating_style }}
-      hcr-stars-size--{{ stars_size }}
-      hcr-review-title-size--{{ review_title_text_size }}
-      hcr-review-text-size--{{ review_text_size }}
-      hcr-review-text-length--{{ review_text_length }}
-    "
-  >
+  <div class="hcr-widget hcr-corner--{{ block.settings.corner_styling }} hcr-header-size--{{ block.settings.header_text_size }} hcr-header-weight--{{ block.settings.header_text_weight }} hcr-rating-style--{{ block.settings.average_rating_style }} hcr-stars-size--{{ block.settings.stars_size }} hcr-review-title-size--{{ block.settings.review_title_text_size }} hcr-review-text-size--{{ block.settings.review_text_size }} hcr-review-text-length--{{ block.settings.review_text_length }}">
     <div class="hcr-top">
-      {% if show_widget_title %}
-        <h2 class="hcr-widget-title">{{ widget_title }}</h2>
+      {% if block.settings.show_widget_title %}
+        <h2 class="hcr-widget-title">{{ block.settings.widget_title }}</h2>
       {% endif %}
 
       <div class="hcr-summary-wrap">
         <div class="hcr-summary-header">
           <div class="hcr-summary-title-wrap">
-            <h3 class="hcr-summary-title">{{ store_summary_title }}</h3>
-
+            <h3 class="hcr-summary-title">{{ block.settings.store_summary_title }}</h3>
             <div class="hcr-summary-rating-line">
               <span class="hcr-summary-average">0.0</span>
               <span class="hcr-summary-count">0 reviews</span>
-              <span class="hcr-summary-verified" hidden>
-                <span class="hcr-summary-verified-badge">Verified</span>
-              </span>
+              <span class="hcr-summary-verified" hidden><span class="hcr-summary-verified-badge">Verified</span></span>
             </div>
           </div>
         </div>
 
         <div class="hcr-summary-grid">
-          <div class="hcr-bar-chart" {% unless show_bar_chart %}hidden{% endunless %}>
+          <div class="hcr-bar-chart" {% unless block.settings.show_bar_chart %}hidden{% endunless %}>
             {% for star in (1..5) reversed %}
               <div class="hcr-bar-row" data-star-row="{{ star }}">
-                <div class="hcr-bar-label">
-                  <span>{{ star }}</span>
-                  <span class="hcr-bar-star">★</span>
-                </div>
-
-                <div class="hcr-bar-track">
-                  <div class="hcr-bar-fill" style="width:0%"></div>
-                </div>
-
+                <div class="hcr-bar-label"><span>{{ star }}</span><span class="hcr-bar-star">★</span></div>
+                <div class="hcr-bar-track"><div class="hcr-bar-fill" style="width:0%"></div></div>
                 <div class="hcr-bar-value">0</div>
               </div>
             {% endfor %}
           </div>
 
-          <div class="hcr-media-gallery" {% unless show_media_gallery %}hidden{% endunless %}>
+          <div class="hcr-media-gallery" {% unless block.settings.show_media_gallery %}hidden{% endunless %}>
             <div class="hcr-media-grid"></div>
           </div>
 
           <div class="hcr-write-review-wrap">
-            <button
-              type="button"
-              class="hcr-write-review-btn"
-              data-hcr-open-review-flow
-              aria-haspopup="dialog"
-              aria-expanded="false"
-            >
-              {{ write_review_label }}
+            <button type="button" class="hcr-write-review-btn" data-hcr-open-review-flow aria-haspopup="dialog" aria-expanded="false">
+              {{ block.settings.write_review_label }}
             </button>
           </div>
         </div>
@@ -154,63 +74,39 @@
 
     <div class="hcr-controls">
       <div class="hcr-tabs" role="tablist" aria-label="Review type tabs">
-        <button
-          type="button"
-          class="hcr-tab"
-          data-tab="product"
-          role="tab"
-          aria-selected="true"
-        >
+        <button type="button" class="hcr-tab" data-tab="product" role="tab" aria-selected="true">
           Product reviews <span class="hcr-tab-count">(0)</span>
         </button>
-
-        <button
-          type="button"
-          class="hcr-tab"
-          data-tab="store"
-          role="tab"
-          aria-selected="false"
-        >
+        <button type="button" class="hcr-tab" data-tab="store" role="tab" aria-selected="false">
           Store reviews <span class="hcr-tab-count">(0)</span>
         </button>
       </div>
 
       <div class="hcr-actions">
-        {% if show_filters %}
-          <button
-            type="button"
-            class="hcr-filter-toggle"
-            aria-expanded="false"
-            aria-controls="hcr-filters-{{ block.id }}"
-          >
+        {% if block.settings.show_filters %}
+          <button type="button" class="hcr-filter-toggle" aria-expanded="false" aria-controls="hcr-filters-{{ block.id }}">
             <span class="hcr-filter-icon" aria-hidden="true">
-              <svg viewBox="0 0 20 20" focusable="false">
-                <path d="M3.5 5h13l-5 5.5v4l-3 1v-5L3.5 5z" fill="currentColor"/>
-              </svg>
+              <svg viewBox="0 0 20 20" focusable="false"><path d="M3.5 5h13l-5 5.5v4l-3 1v-5L3.5 5z" fill="currentColor"/></svg>
             </span>
             <span>Filters</span>
           </button>
         {% endif %}
 
-        {% if show_sort %}
+        {% if block.settings.show_sort %}
           <label class="hcr-sort-wrap">
             <span class="hcr-visually-hidden">Sort reviews</span>
             <select class="hcr-sort-select">
-              <option value="most_recent" {% if default_sort == 'most_recent' %}selected{% endif %}>Most recent</option>
-              <option value="highest_rating" {% if default_sort == 'highest_rating' %}selected{% endif %}>Highest rating</option>
-              <option value="lowest_rating" {% if default_sort == 'lowest_rating' %}selected{% endif %}>Lowest rating</option>
-              <option value="oldest" {% if default_sort == 'oldest' %}selected{% endif %}>Oldest</option>
+              <option value="most_recent" {% if block.settings.default_sort == 'most_recent' %}selected{% endif %}>Most recent</option>
+              <option value="highest_rating" {% if block.settings.default_sort == 'highest_rating' %}selected{% endif %}>Highest rating</option>
+              <option value="lowest_rating" {% if block.settings.default_sort == 'lowest_rating' %}selected{% endif %}>Lowest rating</option>
+              <option value="oldest" {% if block.settings.default_sort == 'oldest' %}selected{% endif %}>Oldest</option>
             </select>
           </label>
         {% endif %}
       </div>
     </div>
 
-    <div
-      id="hcr-filters-{{ block.id }}"
-      class="hcr-filters-panel"
-      hidden
-    >
+    <div id="hcr-filters-{{ block.id }}" class="hcr-filters-panel" hidden>
       <div class="hcr-filter-group">
         <div class="hcr-filter-title">Rating</div>
         <div class="hcr-rating-chips">
@@ -231,12 +127,7 @@
       <div class="hcr-filter-group hcr-filter-group--search">
         <div class="hcr-filter-title">Search</div>
         <label class="hcr-search-wrap">
-          <input
-            type="search"
-            class="hcr-search-input"
-            placeholder="Search reviews"
-            autocomplete="off"
-          >
+          <input type="search" class="hcr-search-input" placeholder="Search reviews" autocomplete="off">
         </label>
       </div>
 
@@ -255,31 +146,23 @@
     </div>
 
     <div class="hcr-reviews-state hcr-reviews-state--empty" hidden>
-      <p>{{ no_reviews_text }}</p>
+      <p>{{ block.settings.no_reviews_text }}</p>
     </div>
 
     <div class="hcr-reviews-list" hidden></div>
 
     <div class="hcr-pagination" hidden>
-      <button type="button" class="hcr-page-btn hcr-page-btn--prev" disabled>
-        Previous
-      </button>
-
+      <button type="button" class="hcr-page-btn hcr-page-btn--prev" disabled>Previous</button>
       <div class="hcr-page-numbers"></div>
-
-      <button type="button" class="hcr-page-btn hcr-page-btn--next" disabled>
-        Next
-      </button>
+      <button type="button" class="hcr-page-btn hcr-page-btn--next" disabled>Next</button>
     </div>
   </div>
 
   <template id="hcr-review-card-template-{{ block.id }}">
     <article class="hcr-review-card">
       <div class="hcr-review-stars">★★★★★</div>
-
       <div class="hcr-review-meta">
         <div class="hcr-reviewer-avatar">A</div>
-
         <div class="hcr-reviewer-info">
           <div class="hcr-reviewer-topline">
             <div class="hcr-reviewer-name">Anonymous</div>
@@ -287,13 +170,9 @@
           </div>
         </div>
       </div>
-
       <h4 class="hcr-review-title"></h4>
-
       <div class="hcr-review-text"></div>
-
       <div class="hcr-review-media-row"></div>
-
       <div class="hcr-review-footer">
         <div class="hcr-review-source-badge"></div>
         <div class="hcr-review-date"></div>
@@ -305,304 +184,5 @@
 </div>
 
 {% schema %}
-{
-  "name": "Happy Customers Reviews",
-  "target": "section",
-  "stylesheet": "happy-customers-reviews.css",
-  "javascript": "happy-customers-reviews.js",
-  "settings": [
-    {
-      "type": "header",
-      "content": "Text"
-    },
-    {
-      "type": "checkbox",
-      "id": "show_widget_title",
-      "label": "Show widget title",
-      "default": true
-    },
-    {
-      "type": "text",
-      "id": "widget_title",
-      "label": "Widget title",
-      "default": "Customer reviews"
-    },
-    {
-      "type": "text",
-      "id": "no_reviews_text",
-      "label": "No reviews text",
-      "default": "Be the first to write a review"
-    },
-    {
-      "type": "text",
-      "id": "store_summary_title",
-      "label": "Summary title",
-      "default": "Customers say about this store"
-    },
-    {
-      "type": "text",
-      "id": "write_review_label",
-      "label": "Write review button label",
-      "default": "Write a review"
-    },
-    {
-      "type": "url",
-      "id": "write_review_url",
-      "label": "Fallback review link (optional)"
-    },
-    {
-      "type": "header",
-      "content": "Review form uploads"
-    },
-    {
-      "type": "text",
-      "id": "cloudinary_cloud_name",
-      "label": "Cloudinary cloud name"
-    },
-    {
-      "type": "text",
-      "id": "cloudinary_upload_preset",
-      "label": "Cloudinary upload preset"
-    },
-    {
-      "type": "header",
-      "content": "Header"
-    },
-    {
-      "type": "select",
-      "id": "header_text_size",
-      "label": "Header text size",
-      "default": "medium",
-      "options": [
-        { "value": "small", "label": "Small" },
-        { "value": "medium", "label": "Medium" },
-        { "value": "large", "label": "Large" }
-      ]
-    },
-    {
-      "type": "select",
-      "id": "header_text_weight",
-      "label": "Header text weight",
-      "default": "regular",
-      "options": [
-        { "value": "regular", "label": "Regular" },
-        { "value": "medium", "label": "Medium" },
-        { "value": "bold", "label": "Bold" }
-      ]
-    },
-    {
-      "type": "select",
-      "id": "average_rating_style",
-      "label": "Average rating style",
-      "default": "compact",
-      "options": [
-        { "value": "compact", "label": "Compact" },
-        { "value": "comfortable", "label": "Comfortable" }
-      ]
-    },
-    {
-      "type": "header",
-      "content": "Reviews section"
-    },
-    {
-      "type": "select",
-      "id": "default_tab",
-      "label": "Default tab",
-      "default": "product",
-      "options": [
-        { "value": "product", "label": "Product reviews" },
-        { "value": "store", "label": "Store reviews" }
-      ]
-    },
-    {
-      "type": "select",
-      "id": "reviews_per_page",
-      "label": "Reviews per page",
-      "default": "5",
-      "options": [
-        { "value": "5", "label": "5" },
-        { "value": "7", "label": "7" }
-      ]
-    },
-    {
-      "type": "select",
-      "id": "default_sort",
-      "label": "Default sorting",
-      "default": "most_recent",
-      "options": [
-        { "value": "most_recent", "label": "Most recent" },
-        { "value": "highest_rating", "label": "Highest rating" },
-        { "value": "lowest_rating", "label": "Lowest rating" },
-        { "value": "oldest", "label": "Oldest" }
-      ]
-    },
-    {
-      "type": "checkbox",
-      "id": "show_filters",
-      "label": "Show filters",
-      "default": true
-    },
-    {
-      "type": "checkbox",
-      "id": "show_sort",
-      "label": "Show sorting",
-      "default": true
-    },
-    {
-      "type": "checkbox",
-      "id": "show_bar_chart",
-      "label": "Show bar chart",
-      "default": true
-    },
-    {
-      "type": "checkbox",
-      "id": "show_media_gallery",
-      "label": "Show media gallery",
-      "default": true
-    },
-    {
-      "type": "header",
-      "content": "Review cards styling"
-    },
-    {
-      "type": "select",
-      "id": "image_style",
-      "label": "Image style",
-      "default": "thumbnails",
-      "options": [
-        { "value": "thumbnails", "label": "Thumbnails" },
-        { "value": "hidden", "label": "Hidden" }
-      ]
-    },
-    {
-      "type": "select",
-      "id": "stars_size",
-      "label": "Stars size",
-      "default": "medium",
-      "options": [
-        { "value": "small", "label": "Small" },
-        { "value": "medium", "label": "Medium" },
-        { "value": "large", "label": "Large" }
-      ]
-    },
-    {
-      "type": "select",
-      "id": "verified_badge_style",
-      "label": "Verified badge",
-      "default": "standard_text",
-      "options": [
-        { "value": "standard_text", "label": "Standard text" },
-        { "value": "badge", "label": "Badge" },
-        { "value": "hidden", "label": "Hidden" }
-      ]
-    },
-    {
-      "type": "select",
-      "id": "review_title_text_size",
-      "label": "Review title text size",
-      "default": "medium",
-      "options": [
-        { "value": "small", "label": "Small" },
-        { "value": "medium", "label": "Medium" },
-        { "value": "large", "label": "Large" }
-      ]
-    },
-    {
-      "type": "select",
-      "id": "review_text_size",
-      "label": "Review text size",
-      "default": "medium",
-      "options": [
-        { "value": "small", "label": "Small" },
-        { "value": "medium", "label": "Medium" },
-        { "value": "large", "label": "Large" }
-      ]
-    },
-    {
-      "type": "select",
-      "id": "review_text_length",
-      "label": "Review text length",
-      "default": "medium",
-      "options": [
-        { "value": "short", "label": "Short" },
-        { "value": "medium", "label": "Medium" },
-        { "value": "long", "label": "Long" }
-      ]
-    },
-    {
-      "type": "select",
-      "id": "reviewer_name_format",
-      "label": "Reviewer name format",
-      "default": "full_name",
-      "options": [
-        { "value": "full_name", "label": "Show full name (John Smith)" },
-        { "value": "first_name_last_initial", "label": "John S." },
-        { "value": "first_initial_last_name", "label": "J. Smith" }
-      ]
-    },
-    {
-      "type": "header",
-      "content": "Color and styling"
-    },
-    {
-      "type": "select",
-      "id": "corner_styling",
-      "label": "Corner styling",
-      "default": "soft",
-      "options": [
-        { "value": "square", "label": "Square" },
-        { "value": "soft", "label": "Soft" },
-        { "value": "round", "label": "Round" }
-      ]
-    },
-    {
-      "type": "color",
-      "id": "accent_color",
-      "label": "Star and bar chart color",
-      "default": "#108474"
-    },
-    {
-      "type": "color",
-      "id": "button_color",
-      "label": "Button color",
-      "default": "#108474"
-    },
-    {
-      "type": "color",
-      "id": "button_text_color",
-      "label": "Button text color",
-      "default": "#FFFFFF"
-    },
-    {
-      "type": "color",
-      "id": "text_color",
-      "label": "Text color",
-      "default": "#000000"
-    },
-    {
-      "type": "color",
-      "id": "lighter_text_color",
-      "label": "Lighter text color",
-      "default": "#7B7B7B"
-    },
-    {
-      "type": "color",
-      "id": "card_background",
-      "label": "Card background",
-      "default": "#FFFFFF"
-    },
-    {
-      "type": "color",
-      "id": "section_background",
-      "label": "Section background",
-      "default": "#FFFFFF"
-    },
-    {
-      "type": "color",
-      "id": "border_color",
-      "label": "Border color",
-      "default": "#E5E7EB"
-    }
-  ]
-}
+{"name":"Happy Customers Reviews","target":"section","stylesheet":"happy-customers-reviews.css","javascript":"happy-customers-reviews.js","settings":[{"type":"header","content":"Text"},{"type":"checkbox","id":"show_widget_title","label":"Show widget title","default":true},{"type":"text","id":"widget_title","label":"Widget title","default":"Customer reviews"},{"type":"text","id":"no_reviews_text","label":"No reviews text","default":"Be the first to write a review"},{"type":"text","id":"store_summary_title","label":"Summary title","default":"Customers say about this store"},{"type":"text","id":"write_review_label","label":"Write review button label","default":"Write a review"},{"type":"url","id":"write_review_url","label":"Fallback review link (optional)"},{"type":"header","content":"Review form uploads"},{"type":"text","id":"cloudinary_cloud_name","label":"Cloudinary cloud name"},{"type":"text","id":"cloudinary_upload_preset","label":"Cloudinary upload preset"},{"type":"header","content":"Header"},{"type":"select","id":"header_text_size","label":"Header text size","default":"medium","options":[{"value":"small","label":"Small"},{"value":"medium","label":"Medium"},{"value":"large","label":"Large"}]},{"type":"select","id":"header_text_weight","label":"Header text weight","default":"regular","options":[{"value":"regular","label":"Regular"},{"value":"medium","label":"Medium"},{"value":"bold","label":"Bold"}]},{"type":"select","id":"average_rating_style","label":"Average rating style","default":"compact","options":[{"value":"compact","label":"Compact"},{"value":"comfortable","label":"Comfortable"}]},{"type":"header","content":"Reviews section"},{"type":"select","id":"default_tab","label":"Default tab","default":"product","options":[{"value":"product","label":"Product reviews"},{"value":"store","label":"Store reviews"}]},{"type":"select","id":"reviews_per_page","label":"Reviews per page","default":"5","options":[{"value":"5","label":"5"},{"value":"7","label":"7"}]},{"type":"select","id":"default_sort","label":"Default sorting","default":"most_recent","options":[{"value":"most_recent","label":"Most recent"},{"value":"highest_rating","label":"Highest rating"},{"value":"lowest_rating","label":"Lowest rating"},{"value":"oldest","label":"Oldest"}]},{"type":"checkbox","id":"show_filters","label":"Show filters","default":true},{"type":"checkbox","id":"show_sort","label":"Show sorting","default":true},{"type":"checkbox","id":"show_bar_chart","label":"Show bar chart","default":true},{"type":"checkbox","id":"show_media_gallery","label":"Show media gallery","default":true},{"type":"header","content":"Review cards styling"},{"type":"select","id":"image_style","label":"Image style","default":"thumbnails","options":[{"value":"thumbnails","label":"Thumbnails"},{"value":"hidden","label":"Hidden"}]},{"type":"select","id":"stars_size","label":"Stars size","default":"medium","options":[{"value":"small","label":"Small"},{"value":"medium","label":"Medium"},{"value":"large","label":"Large"}]},{"type":"select","id":"verified_badge_style","label":"Verified badge","default":"standard_text","options":[{"value":"standard_text","label":"Standard text"},{"value":"badge","label":"Badge"},{"value":"hidden","label":"Hidden"}]},{"type":"select","id":"review_title_text_size","label":"Review title text size","default":"medium","options":[{"value":"small","label":"Small"},{"value":"medium","label":"Medium"},{"value":"large","label":"Large"}]},{"type":"select","id":"review_text_size","label":"Review text size","default":"medium","options":[{"value":"small","label":"Small"},{"value":"medium","label":"Medium"},{"value":"large","label":"Large"}]},{"type":"select","id":"review_text_length","label":"Review text length","default":"medium","options":[{"value":"short","label":"Short"},{"value":"medium","label":"Medium"},{"value":"long","label":"Long"}]},{"type":"select","id":"reviewer_name_format","label":"Reviewer name format","default":"full_name","options":[{"value":"full_name","label":"Show full name (John Smith)"},{"value":"first_name_last_initial","label":"John S."},{"value":"first_initial_last_name","label":"J. Smith"}]},{"type":"header","content":"Color and styling"},{"type":"select","id":"corner_styling","label":"Corner styling","default":"soft","options":[{"value":"square","label":"Square"},{"value":"soft","label":"Soft"},{"value":"round","label":"Round"}]},{"type":"color","id":"accent_color","label":"Star and bar chart color","default":"#108474"},{"type":"color","id":"button_color","label":"Button color","default":"#108474"},{"type":"color","id":"button_text_color","label":"Button text color","default":"#FFFFFF"},{"type":"color","id":"text_color","label":"Text color","default":"#000000"},{"type":"color","id":"lighter_text_color","label":"Lighter text color","default":"#7B7B7B"},{"type":"color","id":"card_background","label":"Card background","default":"#FFFFFF"},{"type":"color","id":"section_background","label":"Section background","default":"#FFFFFF"},{"type":"color","id":"border_color","label":"Border color","default":"#E5E7EB"}]}
 {% endschema %}
