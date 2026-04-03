@@ -1,32 +1,3 @@
-{% liquid
-  assign review_source = block.settings.review_source | default: 'store_reviews'
-  assign max_reviews = block.settings.max_reviews | default: 20
-  assign popup_position = block.settings.popup_position | default: 'bottom-left'
-  assign popup_delay = block.settings.popup_delay | default: 8
-  assign popup_repeat_interval = block.settings.popup_repeat_interval | default: 45
-  assign popup_auto_close = block.settings.popup_auto_close | default: 10
-
-  assign popup_heading = block.settings.popup_heading | default: 'Recent review'
-  assign popup_subheading = block.settings.popup_subheading | default: 'Customers are loving this'
-
-  assign show_product_name = block.settings.show_product_name
-  assign show_review_image = block.settings.show_review_image
-  assign show_verified_badge = block.settings.show_verified_badge
-  assign pause_on_hover = block.settings.pause_on_hover
-
-  assign popup_width = block.settings.popup_width | default: 340
-  assign popup_corner_radius = block.settings.popup_corner_radius | default: 18
-  assign popup_offset = block.settings.popup_offset | default: 20
-
-  assign card_bg = block.settings.card_bg | default: '#ffffff'
-  assign accent_color = block.settings.accent_color | default: '#0f172a'
-  assign stars_color = block.settings.stars_color | default: '#0f172a'
-  assign text_color = block.settings.text_color | default: '#111827'
-  assign subtext_color = block.settings.subtext_color | default: '#6b7280'
-  assign border_color = block.settings.border_color | default: '#e5e7eb'
-  assign shadow_strength = block.settings.shadow_strength | default: 22
-%}
-
 <div
   id="prp-root-{{ block.id }}"
   class="prp-root"
@@ -34,63 +5,51 @@
   data-endpoint="/apps/reviews"
   data-shop="{{ shop.permanent_domain }}"
   data-app-script="{{ 'popup-reviews-main.js' | asset_url }}"
-  data-review-source="{{ review_source }}"
-  data-max-reviews="{{ max_reviews }}"
-  data-popup-position="{{ popup_position }}"
-  data-popup-delay="{{ popup_delay }}"
-  data-popup-repeat-interval="{{ popup_repeat_interval }}"
-  data-popup-auto-close="{{ popup_auto_close }}"
-  data-show-product-name="{{ show_product_name }}"
-  data-show-review-image="{{ show_review_image }}"
-  data-show-verified-badge="{{ show_verified_badge }}"
-  data-pause-on-hover="{{ pause_on_hover }}"
+  data-review-source="{{ block.settings.review_source }}"
+  data-max-reviews="{{ block.settings.max_reviews }}"
+  data-popup-position="{{ block.settings.popup_position }}"
+  data-popup-delay="{{ block.settings.popup_delay }}"
+  data-popup-repeat-interval="{{ block.settings.popup_repeat_interval }}"
+  data-popup-auto-close="{{ block.settings.popup_auto_close }}"
+  data-show-product-name="{{ block.settings.show_product_name }}"
+  data-show-review-image="{{ block.settings.show_review_image }}"
+  data-show-verified-badge="{{ block.settings.show_verified_badge }}"
+  data-pause-on-hover="{{ block.settings.pause_on_hover }}"
   data-current-product-id="{{ product.id }}"
   data-current-product-handle="{{ product.handle }}"
   data-current-collection-id="{{ collection.id }}"
   data-current-collection-handle="{{ collection.handle }}"
   style="
-    --prp-width: {{ popup_width }}px;
-    --prp-radius: {{ popup_corner_radius }}px;
-    --prp-offset: {{ popup_offset }}px;
-    --prp-bg: {{ card_bg }};
-    --prp-accent: {{ accent_color }};
-    --prp-stars: {{ stars_color }};
-    --prp-text: {{ text_color }};
-    --prp-subtext: {{ subtext_color }};
-    --prp-border: {{ border_color }};
-    --prp-shadow-strength: {{ shadow_strength }};
+    --prp-width: {{ block.settings.popup_width }}px;
+    --prp-radius: {{ block.settings.popup_corner_radius }}px;
+    --prp-offset: {{ block.settings.popup_offset }}px;
+    --prp-bg: {{ block.settings.card_bg }};
+    --prp-accent: {{ block.settings.accent_color }};
+    --prp-stars: {{ block.settings.stars_color }};
+    --prp-text: {{ block.settings.text_color }};
+    --prp-subtext: {{ block.settings.subtext_color }};
+    --prp-border: {{ block.settings.border_color }};
+    --prp-shadow-strength: {{ block.settings.shadow_strength }};
   "
 >
   <div
-    class="prp-popup prp-popup--{{ popup_position }}"
+    class="prp-popup prp-popup--{{ block.settings.popup_position }}"
     hidden
     aria-live="polite"
     aria-atomic="true"
   >
-    <button
-      type="button"
-      class="prp-close"
-      aria-label="Close popup review"
-    >
-      ×
-    </button>
+    <button type="button" class="prp-close" aria-label="Close popup review">×</button>
 
     <div class="prp-card" role="dialog" aria-label="Pop-up review">
       <div class="prp-media" hidden>
-        <img
-          class="prp-media-image"
-          alt=""
-          loading="lazy"
-          width="96"
-          height="96"
-        >
+        <img class="prp-media-image" alt="" loading="lazy" width="96" height="96">
       </div>
 
       <div class="prp-content">
         <div class="prp-topline">
           <div class="prp-heading-wrap">
-            <div class="prp-heading">{{ popup_heading }}</div>
-            <div class="prp-subheading">{{ popup_subheading }}</div>
+            <div class="prp-heading">{{ block.settings.popup_heading }}</div>
+            <div class="prp-subheading">{{ block.settings.popup_subheading }}</div>
           </div>
         </div>
 
@@ -116,221 +75,5 @@
 </div>
 
 {% schema %}
-{
-  "name": "Pop-up Reviews",
-  "target": "body",
-  "stylesheet": "popup-reviews.css",
-  "javascript": "popup-reviews.js",
-  "settings": [
-    {
-      "type": "paragraph",
-      "content": "Enable this app embed from the theme customizer to show one automatic review popup across the website."
-    },
-
-    {
-      "type": "header",
-      "content": "Review source"
-    },
-    {
-      "type": "select",
-      "id": "review_source",
-      "label": "Show reviews from",
-      "default": "store_reviews",
-      "options": [
-        { "value": "all_reviews", "label": "All reviews" },
-        { "value": "store_reviews", "label": "Store reviews" },
-        { "value": "product_reviews", "label": "Product reviews" },
-        { "value": "current_product", "label": "Current product" },
-        { "value": "current_collection", "label": "Current collection" },
-        { "value": "featured_reviews", "label": "Featured reviews" }
-      ]
-    },
-    {
-      "type": "range",
-      "id": "max_reviews",
-      "label": "Maximum reviews pool",
-      "min": 3,
-      "max": 30,
-      "step": 1,
-      "default": 20
-    },
-
-    {
-      "type": "header",
-      "content": "Popup behavior"
-    },
-    {
-      "type": "select",
-      "id": "popup_position",
-      "label": "Popup position",
-      "default": "bottom-left",
-      "options": [
-        { "value": "top-left", "label": "Top left" },
-        { "value": "top-center", "label": "Top center" },
-        { "value": "top-right", "label": "Top right" },
-        { "value": "center-left", "label": "Center left" },
-        { "value": "center", "label": "Center" },
-        { "value": "center-right", "label": "Center right" },
-        { "value": "bottom-left", "label": "Bottom left" },
-        { "value": "bottom-center", "label": "Bottom center" },
-        { "value": "bottom-right", "label": "Bottom right" }
-      ]
-    },
-    {
-      "type": "range",
-      "id": "popup_delay",
-      "label": "Show first popup after",
-      "min": 2,
-      "max": 60,
-      "step": 1,
-      "unit": "s",
-      "default": 8
-    },
-    {
-      "type": "range",
-      "id": "popup_repeat_interval",
-      "label": "Repeat popup every",
-      "min": 10,
-      "max": 180,
-      "step": 5,
-      "unit": "s",
-      "default": 45
-    },
-    {
-      "type": "range",
-      "id": "popup_auto_close",
-      "label": "Auto close after",
-      "min": 3,
-      "max": 30,
-      "step": 1,
-      "unit": "s",
-      "default": 10
-    },
-    {
-      "type": "checkbox",
-      "id": "pause_on_hover",
-      "label": "Pause auto close on hover",
-      "default": true
-    },
-
-    {
-      "type": "header",
-      "content": "Popup content"
-    },
-    {
-      "type": "text",
-      "id": "popup_heading",
-      "label": "Popup heading",
-      "default": "Recent review"
-    },
-    {
-      "type": "text",
-      "id": "popup_subheading",
-      "label": "Popup subheading",
-      "default": "Customers are loving this"
-    },
-    {
-      "type": "checkbox",
-      "id": "show_review_image",
-      "label": "Show review image when available",
-      "default": true
-    },
-    {
-      "type": "checkbox",
-      "id": "show_product_name",
-      "label": "Show product/store name",
-      "default": true
-    },
-    {
-      "type": "checkbox",
-      "id": "show_verified_badge",
-      "label": "Show verified badge",
-      "default": true
-    },
-
-    {
-      "type": "header",
-      "content": "Popup layout"
-    },
-    {
-      "type": "range",
-      "id": "popup_width",
-      "label": "Popup width",
-      "min": 260,
-      "max": 460,
-      "step": 4,
-      "unit": "px",
-      "default": 340
-    },
-    {
-      "type": "range",
-      "id": "popup_corner_radius",
-      "label": "Corner radius",
-      "min": 8,
-      "max": 28,
-      "step": 1,
-      "default": 18
-    },
-    {
-      "type": "range",
-      "id": "popup_offset",
-      "label": "Screen offset spacing",
-      "min": 8,
-      "max": 80,
-      "step": 1,
-      "unit": "px",
-      "default": 20
-    },
-    {
-      "type": "range",
-      "id": "shadow_strength",
-      "label": "Shadow strength",
-      "min": 8,
-      "max": 40,
-      "step": 1,
-      "default": 22
-    },
-
-    {
-      "type": "header",
-      "content": "Colors"
-    },
-    {
-      "type": "color",
-      "id": "card_bg",
-      "label": "Card background",
-      "default": "#ffffff"
-    },
-    {
-      "type": "color",
-      "id": "accent_color",
-      "label": "Accent color",
-      "default": "#0f172a"
-    },
-    {
-      "type": "color",
-      "id": "stars_color",
-      "label": "Stars color",
-      "default": "#0f172a"
-    },
-    {
-      "type": "color",
-      "id": "text_color",
-      "label": "Text color",
-      "default": "#111827"
-    },
-    {
-      "type": "color",
-      "id": "subtext_color",
-      "label": "Secondary text color",
-      "default": "#6b7280"
-    },
-    {
-      "type": "color",
-      "id": "border_color",
-      "label": "Border color",
-      "default": "#e5e7eb"
-    }
-  ]
-}
+{"name":"Pop-up Reviews","target":"body","stylesheet":"popup-reviews.css","javascript":"popup-reviews.js","settings":[{"type":"paragraph","content":"Enable this app embed from the theme customizer to show one automatic review popup across the website."},{"type":"header","content":"Review source"},{"type":"select","id":"review_source","label":"Show reviews from","default":"store_reviews","options":[{"value":"all_reviews","label":"All reviews"},{"value":"store_reviews","label":"Store reviews"},{"value":"product_reviews","label":"Product reviews"},{"value":"current_product","label":"Current product"},{"value":"current_collection","label":"Current collection"},{"value":"featured_reviews","label":"Featured reviews"}]},{"type":"range","id":"max_reviews","label":"Maximum reviews pool","min":3,"max":30,"step":1,"default":20},{"type":"header","content":"Popup behavior"},{"type":"select","id":"popup_position","label":"Popup position","default":"bottom-left","options":[{"value":"top-left","label":"Top left"},{"value":"top-center","label":"Top center"},{"value":"top-right","label":"Top right"},{"value":"center-left","label":"Center left"},{"value":"center","label":"Center"},{"value":"center-right","label":"Center right"},{"value":"bottom-left","label":"Bottom left"},{"value":"bottom-center","label":"Bottom center"},{"value":"bottom-right","label":"Bottom right"}]},{"type":"range","id":"popup_delay","label":"Show first popup after","min":2,"max":60,"step":1,"unit":"s","default":8},{"type":"range","id":"popup_repeat_interval","label":"Repeat popup every","min":10,"max":180,"step":5,"unit":"s","default":45},{"type":"range","id":"popup_auto_close","label":"Auto close after","min":3,"max":30,"step":1,"unit":"s","default":10},{"type":"checkbox","id":"pause_on_hover","label":"Pause auto close on hover","default":true},{"type":"header","content":"Popup content"},{"type":"text","id":"popup_heading","label":"Popup heading","default":"Recent review"},{"type":"text","id":"popup_subheading","label":"Popup subheading","default":"Customers are loving this"},{"type":"checkbox","id":"show_review_image","label":"Show review image when available","default":true},{"type":"checkbox","id":"show_product_name","label":"Show product/store name","default":true},{"type":"checkbox","id":"show_verified_badge","label":"Show verified badge","default":true},{"type":"header","content":"Popup layout"},{"type":"range","id":"popup_width","label":"Popup width","min":260,"max":460,"step":4,"unit":"px","default":340},{"type":"range","id":"popup_corner_radius","label":"Corner radius","min":8,"max":28,"step":1,"default":18},{"type":"range","id":"popup_offset","label":"Screen offset spacing","min":8,"max":80,"step":1,"unit":"px","default":20},{"type":"range","id":"shadow_strength","label":"Shadow strength","min":8,"max":40,"step":1,"default":22},{"type":"header","content":"Colors"},{"type":"color","id":"card_bg","label":"Card background","default":"#ffffff"},{"type":"color","id":"accent_color","label":"Accent color","default":"#0f172a"},{"type":"color","id":"stars_color","label":"Stars color","default":"#0f172a"},{"type":"color","id":"text_color","label":"Text color","default":"#111827"},{"type":"color","id":"subtext_color","label":"Secondary text color","default":"#6b7280"},{"type":"color","id":"border_color","label":"Border color","default":"#e5e7eb"}]}
 {% endschema %}
