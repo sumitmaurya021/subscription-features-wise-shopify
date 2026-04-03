@@ -1,0 +1,541 @@
+{% liquid
+  assign review_source = block.settings.review_source | default: 'current_product'
+  assign review_curation = block.settings.review_curation | default: 'recent_5_star'
+  assign product_subheading = block.settings.product_subheading | default: 'See what other buyers are saying about this product'
+  assign collection_subheading = block.settings.collection_subheading | default: 'See what shoppers are saying about this collection'
+  assign store_subheading = block.settings.store_subheading | default: 'See what customers are saying about our store'
+
+  if review_source == 'custom_product' and block.settings.custom_product != blank
+    assign source_product = block.settings.custom_product
+  elsif review_source == 'custom_collection' and block.settings.custom_collection != blank
+    assign source_collection = block.settings.custom_collection
+  elsif review_source == 'current_collection' and collection
+    assign source_collection = collection
+  elsif review_source != 'store_reviews' and product
+    assign source_product = product
+  elsif review_source != 'store_reviews' and collection
+    assign source_collection = collection
+  endif
+
+  assign resolved_review_type = 'store'
+  assign resolved_target_id = ''
+  assign resolved_target_handle = ''
+  assign resolved_target_title = shop.name
+  assign resolved_context_label = 'Store'
+  assign resolved_context_subheading = store_subheading
+  assign resolved_context_image = ''
+  assign resolved_product_id = ''
+  assign resolved_product_title = ''
+
+  if source_product != blank
+    assign resolved_review_type = 'product'
+    assign resolved_target_id = source_product.id
+    assign resolved_target_handle = source_product.handle
+    assign resolved_target_title = source_product.title
+    assign resolved_context_label = 'Product'
+    assign resolved_context_subheading = product_subheading
+    assign resolved_product_id = source_product.id
+    assign resolved_product_title = source_product.title
+    if source_product.featured_image
+      assign resolved_context_image = source_product.featured_image | image_url: width: 900
+    endif
+  elsif source_collection != blank
+    assign resolved_review_type = 'collection'
+    assign resolved_target_id = source_collection.id
+    assign resolved_target_handle = source_collection.handle
+    assign resolved_target_title = source_collection.title
+    assign resolved_context_label = 'Collection'
+    assign resolved_context_subheading = collection_subheading
+    if source_collection.image
+      assign resolved_context_image = source_collection.image | image_url: width: 900
+    endif
+  endif
+
+  assign only_media = false
+  assign featured_only = false
+  assign star_rating = ''
+  assign min_rating = ''
+
+  if review_curation == 'recent_with_media'
+    assign only_media = true
+  elsif review_curation == 'manual_featured'
+    assign featured_only = true
+  elsif review_curation == 'recent_5_star'
+    assign star_rating = '5'
+  elsif review_curation == 'minimum_4_star'
+    assign min_rating = '4'
+  endif
+%}
+
+<div
+  id="rcc-root-{{ block.id }}"
+  class="rcc-root"
+  {{ block.shopify_attributes }}
+  data-block-id="{{ block.id }}"
+  data-section-id="{{ block.id }}"
+  data-endpoint="/apps/reviews"
+  data-main-script="{{ 'reviews-carousel-classic-main.js' | asset_url }}"
+  data-shop="{{ shop.permanent_domain }}"
+  data-review-type="{{ resolved_review_type }}"
+  data-target-id="{{ resolved_target_id }}"
+  data-target-handle="{{ resolved_target_handle }}"
+  data-target-title="{{ resolved_target_title | escape }}"
+  data-context-label="{{ resolved_context_label | escape }}"
+  data-context-subheading="{{ resolved_context_subheading | escape }}"
+  data-context-image="{{ resolved_context_image }}"
+  data-product-id="{{ resolved_product_id }}"
+  data-product-title="{{ resolved_product_title | escape }}"
+  data-review-curation="{{ review_curation }}"
+  data-only-media="{{ only_media }}"
+  data-featured-only="{{ featured_only }}"
+  data-star-rating="{{ star_rating }}"
+  data-min-rating="{{ min_rating }}"
+  data-widget-theme="{{ block.settings.widget_theme | default: 'compact' }}"
+  data-arrow-position="{{ block.settings.arrow_position | default: 'below' }}"
+  data-show-header="{{ block.settings.show_header }}"
+  data-header-title="{{ block.settings.header_title | default: 'Let customers speak for us' | escape }}"
+  data-header-text="{{ block.settings.header_text | default: 'from [n] reviews' | escape }}"
+  data-empty-text="{{ block.settings.empty_text | default: 'No reviews yet' | escape }}"
+  data-loading-text="{{ block.settings.loading_text | default: 'Loading reviews...' | escape }}"
+  data-show-ai-summary="{{ block.settings.show_ai_summary }}"
+  data-ai-summary-heading="{{ block.settings.ai_summary_heading | default: 'AI review summary' | escape }}"
+  data-show-review-rating="{{ block.settings.show_review_rating }}"
+  data-show-review-title="{{ block.settings.show_review_title }}"
+  data-show-review-body="{{ block.settings.show_review_body }}"
+  data-show-review-date="{{ block.settings.show_review_date }}"
+  data-show-reviewer-name="{{ block.settings.show_reviewer_name }}"
+  data-show-product-name="{{ block.settings.show_product_name }}"
+  data-show-verified-badge="{{ block.settings.show_verified_badge }}"
+  data-show-average-rating="{{ block.settings.show_average_rating }}"
+  data-enable-autoplay="{{ block.settings.enable_autoplay }}"
+  data-pause-on-hover="{{ block.settings.pause_on_hover }}"
+  data-enable-swipe="{{ block.settings.enable_swipe }}"
+  data-loop="{{ block.settings.enable_loop }}"
+  data-desktop-reviews="{{ block.settings.desktop_reviews | default: 3 }}"
+  data-tablet-reviews="{{ block.settings.tablet_reviews | default: 2 }}"
+  data-mobile-reviews="{{ block.settings.mobile_reviews | default: 1 }}"
+  data-autoslide-interval="{{ block.settings.autoslide_interval | default: 5 }}"
+  data-block-height="{{ block.settings.block_height | default: 250 }}"
+  data-page-width="{{ block.settings.page_width | default: 80 }}"
+  data-card-gap="{{ block.settings.card_gap | default: 20 }}"
+  data-border-radius="{{ block.settings.border_radius | default: 14 }}"
+  data-image-ratio="{{ block.settings.image_ratio | default: 'square' }}"
+  data-text-align="{{ block.settings.text_align | default: 'left' }}"
+  data-accent-color="{{ block.settings.accent_color | default: '#149c9c' }}"
+  data-star-color="{{ block.settings.star_color | default: '#149c9c' }}"
+  data-text-color="{{ block.settings.text_color | default: '#111827' }}"
+  data-muted-text-color="{{ block.settings.muted_text_color | default: '#6b7280' }}"
+  data-card-background="{{ block.settings.card_background | default: '#ffffff' }}"
+  data-section-background="{{ block.settings.section_background | default: '#ffffff' }}"
+  data-border-color="{{ block.settings.border_color | default: '#e5e7eb' }}"
+  data-arrow-color="{{ block.settings.arrow_color | default: '#c7c9d1' }}"
+  data-shadow-color="{{ block.settings.shadow_color | default: 'rgba(15, 23, 42, 0.08)' }}"
+  data-section-padding-top="{{ block.settings.section_padding_top | default: 10 }}"
+  data-section-padding-bottom="{{ block.settings.section_padding_bottom | default: 10 }}"
+  data-custom-css="{{ block.settings.custom_css | escape }}"
+>
+  <div class="rcc-widget" aria-busy="true">
+    <div class="rcc-shell" style="width: {{ block.settings.page_width | default: 80 }}%;">
+      <div class="rcc-stage">
+        <div class="rcc-skeleton rcc-skeleton--header">
+          <div class="rcc-skeleton-line rcc-skeleton-line--title"></div>
+          <div class="rcc-skeleton-line rcc-skeleton-line--stars"></div>
+          <div class="rcc-skeleton-line rcc-skeleton-line--meta"></div>
+        </div>
+
+        <div class="rcc-skeleton-track">
+          {% for _ in (1..3) %}
+            <div class="rcc-skeleton-card">
+              <div class="rcc-skeleton-line rcc-skeleton-line--stars"></div>
+              <div class="rcc-skeleton-line rcc-skeleton-line--title-sm"></div>
+              <div class="rcc-skeleton-line"></div>
+              <div class="rcc-skeleton-line"></div>
+              <div class="rcc-skeleton-line rcc-skeleton-line--short"></div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Reviews Carousel Classic",
+  "target": "section",
+  "templates": ["product", "collection", "index", "page"],
+  "stylesheet": "reviews-carousel-classic.css",
+  "javascript": "reviews-carousel-classic.js",
+  "settings": [
+    {
+      "type": "select",
+      "id": "review_source",
+      "label": "Show reviews for",
+      "default": "current_product",
+      "options": [
+        { "value": "current_product", "label": "Current product" },
+        { "value": "current_collection", "label": "Current collection" },
+        { "value": "store_reviews", "label": "Store reviews" },
+        { "value": "custom_product", "label": "Custom product" },
+        { "value": "custom_collection", "label": "Custom collection" }
+      ]
+    },
+    {
+      "type": "product",
+      "id": "custom_product",
+      "label": "Custom product"
+    },
+    {
+      "type": "collection",
+      "id": "custom_collection",
+      "label": "Custom collection"
+    },
+    {
+      "type": "text",
+      "id": "product_subheading",
+      "label": "Product subheading",
+      "default": "See what other buyers are saying about this product"
+    },
+    {
+      "type": "text",
+      "id": "collection_subheading",
+      "label": "Collection subheading",
+      "default": "See what shoppers are saying about this collection"
+    },
+    {
+      "type": "text",
+      "id": "store_subheading",
+      "label": "Store subheading",
+      "default": "See what customers are saying about our store"
+    },
+    {
+      "type": "radio",
+      "id": "review_curation",
+      "label": "Which reviews should be shown",
+      "default": "recent_5_star",
+      "options": [
+        { "value": "recent_5_star", "label": "Recent 5-star reviews" },
+        { "value": "recent_with_media", "label": "Recent reviews with pictures / media" },
+        { "value": "manual_featured", "label": "Choose reviews manually (Pinned reviews)" },
+        { "value": "minimum_4_star", "label": "Minimum 4-star reviews" }
+      ]
+    },
+    {
+      "type": "select",
+      "id": "widget_theme",
+      "label": "Widget theme",
+      "default": "compact",
+      "options": [
+        { "value": "compact", "label": "Compact without pictures (default)" },
+        { "value": "gallery", "label": "Gallery" },
+        { "value": "cards", "label": "Cards" },
+        { "value": "centered", "label": "Centered" },
+        { "value": "compact_with_pictures", "label": "Compact with pictures" },
+        { "value": "focused_view", "label": "Focused view" },
+        { "value": "vertical_sliding", "label": "Vertical sliding" }
+      ]
+    },
+    {
+      "type": "select",
+      "id": "arrow_position",
+      "label": "Slider arrows",
+      "default": "below",
+      "options": [
+        { "value": "sides", "label": "Show arrows on the sides of the carousel" },
+        { "value": "below", "label": "Show arrows below the carousel" }
+      ]
+    },
+    {
+      "type": "checkbox",
+      "id": "show_ai_summary",
+      "label": "Show AI review summary",
+      "default": false
+    },
+    {
+      "type": "text",
+      "id": "ai_summary_heading",
+      "label": "AI summary heading",
+      "default": "AI review summary"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_review_rating",
+      "label": "Show review rating",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_review_title",
+      "label": "Show review title",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_review_body",
+      "label": "Show review body",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_review_date",
+      "label": "Show review date",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_reviewer_name",
+      "label": "Show reviewer name",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_product_name",
+      "label": "Show product / target name",
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "show_verified_badge",
+      "label": "Show verified badge",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_average_rating",
+      "label": "Show average rating summary",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "desktop_reviews",
+      "label": "Number of reviews on desktop",
+      "min": 1,
+      "max": 5,
+      "step": 1,
+      "default": 3
+    },
+    {
+      "type": "range",
+      "id": "tablet_reviews",
+      "label": "Number of reviews on tablet",
+      "min": 1,
+      "max": 4,
+      "step": 1,
+      "default": 2
+    },
+    {
+      "type": "select",
+      "id": "mobile_reviews",
+      "label": "Number of reviews on mobile",
+      "default": "1",
+      "options": [
+        { "value": "1", "label": "1" },
+        { "value": "2", "label": "2" }
+      ]
+    },
+    {
+      "type": "range",
+      "id": "autoslide_interval",
+      "label": "Autoslide interval (seconds)",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "default": 5
+    },
+    {
+      "type": "range",
+      "id": "block_height",
+      "label": "Block height",
+      "min": 180,
+      "max": 520,
+      "step": 10,
+      "unit": "px",
+      "default": 250
+    },
+    {
+      "type": "range",
+      "id": "page_width",
+      "label": "Page width",
+      "min": 50,
+      "max": 100,
+      "step": 1,
+      "unit": "%",
+      "default": 80
+    },
+    {
+      "type": "range",
+      "id": "card_gap",
+      "label": "Gap between review cards",
+      "min": 8,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "default": 20
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "label": "Card corner radius",
+      "min": 0,
+      "max": 32,
+      "step": 2,
+      "unit": "px",
+      "default": 14
+    },
+    {
+      "type": "select",
+      "id": "image_ratio",
+      "label": "Review image ratio",
+      "default": "square",
+      "options": [
+        { "value": "square", "label": "Square" },
+        { "value": "portrait", "label": "Portrait" },
+        { "value": "landscape", "label": "Landscape" }
+      ]
+    },
+    {
+      "type": "select",
+      "id": "text_align",
+      "label": "Text alignment",
+      "default": "left",
+      "options": [
+        { "value": "left", "label": "Left" },
+        { "value": "center", "label": "Center" }
+      ]
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_autoplay",
+      "label": "Enable autoplay",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "pause_on_hover",
+      "label": "Pause on hover",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_swipe",
+      "label": "Enable swipe / drag",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_loop",
+      "label": "Loop slider",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_header",
+      "label": "Show the header",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "header_title",
+      "label": "Header title",
+      "default": "Let customers speak for us"
+    },
+    {
+      "type": "text",
+      "id": "header_text",
+      "label": "Header text",
+      "default": "from [n] reviews"
+    },
+    {
+      "type": "text",
+      "id": "empty_text",
+      "label": "Empty state text",
+      "default": "No reviews yet"
+    },
+    {
+      "type": "text",
+      "id": "loading_text",
+      "label": "Loading text",
+      "default": "Loading reviews..."
+    },
+    {
+      "type": "color",
+      "id": "accent_color",
+      "label": "Accent color",
+      "default": "#149c9c"
+    },
+    {
+      "type": "color",
+      "id": "star_color",
+      "label": "Star color",
+      "default": "#149c9c"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Primary text color",
+      "default": "#111827"
+    },
+    {
+      "type": "color",
+      "id": "muted_text_color",
+      "label": "Muted text color",
+      "default": "#6b7280"
+    },
+    {
+      "type": "color",
+      "id": "card_background",
+      "label": "Card background",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "section_background",
+      "label": "Section background",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "Border color",
+      "default": "#e5e7eb"
+    },
+    {
+      "type": "color",
+      "id": "arrow_color",
+      "label": "Arrow color",
+      "default": "#c7c9d1"
+    },
+    {
+      "type": "color",
+      "id": "shadow_color",
+      "label": "Shadow color",
+      "default": "rgba(15, 23, 42, 0.08)"
+    },
+    {
+      "type": "range",
+      "id": "section_padding_top",
+      "label": "Top padding",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 10
+    },
+    {
+      "type": "range",
+      "id": "section_padding_bottom",
+      "label": "Bottom padding",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 10
+    },
+    {
+      "type": "textarea",
+      "id": "custom_css",
+      "label": "Custom CSS"
+    }
+  ]
+}
+{% endschema %}
