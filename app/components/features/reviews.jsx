@@ -19,6 +19,7 @@ import {
 } from "@shopify/polaris";
 
 const GRAPHQL_ENDPOINT = "/graphql";
+const PAGE_SIZE = 10;
 
 const GET_REVIEWS_QUERY = `
   query GetReviews(
@@ -195,6 +196,35 @@ const UNPIN_REVIEW_MUTATION = `
   }
 `;
 
+const initialFilterState = {
+  status: "",
+  reviewType: "",
+  shop: "",
+  productId: "",
+  targetId: "",
+  targetHandle: "",
+};
+
+const initialFormState = {
+  id: null,
+  shop: "",
+  reviewType: "product",
+  targetId: "",
+  targetHandle: "",
+  targetTitle: "",
+  productId: "",
+  productTitle: "",
+  customerName: "",
+  customerEmail: "",
+  rating: "5",
+  title: "",
+  message: "",
+  reviewVideoUrl: "",
+  reviewYoutubeUrl: "",
+  status: "pending",
+  isPinned: "false",
+};
+
 async function graphqlRequest(query, variables = {}) {
   const response = await fetch(GRAPHQL_ENDPOINT, {
     method: "POST",
@@ -215,11 +245,7 @@ async function graphqlRequest(query, variables = {}) {
 
 function normalizeReviewType(value) {
   const reviewType = String(value || "product").trim().toLowerCase();
-
-  if (["product", "collection", "store"].includes(reviewType)) {
-    return reviewType;
-  }
-
+  if (["product", "collection", "store"].includes(reviewType)) return reviewType;
   return "product";
 }
 
@@ -245,10 +271,7 @@ function getReviewTypeOptions(includeAll = false) {
     { label: "Store", value: "store" },
   ];
 
-  if (includeAll) {
-    return [{ label: "All", value: "" }, ...base];
-  }
-
+  if (includeAll) return [{ label: "All", value: "" }, ...base];
   return base;
 }
 
@@ -262,17 +285,8 @@ function getRatingOptions() {
   ];
 }
 
-function getReviewTypeLabel(reviewType) {
-  const normalized = normalizeReviewType(reviewType);
-
-  if (normalized === "collection") return "Collection Review";
-  if (normalized === "store") return "Store Review";
-  return "Product Review";
-}
-
 function getReviewTypeShortLabel(reviewType) {
   const normalized = normalizeReviewType(reviewType);
-
   if (normalized === "collection") return "Collection";
   if (normalized === "store") return "Store";
   return "Product";
@@ -280,7 +294,6 @@ function getReviewTypeShortLabel(reviewType) {
 
 function getReviewTypeTone(reviewType) {
   const normalized = normalizeReviewType(reviewType);
-
   if (normalized === "collection") return "attention";
   if (normalized === "store") return "info";
   return "success";
@@ -354,7 +367,6 @@ function getYoutubeEmbedUrl(url) {
       }
 
       if (!videoId) return null;
-
       return `https://www.youtube.com/embed/${videoId}`;
     }
 
@@ -373,7 +385,6 @@ function getReviewTargetSummary(review) {
 
   if (reviewType === "product") {
     return {
-      label: "Product",
       title: targetTitle || "Untitled Product",
       subText: `Product ID: ${review.targetId || review.productId || "-"}`,
     };
@@ -381,7 +392,6 @@ function getReviewTargetSummary(review) {
 
   if (reviewType === "collection") {
     return {
-      label: "Collection",
       title: targetTitle || "Untitled Collection",
       subText: `Collection ID: ${review.targetId || "-"}${
         review.targetHandle ? ` · Handle: ${review.targetHandle}` : ""
@@ -390,10 +400,54 @@ function getReviewTargetSummary(review) {
   }
 
   return {
-    label: "Store",
     title: targetTitle || review.shop || "Store",
     subText: `Shop: ${review.shop || "-"}`,
   };
+}
+
+function getReviewImages(reviewImages) {
+  if (Array.isArray(reviewImages)) return reviewImages.filter(Boolean);
+
+  if (typeof reviewImages === "string") {
+    try {
+      const parsed = JSON.parse(reviewImages);
+      if (Array.isArray(parsed)) return parsed.filter(Boolean);
+      return reviewImages ? [reviewImages] : [];
+    } catch {
+      return reviewImages ? [reviewImages] : [];
+    }
+  }
+
+  return [];
+}
+
+function getMediaCount(review) {
+  const images = getReviewImages(review.reviewImages);
+  return (
+    images.length +
+    (review.reviewVideoUrl ? 1 : 0) +
+    (review.reviewYoutubeUrl ? 1 : 0)
+  );
+}
+
+function hasMedia(review) {
+  return getMediaCount(review) > 0;
+}
+
+function getVisiblePages(currentPage, totalPages) {
+  if (totalPages <= 5) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  if (currentPage <= 3) {
+    return [1, 2, 3, 4, "...", totalPages];
+  }
+
+  if (currentPage >= totalPages - 2) {
+    return [1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  }
+
+  return [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages];
 }
 
 function StatusPill({ status }) {
@@ -414,6 +468,7 @@ function StatusPill({ status }) {
         fontWeight: 700,
         textTransform: "capitalize",
         lineHeight: 1,
+        whiteSpace: "nowrap",
       }}
     >
       <span
@@ -430,410 +485,137 @@ function StatusPill({ status }) {
   );
 }
 
-function StatCard({ title, value, helper, tone = "base" }) {
-  const backgroundMap = {
-    base: "#ffffff",
-    success: "#f0fdf4",
-    warning: "#fffbeb",
-    critical: "#fef2f2",
+function PremiumStatCard({
+  title,
+  value,
+  helper,
+  accent = "blue",
+  softLabel,
+}) {
+  const accentMap = {
+    blue: {
+      top: "linear-gradient(135deg, #eef4ff 0%, #f8fbff 100%)",
+      glow: "rgba(59, 130, 246, 0.16)",
+      line: "#3b82f6",
+      chipBg: "#eff6ff",
+      chipText: "#1d4ed8",
+    },
+    green: {
+      top: "linear-gradient(135deg, #ecfdf3 0%, #f7fef9 100%)",
+      glow: "rgba(16, 185, 129, 0.16)",
+      line: "#10b981",
+      chipBg: "#ecfdf5",
+      chipText: "#047857",
+    },
+    amber: {
+      top: "linear-gradient(135deg, #fff7e8 0%, #fffdfa 100%)",
+      glow: "rgba(245, 158, 11, 0.16)",
+      line: "#f59e0b",
+      chipBg: "#fffbeb",
+      chipText: "#b45309",
+    },
+    red: {
+      top: "linear-gradient(135deg, #fef2f2 0%, #fff8f8 100%)",
+      glow: "rgba(239, 68, 68, 0.16)",
+      line: "#ef4444",
+      chipBg: "#fef2f2",
+      chipText: "#b91c1c",
+    },
+    violet: {
+      top: "linear-gradient(135deg, #f5f3ff 0%, #fbfaff 100%)",
+      glow: "rgba(139, 92, 246, 0.16)",
+      line: "#8b5cf6",
+      chipBg: "#f5f3ff",
+      chipText: "#6d28d9",
+    },
+    slate: {
+      top: "linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)",
+      glow: "rgba(71, 85, 105, 0.12)",
+      line: "#64748b",
+      chipBg: "#f1f5f9",
+      chipText: "#334155",
+    },
   };
 
-  return (
-    <div
-      style={{
-        background: backgroundMap[tone] || "#ffffff",
-        border: "1px solid #e5e7eb",
-        borderRadius: 16,
-        padding: 18,
-        minHeight: 108,
-        boxShadow: "0 1px 2px rgba(16, 24, 40, 0.04)",
-      }}
-    >
-      <BlockStack gap="100">
-        <Text as="span" variant="bodySm" tone="subdued">
-          {title}
-        </Text>
-        <Text as="h3" variant="heading2xl">
-          {value}
-        </Text>
-        {helper ? (
-          <Text as="span" variant="bodySm" tone="subdued">
-            {helper}
-          </Text>
-        ) : null}
-      </BlockStack>
-    </div>
-  );
-}
-
-function FieldLabel({ children }) {
-  return (
-    <Text as="span" variant="bodySm" tone="subdued">
-      {children}
-    </Text>
-  );
-}
-
-function InfoLine({ label, value, breakWord = false }) {
-  return (
-    <div>
-      <FieldLabel>{label}</FieldLabel>
-      <div
-        style={{
-          marginTop: 4,
-          wordBreak: breakWord ? "break-word" : "normal",
-          overflowWrap: breakWord ? "anywhere" : "normal",
-        }}
-      >
-        <Text as="p" variant="bodySm">
-          {value || "-"}
-        </Text>
-      </div>
-    </div>
-  );
-}
-
-function ReviewImageThumb({ src, alt }) {
-  return (
-    <img
-      src={src}
-      alt={alt}
-      style={{
-        width: 52,
-        height: 52,
-        objectFit: "cover",
-        borderRadius: 10,
-        border: "1px solid #e5e7eb",
-        display: "block",
-        background: "#f9fafb",
-      }}
-    />
-  );
-}
-
-function ReviewMediaCard({ review }) {
-  const youtubeEmbedUrl =
-    getYoutubeEmbedUrl(review.reviewYoutubeUrl) || review.reviewYoutubeUrl;
+  const palette = accentMap[accent] || accentMap.blue;
 
   return (
     <div
       style={{
-        padding: 14,
-        background: "#f8fafc",
-        border: "1px solid #e5e7eb",
-        borderRadius: 14,
-      }}
-    >
-      <BlockStack gap="200">
-        <Text as="h4" variant="headingSm">
-          Media
-        </Text>
-
-        {Array.isArray(review.reviewImages) && review.reviewImages.length ? (
-          <div>
-            <FieldLabel>Images</FieldLabel>
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 8,
-                marginTop: 8,
-              }}
-            >
-              {review.reviewImages.map((img, i) => (
-                <ReviewImageThumb key={i} src={img} alt={`Review image ${i + 1}`} />
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {review.reviewVideoUrl ? (
-          <div>
-            <FieldLabel>Uploaded Video</FieldLabel>
-            <div style={{ marginTop: 8 }}>
-              <video
-                src={review.reviewVideoUrl}
-                controls
-                style={{
-                  width: "100%",
-                  maxWidth: 260,
-                  borderRadius: 12,
-                  border: "1px solid #e5e7eb",
-                  background: "#000",
-                  display: "block",
-                }}
-              />
-            </div>
-          </div>
-        ) : null}
-
-        {youtubeEmbedUrl ? (
-          <div>
-            <FieldLabel>YouTube Video</FieldLabel>
-            <div style={{ marginTop: 8 }}>
-              <iframe
-                src={youtubeEmbedUrl}
-                title="Review YouTube video"
-                width="260"
-                height="160"
-                style={{
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 12,
-                  background: "#fff",
-                }}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            </div>
-          </div>
-        ) : null}
-
-        {!(
-          (Array.isArray(review.reviewImages) && review.reviewImages.length) ||
-          review.reviewVideoUrl ||
-          youtubeEmbedUrl
-        ) ? (
-          <Text as="p" variant="bodySm" tone="subdued">
-            No media added
-          </Text>
-        ) : null}
-      </BlockStack>
-    </div>
-  );
-}
-
-function ReviewCard({
-  review,
-  openEditModal,
-  handleApprove,
-  handleReject,
-  handleDelete,
-  handlePin,
-  handleUnpin,
-  approveLoadingId,
-  rejectLoadingId,
-  deleteLoadingId,
-  pinLoadingId,
-}) {
-  const target = getReviewTargetSummary(review);
-
-  return (
-    <div
-      style={{
-        border: "1px solid #e5e7eb",
-        borderRadius: 18,
+        position: "relative",
         overflow: "hidden",
-        background: "#ffffff",
-        boxShadow: "0 1px 2px rgba(16, 24, 40, 0.04)",
+        borderRadius: 20,
+        border: "1px solid rgba(226, 232, 240, 0.95)",
+        background: palette.top,
+        boxShadow: `0 10px 30px ${palette.glow}, 0 2px 6px rgba(15, 23, 42, 0.04)`,
+        padding: 18,
+        minHeight: 128,
       }}
     >
       <div
         style={{
-          padding: 18,
-          borderBottom: "1px solid #f1f5f9",
-          background: "#fcfcfd",
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 4,
+          background: palette.line,
         }}
-      >
-        <InlineStack align="space-between" blockAlign="start" wrap gap="300">
-          <BlockStack gap="050">
-            <InlineStack gap="200" wrap blockAlign="center">
-              <Text as="h3" variant="headingMd">
-                {target.title}
-              </Text>
-              <Badge tone={getReviewTypeTone(review.reviewType)}>
-                {getReviewTypeShortLabel(review.reviewType)}
-              </Badge>
-              {review.isPinned ? <Badge tone="info">Pinned</Badge> : null}
-            </InlineStack>
-            <Text as="p" variant="bodySm" tone="subdued">
-              {target.subText}
-            </Text>
-          </BlockStack>
+      />
 
-          <InlineStack gap="200" wrap blockAlign="center">
-            <StatusPill status={review.status} />
-            <Badge tone={getBadgeTone(review.status)}>
-              {review.rating}/5 · {renderStars(review.rating)}
-            </Badge>
-          </InlineStack>
+      <BlockStack gap="200">
+        <InlineStack align="space-between" blockAlign="start">
+          <Text as="span" variant="bodySm" tone="subdued">
+            {title}
+          </Text>
+
+          {softLabel ? (
+            <span
+              style={{
+                padding: "5px 9px",
+                borderRadius: 999,
+                background: palette.chipBg,
+                color: palette.chipText,
+                fontSize: 11,
+                fontWeight: 700,
+                lineHeight: 1,
+              }}
+            >
+              {softLabel}
+            </span>
+          ) : null}
         </InlineStack>
-      </div>
 
-      <div style={{ padding: 18 }}>
-        <BlockStack gap="400">
+        <div>
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns:
-                "minmax(220px, 1fr) minmax(220px, 1fr) minmax(220px, 1fr)",
-              gap: 16,
+              fontSize: 30,
+              fontWeight: 800,
+              color: "#0f172a",
+              lineHeight: 1.1,
+              letterSpacing: "-0.03em",
             }}
           >
+            {value}
+          </div>
+
+          {helper ? (
             <div
               style={{
-                padding: 14,
-                background: "#f8fafc",
-                border: "1px solid #e5e7eb",
-                borderRadius: 14,
+                marginTop: 8,
+                color: "#64748b",
+                fontSize: 12,
+                fontWeight: 500,
               }}
             >
-              <BlockStack gap="200">
-                <Text as="h4" variant="headingSm">
-                  Review Target
-                </Text>
-                <InfoLine
-                  label="Type"
-                  value={getReviewTypeLabel(review.reviewType)}
-                />
-                <InfoLine label="Title" value={review.targetTitle || review.productTitle} breakWord />
-                <InfoLine label="Target ID" value={review.targetId || review.productId} breakWord />
-                <InfoLine label="Target Handle" value={review.targetHandle} breakWord />
-                <InfoLine label="Shop" value={review.shop} breakWord />
-              </BlockStack>
+              {helper}
             </div>
-
-            <div
-              style={{
-                padding: 14,
-                background: "#f8fafc",
-                border: "1px solid #e5e7eb",
-                borderRadius: 14,
-              }}
-            >
-              <BlockStack gap="200">
-                <Text as="h4" variant="headingSm">
-                  Customer
-                </Text>
-                <InfoLine label="Name" value={review.customerName} breakWord />
-                <InfoLine
-                  label="Email"
-                  value={review.customerEmail}
-                  breakWord
-                />
-                <InfoLine
-                  label="Helpful Count"
-                  value={String(Number(review.helpfulCount || 0))}
-                />
-              </BlockStack>
-            </div>
-
-            <ReviewMediaCard review={review} />
-          </div>
-
-          <div
-            style={{
-              padding: 14,
-              background: "#f8fafc",
-              border: "1px solid #e5e7eb",
-              borderRadius: 14,
-            }}
-          >
-            <BlockStack gap="200">
-              <Text as="h4" variant="headingSm">
-                Review Meta
-              </Text>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                  gap: 14,
-                }}
-              >
-                <InfoLine label="Title" value={review.title} breakWord />
-                <InfoLine label="Created" value={formatDate(review.createdAt)} />
-                <InfoLine label="Updated" value={formatDate(review.updatedAt)} />
-                <InfoLine label="Status" value={review.status} />
-              </div>
-            </BlockStack>
-          </div>
-
-          <div
-            style={{
-              padding: 16,
-              background: "#ffffff",
-              border: "1px solid #e5e7eb",
-              borderRadius: 14,
-            }}
-          >
-            <BlockStack gap="150">
-              <FieldLabel>Review Message</FieldLabel>
-              <Text as="p" variant="bodyMd">
-                {review.message || "-"}
-              </Text>
-            </BlockStack>
-          </div>
-
-          <InlineStack gap="200" wrap>
-            <Button onClick={() => openEditModal(review)}>Edit</Button>
-
-            <Button
-              variant="primary"
-              tone="success"
-              loading={approveLoadingId === review.id}
-              onClick={() => handleApprove(review.id)}
-            >
-              Approve
-            </Button>
-
-            <Button
-              tone="critical"
-              loading={rejectLoadingId === review.id}
-              onClick={() => handleReject(review.id)}
-            >
-              Reject
-            </Button>
-
-            {review.isPinned ? (
-              <Button
-                loading={pinLoadingId === review.id}
-                onClick={() => handleUnpin(review.id)}
-              >
-                Unpin
-              </Button>
-            ) : (
-              <Button
-                variant="primary"
-                loading={pinLoadingId === review.id}
-                onClick={() => handlePin(review.id)}
-              >
-                Pin
-              </Button>
-            )}
-
-            <Button
-              variant="primary"
-              tone="critical"
-              loading={deleteLoadingId === review.id}
-              onClick={() => handleDelete(review.id)}
-            >
-              Delete
-            </Button>
-          </InlineStack>
-        </BlockStack>
-      </div>
+          ) : null}
+        </div>
+      </BlockStack>
     </div>
   );
 }
-
-const initialFormState = {
-  id: null,
-  shop: "",
-  reviewType: "product",
-  targetId: "",
-  targetHandle: "",
-  targetTitle: "",
-  productId: "",
-  productTitle: "",
-  customerName: "",
-  customerEmail: "",
-  rating: "5",
-  title: "",
-  message: "",
-  reviewVideoUrl: "",
-  reviewYoutubeUrl: "",
-  status: "pending",
-  isPinned: "false",
-};
 
 export default function ReviewsPage() {
   const [reviews, setReviews] = useState([]);
@@ -841,12 +623,8 @@ export default function ReviewsPage() {
   const [pageError, setPageError] = useState("");
   const [pageMessage, setPageMessage] = useState("");
 
-  const [statusFilter, setStatusFilter] = useState("");
-  const [reviewTypeFilter, setReviewTypeFilter] = useState("");
-  const [shopFilter, setShopFilter] = useState("");
-  const [productIdFilter, setProductIdFilter] = useState("");
-  const [targetIdFilter, setTargetIdFilter] = useState("");
-  const [targetHandleFilter, setTargetHandleFilter] = useState("");
+  const [filters, setFilters] = useState(initialFilterState);
+  const [appliedFilters, setAppliedFilters] = useState(initialFilterState);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteLoadingId, setDeleteLoadingId] = useState(null);
@@ -855,7 +633,12 @@ export default function ReviewsPage() {
   const [saveLoading, setSaveLoading] = useState(false);
   const [pinLoadingId, setPinLoadingId] = useState(null);
 
+  const [mediaModalOpen, setMediaModalOpen] = useState(false);
+  const [selectedMediaReview, setSelectedMediaReview] = useState(null);
+
+  const [currentPage, setCurrentPage] = useState(1);
   const [formData, setFormData] = useState(initialFormState);
+
   const isEditMode = Boolean(formData.id);
 
   const fetchReviews = useCallback(async () => {
@@ -864,12 +647,12 @@ export default function ReviewsPage() {
       setPageError("");
 
       const data = await graphqlRequest(GET_REVIEWS_QUERY, {
-        shop: shopFilter || null,
-        status: statusFilter || null,
-        productId: productIdFilter || null,
-        reviewType: reviewTypeFilter || null,
-        targetId: targetIdFilter || null,
-        targetHandle: targetHandleFilter || null,
+        shop: appliedFilters.shop || null,
+        status: appliedFilters.status || null,
+        productId: appliedFilters.productId || null,
+        reviewType: appliedFilters.reviewType || null,
+        targetId: appliedFilters.targetId || null,
+        targetHandle: appliedFilters.targetHandle || null,
       });
 
       setReviews(data.reviews?.data || []);
@@ -878,14 +661,7 @@ export default function ReviewsPage() {
     } finally {
       setLoading(false);
     }
-  }, [
-    shopFilter,
-    statusFilter,
-    productIdFilter,
-    reviewTypeFilter,
-    targetIdFilter,
-    targetHandleFilter,
-  ]);
+  }, [appliedFilters]);
 
   useEffect(() => {
     fetchReviews();
@@ -928,6 +704,25 @@ export default function ReviewsPage() {
     };
   }, [reviews]);
 
+  const totalPages = Math.max(1, Math.ceil(reviews.length / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+
+  const paginatedReviews = useMemo(() => {
+    const start = (safeCurrentPage - 1) * PAGE_SIZE;
+    return reviews.slice(start, start + PAGE_SIZE);
+  }, [reviews, safeCurrentPage]);
+
+  const startItem = reviews.length === 0 ? 0 : (safeCurrentPage - 1) * PAGE_SIZE + 1;
+  const endItem = Math.min(safeCurrentPage * PAGE_SIZE, reviews.length);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const activeFilterCount = useMemo(() => {
+    return Object.values(appliedFilters).filter(Boolean).length;
+  }, [appliedFilters]);
+
   const resetForm = () => {
     setFormData(initialFormState);
   };
@@ -959,6 +754,7 @@ export default function ReviewsPage() {
       status: review.status || "pending",
       isPinned: String(Boolean(review.isPinned)),
     });
+
     setModalOpen(true);
   };
 
@@ -967,12 +763,19 @@ export default function ReviewsPage() {
     resetForm();
   };
 
+  const openMediaModal = (review) => {
+    setSelectedMediaReview(review);
+    setMediaModalOpen(true);
+  };
+
+  const closeMediaModal = () => {
+    setMediaModalOpen(false);
+    setSelectedMediaReview(null);
+  };
+
   const handleFieldChange = (field) => (value) => {
     setFormData((prev) => {
-      const next = {
-        ...prev,
-        [field]: value,
-      };
+      const next = { ...prev, [field]: value };
 
       if (field === "reviewType") {
         const nextType = normalizeReviewType(value);
@@ -998,6 +801,24 @@ export default function ReviewsPage() {
     });
   };
 
+  const handleFilterChange = (field) => (value) => {
+    setFilters((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const applyFilters = () => {
+    setCurrentPage(1);
+    setAppliedFilters(filters);
+  };
+
+  const resetFilters = () => {
+    setFilters(initialFilterState);
+    setAppliedFilters(initialFilterState);
+    setCurrentPage(1);
+  };
+
   const handleSave = async () => {
     try {
       setSaveLoading(true);
@@ -1017,9 +838,7 @@ export default function ReviewsPage() {
       const cleanReviewYoutubeUrl = formData.reviewYoutubeUrl.trim();
 
       if (!cleanShop || !cleanCustomerName || !formData.rating || !cleanMessage) {
-        setPageError(
-          "Shop, Customer name, Rating, and Message are required."
-        );
+        setPageError("Shop, Customer name, Rating, and Message are required.");
         return;
       }
 
@@ -1029,16 +848,11 @@ export default function ReviewsPage() {
       }
 
       if (reviewType === "collection" && !cleanTargetId && !cleanTargetHandle) {
-        setPageError(
-          "Collection review ke liye Target ID ya Target Handle required hai."
-        );
+        setPageError("Collection review ke liye Target ID ya Target Handle required hai.");
         return;
       }
 
-      if (
-        cleanReviewYoutubeUrl &&
-        !getYoutubeEmbedUrl(cleanReviewYoutubeUrl)
-      ) {
+      if (cleanReviewYoutubeUrl && !getYoutubeEmbedUrl(cleanReviewYoutubeUrl)) {
         setPageError("Please enter a valid YouTube link.");
         return;
       }
@@ -1205,26 +1019,265 @@ export default function ReviewsPage() {
     }
   };
 
-  const resetFilters = () => {
-    setStatusFilter("");
-    setReviewTypeFilter("");
-    setShopFilter("");
-    setProductIdFilter("");
-    setTargetIdFilter("");
-    setTargetHandleFilter("");
-  };
-
   const currentReviewType = normalizeReviewType(formData.reviewType);
+  const selectedImages = getReviewImages(selectedMediaReview?.reviewImages);
+  const selectedYoutubeEmbedUrl = getYoutubeEmbedUrl(selectedMediaReview?.reviewYoutubeUrl);
+  const visiblePages = getVisiblePages(safeCurrentPage, totalPages);
 
   return (
     <Page
-      title="Product Reviews"
-      subtitle="Manage product, collection, and store reviews from one place."
+      title="Reviews Management"
+      subtitle="Premium moderation dashboard for product, collection, and store reviews."
       primaryAction={{ content: "Create review", onAction: openCreateModal }}
     >
+      <style>
+        {`
+          .dashboard-shell {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+          }
+
+          .hero-surface {
+            position: relative;
+            overflow: hidden;
+            border-radius: 24px;
+            padding: 24px;
+            background:
+              radial-gradient(circle at top right, rgba(59,130,246,0.16), transparent 28%),
+              radial-gradient(circle at left bottom, rgba(139,92,246,0.12), transparent 30%),
+              linear-gradient(135deg, #ffffff 0%, #f8fbff 55%, #f8fafc 100%);
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+          }
+
+          .hero-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.78);
+            border: 1px solid rgba(226,232,240,0.95);
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+            font-size: 12px;
+            font-weight: 700;
+            color: #334155;
+          }
+
+          .hero-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+          }
+
+          .premium-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 14px;
+          }
+
+          .premium-filter-panel {
+            position: relative;
+            overflow: hidden;
+            border-radius: 24px;
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            background:
+              radial-gradient(circle at top left, rgba(59,130,246,0.08), transparent 24%),
+              linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+            padding: 22px;
+          }
+
+          .premium-filter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+          }
+
+          .filter-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            color: #334155;
+            font-size: 12px;
+            font-weight: 700;
+          }
+
+          .premium-input-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px;
+          }
+
+          .field-shell {
+            padding: 12px;
+            border-radius: 18px;
+            background: rgba(255,255,255,0.86);
+            border: 1px solid #e2e8f0;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.7), 0 6px 18px rgba(15, 23, 42, 0.03);
+            transition: all 0.2s ease;
+          }
+
+          .field-shell:hover {
+            border-color: #cbd5e1;
+            transform: translateY(-1px);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.7), 0 10px 24px rgba(15, 23, 42, 0.05);
+          }
+
+          .premium-filter-panel .Polaris-Labelled__LabelWrapper {
+            margin-bottom: 8px;
+          }
+
+          .premium-filter-panel .Polaris-Label__Text {
+            font-size: 12px;
+            font-weight: 700;
+            color: #334155;
+          }
+
+          .premium-filter-panel .Polaris-TextField,
+          .premium-filter-panel .Polaris-Select__Content {
+            border-radius: 14px !important;
+          }
+
+          .premium-filter-panel .Polaris-TextField__Input,
+          .premium-filter-panel .Polaris-Select__Input {
+            background: #ffffff !important;
+          }
+
+          .reviews-table-wrap {
+            width: 100%;
+            overflow-x: auto;
+          }
+
+          .reviews-table {
+            width: 100%;
+            min-width: 1280px;
+            border-collapse: separate;
+            border-spacing: 0;
+          }
+
+          .reviews-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: #f8fafc;
+            color: #475467;
+            font-size: 12px;
+            font-weight: 700;
+            text-align: left;
+            padding: 14px 16px;
+            border-bottom: 1px solid #e5e7eb;
+            white-space: nowrap;
+          }
+
+          .reviews-table tbody td {
+            padding: 16px;
+            vertical-align: top;
+            border-bottom: 1px solid #eef2f7;
+            background: #ffffff;
+          }
+
+          .reviews-table tbody tr:hover td {
+            background: #fcfcfd;
+          }
+
+          .table-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #111827;
+            line-height: 1.4;
+            margin-bottom: 4px;
+          }
+
+          .table-subtext {
+            font-size: 12px;
+            color: #6b7280;
+            line-height: 1.5;
+            word-break: break-word;
+          }
+
+          .review-message-preview {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+          }
+
+          .media-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
+          }
+
+          .media-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            overflow: hidden;
+            background: #ffffff;
+            animation: mediaCardIn 260ms ease both;
+          }
+
+          .media-image {
+            width: 100%;
+            height: 220px;
+            object-fit: cover;
+            display: block;
+            background: #f8fafc;
+            animation: mediaImageIn 260ms ease both;
+          }
+
+          .media-caption {
+            padding: 10px 12px;
+            font-size: 12px;
+            color: #475467;
+            border-top: 1px solid #eef2f7;
+            background: #fcfcfd;
+          }
+
+          .media-block {
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            padding: 14px;
+            background: #ffffff;
+            animation: mediaCardIn 260ms ease both;
+          }
+
+          @keyframes mediaCardIn {
+            from {
+              opacity: 0;
+              transform: translateY(10px) scale(0.98);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
+          }
+
+          @keyframes mediaImageIn {
+            from {
+              opacity: 0;
+              transform: scale(0.95);
+            }
+            to {
+              opacity: 1;
+              transform: scale(1);
+            }
+          }
+        `}
+      </style>
+
       <Layout>
         <Layout.Section>
-          <BlockStack gap="500">
+          <div className="dashboard-shell">
             {pageError ? (
               <Banner tone="critical" title="Something went wrong">
                 <p>{pageError}</p>
@@ -1237,134 +1290,201 @@ export default function ReviewsPage() {
               </Banner>
             ) : null}
 
-            <Card roundedAbove="sm">
-              <BlockStack gap="400">
+            <div className="hero-surface">
+              <BlockStack gap="500">
                 <InlineStack align="space-between" wrap gap="300">
-                  <BlockStack gap="050">
-                    <Text as="h2" variant="headingLg">
-                      Review Overview
-                    </Text>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      Quick insight into product, collection, and store review moderation.
-                    </Text>
+                  <BlockStack gap="150">
+                    <span className="hero-kicker">
+                      <span className="hero-dot" />
+                      Review Intelligence Dashboard
+                    </span>
+
+                    <div>
+                      <Text as="h2" variant="heading2xl">
+                        Review Overview
+                      </Text>
+                      <div style={{ marginTop: 6 }}>
+                        <Text as="p" variant="bodyMd" tone="subdued">
+                          Track moderation, ratings, and distribution across all review types.
+                        </Text>
+                      </div>
+                    </div>
                   </BlockStack>
 
-                  <Badge tone="info">{reviewStats.total} total reviews</Badge>
+                  <div
+                    style={{
+                      padding: "10px 14px",
+                      borderRadius: 18,
+                      background: "rgba(255,255,255,0.86)",
+                      border: "1px solid #dbeafe",
+                      boxShadow: "0 10px 24px rgba(59, 130, 246, 0.08)",
+                    }}
+                  >
+                    <BlockStack gap="050">
+                      <Text as="span" variant="bodySm" tone="subdued">
+                        Live Review Count
+                      </Text>
+                      <Text as="span" variant="headingLg">
+                        {reviewStats.total} reviews
+                      </Text>
+                    </BlockStack>
+                  </div>
                 </InlineStack>
 
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                    gap: 14,
-                  }}
-                >
-                  <StatCard title="Total Reviews" value={reviewStats.total} />
-                  <StatCard
+                <div className="premium-stats-grid">
+                  <PremiumStatCard
+                    title="Total Reviews"
+                    value={reviewStats.total}
+                    helper="Overall moderation volume"
+                    accent="blue"
+                    softLabel="All"
+                  />
+                  <PremiumStatCard
                     title="Average Rating"
                     value={`${reviewStats.average}/5`}
                     helper={renderStars(Math.round(Number(reviewStats.average)))}
+                    accent="violet"
+                    softLabel="Quality"
                   />
-                  <StatCard
+                  <PremiumStatCard
                     title="Approved"
                     value={reviewStats.approved}
-                    tone="success"
+                    helper="Visible to shoppers"
+                    accent="green"
+                    softLabel="Live"
                   />
-                  <StatCard
+                  <PremiumStatCard
                     title="Pending"
                     value={reviewStats.pending}
-                    tone="warning"
+                    helper="Needs moderation"
+                    accent="amber"
+                    softLabel="Queue"
                   />
-                  <StatCard
+                  <PremiumStatCard
                     title="Rejected"
                     value={reviewStats.rejected}
-                    tone="critical"
+                    helper="Hidden from storefront"
+                    accent="red"
+                    softLabel="Blocked"
                   />
-                  <StatCard title="Pinned" value={reviewStats.pinned} />
-                  <StatCard title="Product Reviews" value={reviewStats.productReviews} />
-                  <StatCard title="Collection Reviews" value={reviewStats.collectionReviews} />
-                  <StatCard title="Store Reviews" value={reviewStats.storeReviews} />
+                  <PremiumStatCard
+                    title="Pinned"
+                    value={reviewStats.pinned}
+                    helper="Highlighted reviews"
+                    accent="slate"
+                    softLabel="Featured"
+                  />
+                  <PremiumStatCard
+                    title="Product Reviews"
+                    value={reviewStats.productReviews}
+                    helper="Item-specific feedback"
+                    accent="blue"
+                    softLabel="Product"
+                  />
+                  <PremiumStatCard
+                    title="Collection Reviews"
+                    value={reviewStats.collectionReviews}
+                    helper="Category-based sentiment"
+                    accent="amber"
+                    softLabel="Collection"
+                  />
+                  <PremiumStatCard
+                    title="Store Reviews"
+                    value={reviewStats.storeReviews}
+                    helper="Brand trust signals"
+                    accent="violet"
+                    softLabel="Store"
+                  />
                 </div>
               </BlockStack>
-            </Card>
+            </div>
 
-            <Card roundedAbove="sm">
-              <BlockStack gap="400">
-                <InlineStack align="space-between" wrap gap="300">
-                  <BlockStack gap="050">
-                    <Text as="h2" variant="headingMd">
-                      Filters
-                    </Text>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      Filter by type, status, shop, target id, handle, or legacy product id.
-                    </Text>
-                  </BlockStack>
+            <div className="premium-filter-panel">
+              <div className="premium-filter-header">
+                <BlockStack gap="100">
+                  <Text as="h2" variant="headingLg">
+                    Smart Filters
+                  </Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Narrow down reviews by type, status, shop, target ID, handle, or legacy product ID.
+                  </Text>
+                </BlockStack>
 
-                  <InlineStack gap="200" wrap>
-                    <Button variant="primary" onClick={fetchReviews}>
-                      Apply filters
-                    </Button>
-                    <Button onClick={resetFilters}>Reset</Button>
-                  </InlineStack>
+                <InlineStack gap="200" wrap>
+                  <span className="filter-chip">
+                    Active Filters: {activeFilterCount}
+                  </span>
+                  <Button variant="primary" onClick={applyFilters}>
+                    Apply Filters
+                  </Button>
+                  <Button onClick={resetFilters}>Reset</Button>
                 </InlineStack>
+              </div>
 
-                <Divider />
+              <Divider />
 
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                    gap: 14,
-                  }}
-                >
+              <div style={{ height: 16 }} />
+
+              <div className="premium-input-grid">
+                <div className="field-shell">
                   <Select
                     label="Status"
                     options={getStatusOptions()}
-                    value={statusFilter}
-                    onChange={setStatusFilter}
+                    value={filters.status}
+                    onChange={handleFilterChange("status")}
                   />
+                </div>
 
+                <div className="field-shell">
                   <Select
                     label="Review Type"
                     options={getReviewTypeOptions(true)}
-                    value={reviewTypeFilter}
-                    onChange={setReviewTypeFilter}
+                    value={filters.reviewType}
+                    onChange={handleFilterChange("reviewType")}
                   />
+                </div>
 
+                <div className="field-shell">
                   <TextField
                     label="Shop"
-                    value={shopFilter}
-                    onChange={setShopFilter}
+                    value={filters.shop}
+                    onChange={handleFilterChange("shop")}
                     autoComplete="off"
                     placeholder="Enter shop domain"
                   />
+                </div>
 
+                <div className="field-shell">
                   <TextField
                     label="Target ID"
-                    value={targetIdFilter}
-                    onChange={setTargetIdFilter}
+                    value={filters.targetId}
+                    onChange={handleFilterChange("targetId")}
                     autoComplete="off"
                     placeholder="Product / Collection target id"
                   />
+                </div>
 
+                <div className="field-shell">
                   <TextField
                     label="Target Handle"
-                    value={targetHandleFilter}
-                    onChange={setTargetHandleFilter}
+                    value={filters.targetHandle}
+                    onChange={handleFilterChange("targetHandle")}
                     autoComplete="off"
                     placeholder="Collection handle"
                   />
+                </div>
 
+                <div className="field-shell">
                   <TextField
                     label="Legacy Product ID"
-                    value={productIdFilter}
-                    onChange={setProductIdFilter}
+                    value={filters.productId}
+                    onChange={handleFilterChange("productId")}
                     autoComplete="off"
                     placeholder="Old product id filter"
                   />
                 </div>
-              </BlockStack>
-            </Card>
+              </div>
+            </div>
 
             <Card roundedAbove="sm">
               <BlockStack gap="0">
@@ -1372,10 +1492,10 @@ export default function ReviewsPage() {
                   <InlineStack align="space-between" wrap gap="300">
                     <BlockStack gap="050">
                       <Text as="h2" variant="headingLg">
-                        All Reviews
+                        Reviews Table
                       </Text>
                       <Text as="p" variant="bodySm" tone="subdued">
-                        One dashboard for product, collection, and store reviews.
+                        Table view with media modal and fixed 10 items per page.
                       </Text>
                     </BlockStack>
 
@@ -1404,32 +1524,352 @@ export default function ReviewsPage() {
                     </EmptyState>
                   </div>
                 ) : (
-                  <div style={{ padding: 20 }}>
-                    <BlockStack gap="300">
-                      {reviews.map((review) => (
-                        <ReviewCard
-                          key={review.id}
-                          review={review}
-                          openEditModal={openEditModal}
-                          handleApprove={handleApprove}
-                          handleReject={handleReject}
-                          handleDelete={handleDelete}
-                          handlePin={handlePin}
-                          handleUnpin={handleUnpin}
-                          approveLoadingId={approveLoadingId}
-                          rejectLoadingId={rejectLoadingId}
-                          deleteLoadingId={deleteLoadingId}
-                          pinLoadingId={pinLoadingId}
-                        />
-                      ))}
-                    </BlockStack>
-                  </div>
+                  <>
+                    <div className="reviews-table-wrap">
+                      <table className="reviews-table">
+                        <thead>
+                          <tr>
+                            <th>Date</th>
+                            <th>Customer</th>
+                            <th>Review</th>
+                            <th>Target</th>
+                            <th>Rating</th>
+                            <th>Status</th>
+                            <th>Helpful</th>
+                            <th>Media</th>
+                            <th>Actions</th>
+                          </tr>
+                        </thead>
+
+                        <tbody>
+                          {paginatedReviews.map((review) => {
+                            const target = getReviewTargetSummary(review);
+                            const mediaCount = getMediaCount(review);
+
+                            return (
+                              <tr key={review.id}>
+                                <td style={{ width: 140 }}>
+                                  <div className="table-title">
+                                    {formatDate(review.createdAt)}
+                                  </div>
+                                  <div className="table-subtext">
+                                    Updated: {formatDate(review.updatedAt)}
+                                  </div>
+                                </td>
+
+                                <td style={{ width: 220 }}>
+                                  <div className="table-title">
+                                    {review.customerName || "-"}
+                                  </div>
+                                  <div className="table-subtext">
+                                    {review.customerEmail || "No email"}
+                                  </div>
+                                  <div className="table-subtext" style={{ marginTop: 6 }}>
+                                    Shop: {review.shop || "-"}
+                                  </div>
+                                </td>
+
+                                <td style={{ width: 320 }}>
+                                  <div className="table-title">
+                                    {review.title || "Untitled review"}
+                                  </div>
+                                  <div className="table-subtext review-message-preview">
+                                    {review.message || "-"}
+                                  </div>
+                                </td>
+
+                                <td style={{ width: 250 }}>
+                                  <InlineStack gap="200" wrap blockAlign="center">
+                                    <Badge tone={getReviewTypeTone(review.reviewType)}>
+                                      {getReviewTypeShortLabel(review.reviewType)}
+                                    </Badge>
+                                    {review.isPinned ? <Badge tone="info">Pinned</Badge> : null}
+                                  </InlineStack>
+
+                                  <div className="table-title" style={{ marginTop: 8 }}>
+                                    {target.title}
+                                  </div>
+                                  <div className="table-subtext">{target.subText}</div>
+                                </td>
+
+                                <td style={{ width: 160 }}>
+                                  <Badge tone={getBadgeTone(review.status)}>
+                                    {review.rating}/5
+                                  </Badge>
+                                  <div className="table-subtext" style={{ marginTop: 8 }}>
+                                    {renderStars(review.rating)}
+                                  </div>
+                                </td>
+
+                                <td style={{ width: 140 }}>
+                                  <StatusPill status={review.status} />
+                                </td>
+
+                                <td style={{ width: 100 }}>
+                                  <div className="table-title">
+                                    {String(Number(review.helpfulCount || 0))}
+                                  </div>
+                                </td>
+
+                                <td style={{ width: 170 }}>
+                                  <Button
+                                    onClick={() => openMediaModal(review)}
+                                    disabled={!hasMedia(review)}
+                                  >
+                                    {hasMedia(review)
+                                      ? `Show Images (${mediaCount})`
+                                      : "No Media"}
+                                  </Button>
+                                </td>
+
+                                <td style={{ width: 320 }}>
+                                  <InlineStack gap="200" wrap>
+                                    <Button onClick={() => openEditModal(review)}>Edit</Button>
+
+                                    <Button
+                                      variant="primary"
+                                      tone="success"
+                                      loading={approveLoadingId === review.id}
+                                      onClick={() => handleApprove(review.id)}
+                                    >
+                                      Approve
+                                    </Button>
+
+                                    <Button
+                                      tone="critical"
+                                      loading={rejectLoadingId === review.id}
+                                      onClick={() => handleReject(review.id)}
+                                    >
+                                      Reject
+                                    </Button>
+
+                                    {review.isPinned ? (
+                                      <Button
+                                        loading={pinLoadingId === review.id}
+                                        onClick={() => handleUnpin(review.id)}
+                                      >
+                                        Unpin
+                                      </Button>
+                                    ) : (
+                                      <Button
+                                        variant="primary"
+                                        loading={pinLoadingId === review.id}
+                                        onClick={() => handlePin(review.id)}
+                                      >
+                                        Pin
+                                      </Button>
+                                    )}
+
+                                    <Button
+                                      variant="primary"
+                                      tone="critical"
+                                      loading={deleteLoadingId === review.id}
+                                      onClick={() => handleDelete(review.id)}
+                                    >
+                                      Delete
+                                    </Button>
+                                  </InlineStack>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <Divider />
+
+                    <div style={{ padding: 20 }}>
+                      <InlineStack align="space-between" wrap gap="300">
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Showing {startItem}-{endItem} of {reviews.length} reviews
+                        </Text>
+
+                        <InlineStack gap="200" wrap>
+                          <Button
+                            disabled={safeCurrentPage === 1}
+                            onClick={() =>
+                              setCurrentPage((prev) => Math.max(1, prev - 1))
+                            }
+                          >
+                            Previous
+                          </Button>
+
+                          {visiblePages.map((page, index) =>
+                            page === "..." ? (
+                              <div
+                                key={`dots-${index}`}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  padding: "0 6px",
+                                  color: "#667085",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                ...
+                              </div>
+                            ) : (
+                              <Button
+                                key={page}
+                                variant={page === safeCurrentPage ? "primary" : undefined}
+                                onClick={() => setCurrentPage(page)}
+                              >
+                                {page}
+                              </Button>
+                            )
+                          )}
+
+                          <Button
+                            disabled={safeCurrentPage === totalPages}
+                            onClick={() =>
+                              setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                            }
+                          >
+                            Next
+                          </Button>
+                        </InlineStack>
+                      </InlineStack>
+                    </div>
+                  </>
                 )}
               </BlockStack>
             </Card>
-          </BlockStack>
+          </div>
         </Layout.Section>
       </Layout>
+
+      <Modal
+        open={mediaModalOpen}
+        onClose={closeMediaModal}
+        title={
+          selectedMediaReview
+            ? `Review Media - ${selectedMediaReview.customerName || "Customer"}`
+            : "Review Media"
+        }
+        large
+        secondaryActions={[
+          {
+            content: "Close",
+            onAction: closeMediaModal,
+          },
+        ]}
+      >
+        <Modal.Section>
+          {selectedMediaReview ? (
+            <BlockStack gap="400">
+              <div
+                style={{
+                  padding: 14,
+                  borderRadius: 14,
+                  background: "#f8fafc",
+                  border: "1px solid #e5e7eb",
+                  animation: "mediaCardIn 240ms ease both",
+                }}
+              >
+                <BlockStack gap="100">
+                  <Text as="h3" variant="headingMd">
+                    {selectedMediaReview.title || "Untitled review"}
+                  </Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    {selectedMediaReview.message || "-"}
+                  </Text>
+                </BlockStack>
+              </div>
+
+              {selectedImages.length ? (
+                <BlockStack gap="200">
+                  <Text as="h3" variant="headingMd">
+                    Images
+                  </Text>
+
+                  <div className="media-grid">
+                    {selectedImages.map((img, index) => (
+                      <div
+                        key={`${img}-${index}`}
+                        className="media-card"
+                        style={{ animationDelay: `${index * 60}ms` }}
+                      >
+                        <a
+                          href={img}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ display: "block", textDecoration: "none" }}
+                        >
+                          <img
+                            src={img}
+                            alt={`Review media ${index + 1}`}
+                            className="media-image"
+                            style={{ animationDelay: `${index * 60}ms` }}
+                          />
+                          <div className="media-caption">
+                            Image {index + 1}
+                          </div>
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </BlockStack>
+              ) : null}
+
+              {selectedMediaReview.reviewVideoUrl ? (
+                <div className="media-block" style={{ animationDelay: "120ms" }}>
+                  <BlockStack gap="200">
+                    <Text as="h3" variant="headingMd">
+                      Uploaded Video
+                    </Text>
+                    <video
+                      src={selectedMediaReview.reviewVideoUrl}
+                      controls
+                      style={{
+                        width: "100%",
+                        maxWidth: 720,
+                        borderRadius: 14,
+                        border: "1px solid #e5e7eb",
+                        background: "#000",
+                        display: "block",
+                      }}
+                    />
+                  </BlockStack>
+                </div>
+              ) : null}
+
+              {selectedYoutubeEmbedUrl ? (
+                <div className="media-block" style={{ animationDelay: "180ms" }}>
+                  <BlockStack gap="200">
+                    <Text as="h3" variant="headingMd">
+                      YouTube Video
+                    </Text>
+                    <iframe
+                      src={selectedYoutubeEmbedUrl}
+                      title="Review YouTube video"
+                      width="100%"
+                      height="400"
+                      style={{
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 14,
+                        background: "#fff",
+                        display: "block",
+                        maxWidth: "100%",
+                      }}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </BlockStack>
+                </div>
+              ) : null}
+
+              {!selectedImages.length &&
+              !selectedMediaReview.reviewVideoUrl &&
+              !selectedYoutubeEmbedUrl ? (
+                <Text as="p" variant="bodySm" tone="subdued">
+                  No media found for this review.
+                </Text>
+              ) : null}
+            </BlockStack>
+          ) : null}
+        </Modal.Section>
+      </Modal>
 
       <Modal
         open={modalOpen}
