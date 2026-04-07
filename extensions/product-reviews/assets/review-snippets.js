@@ -1,16 +1,23 @@
 (function () {
   const ROOT_SELECTOR = ".rsn-root";
 
-  function renderLoadError(scope) {
-    const roots = Array.from(scope.querySelectorAll(ROOT_SELECTOR));
+  function getRoots(scope) {
+    if (!scope || !scope.querySelectorAll) return [];
+    return Array.from(scope.querySelectorAll(ROOT_SELECTOR));
+  }
 
-    roots.forEach((root) => {
+  function renderLoadError(scope) {
+    getRoots(scope).forEach((root) => {
       root.innerHTML = `
-        <div class="rsn-preview-wrap">
-          <div class="rsn-preview-card" style="min-height: 180px; display:flex; align-items:center; justify-content:center; text-align:center;">
-            <p style="margin:0; font-size:16px; line-height:1.5;">
-              Failed to load review snippets widget.
-            </p>
+        <div class="rsn-shell">
+          <div class="rsn-slider">
+            <div class="rsn-card-wrap">
+              <div class="rsn-card rsn-card--empty">
+                <div class="rsn-card-inner" style="text-align:center;align-items:center;">
+                  <p class="rsn-empty-text">Failed to load review snippets widget.</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       `;
@@ -18,27 +25,47 @@
   }
 
   function loadMainScript(src) {
-    if (window.ReviewSnippetsMain) {
+    if (!src) {
+      return Promise.reject(new Error("Missing main script source"));
+    }
+
+    if (window.ReviewSnippetsMain && typeof window.ReviewSnippetsMain.initAll === "function") {
       return Promise.resolve();
     }
 
-    if (window.__reviewSnippetsMainPromise) {
-      return window.__reviewSnippetsMainPromise;
+    window.__reviewSnippetsScriptPromises = window.__reviewSnippetsScriptPromises || {};
+
+    if (window.__reviewSnippetsScriptPromises[src]) {
+      return window.__reviewSnippetsScriptPromises[src];
     }
 
-    window.__reviewSnippetsMainPromise = new Promise((resolve, reject) => {
-      const existingScript = document.querySelector(
-        `script[data-rsn-main-script="${src}"]`
-      );
+    window.__reviewSnippetsScriptPromises[src] = new Promise((resolve, reject) => {
+      const existing = document.querySelector(`script[data-rsn-main-script="${src}"]`);
 
-      if (existingScript) {
-        if (existingScript.dataset.loaded === "true") {
+      if (existing) {
+        if (existing.dataset.loaded === "true") {
           resolve();
           return;
         }
 
-        existingScript.addEventListener("load", () => resolve(), { once: true });
-        existingScript.addEventListener("error", () => reject(), { once: true });
+        const onLoad = () => {
+          existing.dataset.loaded = "true";
+          cleanup();
+          resolve();
+        };
+
+        const onError = () => {
+          cleanup();
+          reject(new Error("Failed to load main snippets script"));
+        };
+
+        const cleanup = () => {
+          existing.removeEventListener("load", onLoad);
+          existing.removeEventListener("error", onError);
+        };
+
+        existing.addEventListener("load", onLoad);
+        existing.addEventListener("error", onError);
         return;
       }
 
@@ -52,20 +79,25 @@
         resolve();
       };
 
-      script.onerror = () => reject(new Error("Failed to load main snippets script"));
+      script.onerror = () => {
+        reject(new Error("Failed to load main snippets script"));
+      };
 
       document.head.appendChild(script);
+    }).catch((error) => {
+      delete window.__reviewSnippetsScriptPromises[src];
+      throw error;
     });
 
-    return window.__reviewSnippetsMainPromise;
+    return window.__reviewSnippetsScriptPromises[src];
   }
 
   function boot(scope) {
-    const roots = Array.from(scope.querySelectorAll(ROOT_SELECTOR));
+    const roots = getRoots(scope);
     if (!roots.length) return;
 
-    const firstRoot = roots[0];
-    const mainScript = firstRoot.dataset.mainScript || "";
+    const firstRootWithScript = roots.find((root) => root.dataset.mainScript);
+    const mainScript = firstRootWithScript ? firstRootWithScript.dataset.mainScript : "";
 
     if (!mainScript) {
       renderLoadError(scope);
@@ -74,8 +106,8 @@
 
     loadMainScript(mainScript)
       .then(() => {
-        if (window.ReviewSnippetsMain?.initAll) {
-          window.ReviewSnippetsMain.initAll(scope);
+        if (window.ReviewSnippetsMain && typeof window.ReviewSnippetsMain.initAll === "function") {
+          window.ReviewSnippetsMain.initAll(scope || document);
         } else {
           renderLoadError(scope);
         }
@@ -85,19 +117,31 @@
       });
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () {
-      boot(document);
-    });
-  } else {
-    boot(document);
+  function onReady(callback) {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", callback, { once: true });
+    } else {
+      callback();
+    }
   }
 
-  document.addEventListener("shopify:section:load", function (event) {
+  onReady(() => {
+    boot(document);
+  });
+
+  document.addEventListener("shopify:section:load", (event) => {
     boot(event.target || document);
   });
 
-  document.addEventListener("shopify:block:select", function (event) {
+  document.addEventListener("shopify:section:reorder", (event) => {
+    boot(event.target || document);
+  });
+
+  document.addEventListener("shopify:block:select", (event) => {
+    boot(event.target || document);
+  });
+
+  document.addEventListener("shopify:block:deselect", (event) => {
     boot(event.target || document);
   });
 })();
