@@ -4,6 +4,20 @@
   --tc-accent-color: #108474;
   --tc-text-color: #000000;
   --tc-arrows-color: #000000;
+  --tc-content-max-width: 860px;
+  --tc-card-padding-x: 28px;
+  --tc-card-padding-y: 36px;
+  --tc-card-padding-x-mobile: 16px;
+  --tc-card-padding-y-mobile: 28px;
+  --tc-padding-top-mobile: 0px;
+  --tc-padding-bottom-mobile: 0px;
+  --tc-verified-icon-size: 16px;
+  --tc-verified-icon-padding: 4px;
+  --tc-verified-icon-color: #108474;
+  --tc-verified-icon-bg: #e7f7f4;
+  --tc-verified-icon-border: #bee7df;
+  --tc-verified-label-size: 12px;
+  --tc-verified-label-color: #4b5563;
 
   width: 100%;
   color: var(--tc-text-color);
@@ -30,7 +44,7 @@
 
 .tc-widget {
   width: 100%;
-  max-width: var(--tc-max-width);
+  max-width: min(100%, var(--tc-max-width));
   margin: 0 auto;
   position: relative;
 }
@@ -38,18 +52,20 @@
 .tc-header {
   text-align: center;
   margin-bottom: 18px;
+  padding-inline: 12px;
 }
 
 .tc-heading {
   margin: 0;
   font-size: 18px;
-  line-height: 1.2;
+  line-height: 1.25;
   font-weight: 700;
   color: var(--tc-text-color);
+  word-break: break-word;
 }
 
 .tc-header-rating {
-  margin-top: 6px;
+  margin-top: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -57,8 +73,9 @@
   gap: 6px;
   color: var(--tc-text-color);
   font-size: 11px;
-  line-height: 1.2;
+  line-height: 1.3;
   font-weight: 500;
+  max-width: 100%;
 }
 
 .tc-header-stars {
@@ -66,38 +83,39 @@
   letter-spacing: 1px;
   font-size: 12px;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .tc-header-rating-value,
 .tc-header-rating-count {
   color: var(--tc-text-color);
+  white-space: nowrap;
 }
 
 .tc-header-rating-separator {
   color: #9ca3af;
+  white-space: nowrap;
 }
 
 .tc-header-rating-verified {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  color: #6b7280;
-}
-
-.tc-header-rating-verified svg {
-  width: 13px;
-  height: 13px;
-  color: #2bb5a8;
+  justify-content: center;
+  gap: 6px;
+  color: var(--tc-verified-label-color);
+  min-width: 0;
 }
 
 .tc-stage {
   position: relative;
+  width: 100%;
 }
 
 .tc-viewport {
   position: relative;
   overflow: hidden;
   width: 100%;
+  border-radius: inherit;
 }
 
 .tc-track {
@@ -120,25 +138,28 @@
   color: var(--tc-text-color);
   text-align: center;
   position: relative;
-  padding: 42px 28px 36px;
+  padding: var(--tc-card-padding-y) var(--tc-card-padding-x);
   margin: 0 auto;
+  overflow: hidden;
 }
 
 .tc-card-content {
   width: 100%;
-  max-width: 860px;
+  max-width: min(100%, var(--tc-content-max-width));
   margin: 0 auto;
 }
 
 .tc-review-message {
   margin: 0 auto 18px;
-  max-width: 760px;
+  max-width: 100%;
   color: var(--tc-text-color);
-  line-height: 1.45;
+  line-height: 1.5;
   font-weight: 400;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .tc-review-stars {
@@ -146,6 +167,7 @@
   letter-spacing: 2px;
   line-height: 1;
   margin-bottom: 12px;
+  white-space: nowrap;
 }
 
 .tc-review-author-row {
@@ -155,44 +177,79 @@
   gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 10px;
+  min-width: 0;
 }
 
 .tc-review-author {
   font-weight: 700;
   color: var(--tc-text-color);
-  line-height: 1.25;
+  line-height: 1.3;
+  word-break: break-word;
 }
 
 .tc-review-verified {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
 }
 
-.tc-review-verified-badge,
-.tc-review-verified-text {
-  display: none;
-}
-
-.tc-root[data-verified-reviewer-style="badge"] .tc-review-verified-badge {
+.tc-verified-icon {
+  width: auto;
+  min-width: calc(var(--tc-verified-icon-size) + (var(--tc-verified-icon-padding) * 2));
+  min-height: calc(var(--tc-verified-icon-size) + (var(--tc-verified-icon-padding) * 2));
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 4px 9px;
-  border-radius: 999px;
-  background: rgba(16, 132, 116, 0.12);
-  color: var(--tc-accent-color);
-  font-size: 11px;
-  line-height: 1;
-  font-weight: 700;
+  padding: var(--tc-verified-icon-padding);
+  color: var(--tc-verified-icon-color);
+  background: var(--tc-verified-icon-bg);
+  border: 1px solid var(--tc-verified-icon-border);
+  flex: 0 0 auto;
 }
 
-.tc-root[data-verified-reviewer-style="text"] .tc-review-verified-text {
-  display: inline-flex;
-  align-items: center;
-  color: #6b7280;
-  font-size: 12px;
+.tc-verified-icon svg {
+  width: var(--tc-verified-icon-size);
+  height: var(--tc-verified-icon-size);
+}
+
+.tc-root[data-verified-icon-shape="none"] .tc-verified-icon {
+  background: transparent;
+  border-color: transparent;
+  border-radius: 0;
+  padding: 0;
+  min-width: var(--tc-verified-icon-size);
+  min-height: var(--tc-verified-icon-size);
+}
+
+.tc-root[data-verified-icon-shape="square"] .tc-verified-icon {
+  border-radius: 0;
+}
+
+.tc-root[data-verified-icon-shape="soft"] .tc-verified-icon {
+  border-radius: 10px;
+}
+
+.tc-root[data-verified-icon-shape="circle"] .tc-verified-icon {
+  border-radius: 999px;
+}
+
+.tc-verified-label {
+  font-size: var(--tc-verified-label-size);
   line-height: 1.2;
   font-weight: 600;
+  color: var(--tc-verified-label-color);
+  word-break: break-word;
+}
+
+.tc-root[data-verified-reviewer-style="icon"] .tc-verified-label {
+  display: none !important;
+}
+
+.tc-root[data-show-verified-label="false"] .tc-verified-label {
+  display: none !important;
 }
 
 .tc-review-product {
@@ -201,6 +258,8 @@
   text-decoration: underline;
   text-underline-offset: 2px;
   line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .tc-quote-mark {
@@ -210,8 +269,9 @@
   align-items: center;
   margin: 0 auto 14px;
   color: var(--tc-accent-color);
-  line-height: 1;
+  line-height: 0.9;
   font-weight: 700;
+  max-width: 100%;
 }
 
 .tc-quote-size--small .tc-quote-mark {
@@ -284,37 +344,31 @@
 
 .tc-text-size--extra-small .tc-review-message {
   font-size: 13px;
-  max-width: 680px;
   -webkit-line-clamp: 4;
 }
 
 .tc-text-size--small .tc-review-message {
   font-size: 15px;
-  max-width: 720px;
   -webkit-line-clamp: 4;
 }
 
 .tc-text-size--medium .tc-review-message {
   font-size: 17px;
-  max-width: 780px;
   -webkit-line-clamp: 4;
 }
 
 .tc-text-size--large .tc-review-message {
   font-size: 19px;
-  max-width: 820px;
   -webkit-line-clamp: 4;
 }
 
 .tc-text-size--extra-large .tc-review-message {
   font-size: 22px;
-  max-width: 860px;
   -webkit-line-clamp: 4;
 }
 
 .tc-text-size--huge .tc-review-message {
   font-size: 26px;
-  max-width: 900px;
   -webkit-line-clamp: 4;
 }
 
@@ -350,19 +404,23 @@
   min-height: 470px;
 }
 
-.tc-corner--square .tc-card {
+.tc-corner--square .tc-card,
+.tc-corner--square .tc-empty-inner {
   border-radius: 0;
 }
 
-.tc-corner--soft .tc-card {
+.tc-corner--soft .tc-card,
+.tc-corner--soft .tc-empty-inner {
   border-radius: 16px;
 }
 
-.tc-corner--round .tc-card {
+.tc-corner--round .tc-card,
+.tc-corner--round .tc-empty-inner {
   border-radius: 26px;
 }
 
-.tc-corner--extra-round .tc-card {
+.tc-corner--extra-round .tc-card,
+.tc-corner--extra-round .tc-empty-inner {
   border-radius: 38px;
 }
 
@@ -382,6 +440,7 @@
   padding: 0;
   margin: 0;
   transition: transform 0.18s ease, opacity 0.18s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .tc-arrow span {
@@ -463,7 +522,7 @@
 }
 
 .tc-card--loading .tc-card-content {
-  max-width: 760px;
+  max-width: min(100%, 760px);
 }
 
 .tc-loading-line {
@@ -522,7 +581,6 @@
 .tc-empty-inner {
   background: #f8fafc;
   border: 1px dashed #cbd5e1;
-  border-radius: 18px;
   padding: 34px 20px;
   text-align: center;
 }
@@ -573,8 +631,18 @@
 }
 
 @media screen and (max-width: 767px) {
+  .tc-root {
+    padding-top: var(--tc-padding-top-mobile) !important;
+    padding-bottom: var(--tc-padding-bottom-mobile) !important;
+  }
+
   .tc-heading {
     font-size: 16px;
+  }
+
+  .tc-header {
+    margin-bottom: 14px;
+    padding-inline: 8px;
   }
 
   .tc-header-rating {
@@ -582,8 +650,12 @@
     gap: 4px;
   }
 
+  .tc-header-stars {
+    font-size: 11px;
+  }
+
   .tc-card {
-    padding: 30px 16px 28px;
+    padding: var(--tc-card-padding-y-mobile) var(--tc-card-padding-x-mobile);
   }
 
   .tc-card-content {

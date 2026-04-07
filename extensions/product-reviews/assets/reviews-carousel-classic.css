@@ -186,7 +186,7 @@
 .rcc-card--focused_view,
 .rcc-card--vertical_sliding {
   border: 1px solid var(--rcc-border);
-  box-shadow: 0 2px 8px var(--rcc-shadow);
+  /* box-shadow: 0 2px 8px var(--rcc-shadow); */
 }
 
 .rcc-card--center {
@@ -208,7 +208,7 @@
 .rcc-card-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  /* justify-content: space-between; */
   gap: 10px;
   margin-bottom: 8px;
 }
