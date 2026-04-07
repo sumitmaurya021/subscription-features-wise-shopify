@@ -2,9 +2,15 @@
   const ROOT_SELECTOR = "#product-reviews-root";
   const MAX_REVIEW_IMAGES = 4;
   const MAX_VIDEO_SIZE_MB = 20;
+  const MAX_IMAGE_SIZE_MB = 10;
   const DEFAULT_VISIBLE_COUNT = 4;
   const LOAD_MORE_STEP = 4;
   const TOTAL_STEPS = 4;
+  const PAGE_SIZE = 8;
+
+  const UPLOAD_DB_NAME = "pr-media-upload-db";
+  const UPLOAD_DB_STORE = "jobs";
+  const ACTIVE_UPLOAD_JOBS = new Set();
 
   const RATING_LABELS = {
     1: "Poor",
@@ -13,6 +19,63 @@
     4: "Very Good",
     5: "Excellent",
   };
+
+  function openUploadDb() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(UPLOAD_DB_NAME, 1);
+
+      request.onupgradeneeded = function () {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(UPLOAD_DB_STORE)) {
+          db.createObjectStore(UPLOAD_DB_STORE, { keyPath: "id" });
+        }
+      };
+
+      request.onsuccess = function () {
+        resolve(request.result);
+      };
+
+      request.onerror = function () {
+        reject(request.error || new Error("Failed to open upload DB"));
+      };
+    });
+  }
+
+  async function idbPut(value) {
+    const db = await openUploadDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(UPLOAD_DB_STORE, "readwrite");
+      const store = tx.objectStore(UPLOAD_DB_STORE);
+      store.put(value);
+
+      tx.oncomplete = () => resolve(value);
+      tx.onerror = () => reject(tx.error || new Error("Failed to save upload job"));
+    });
+  }
+
+  async function idbGetAll() {
+    const db = await openUploadDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(UPLOAD_DB_STORE, "readonly");
+      const store = tx.objectStore(UPLOAD_DB_STORE);
+      const req = store.getAll();
+
+      req.onsuccess = () => resolve(Array.isArray(req.result) ? req.result : []);
+      req.onerror = () => reject(req.error || new Error("Failed to list upload jobs"));
+    });
+  }
+
+  async function idbDelete(key) {
+    const db = await openUploadDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(UPLOAD_DB_STORE, "readwrite");
+      const store = tx.objectStore(UPLOAD_DB_STORE);
+      store.delete(key);
+
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error || new Error("Failed to delete upload job"));
+    });
+  }
 
   function escapeHtml(value) {
     if (value === null || value === undefined) return "";
@@ -26,6 +89,14 @@
 
   function safeText(value) {
     return value === null || value === undefined ? "" : String(value);
+  }
+
+  function getCloudinaryThumb(url, width = 300, height = 300) {
+    if (!url || typeof url !== "string" || !url.includes("/upload/")) return url;
+    return url.replace(
+      "/upload/",
+      `/upload/f_auto,q_auto,c_fill,w_${width},h_${height}/`
+    );
   }
 
   function getWidgetMarkup(config) {
@@ -400,12 +471,27 @@
                 </p>
 
                 <p class="pr-success-copy">
-                  Please confirm your email by clicking the link we just sent you. This helps us keep reviews authentic.
+                  Your review was submitted successfully.
                 </p>
 
                 <div class="pr-success-secondary">
-                  <h3>Would you like to share your experience of shopping with us?</h3>
-                  <p>We value your feedback and use it to improve. Please share any thoughts or suggestions you have.</p>
+                  <h3>Media upload note</h3>
+                  <p>If you added photos or video, they are being attached after review submission.</p>
+                </div>
+
+                <div id="pr-upload-status-wrap" class="pr-upload-status-wrap" hidden>
+                  <div class="pr-upload-status-head">
+                    <strong id="pr-upload-status-title">Uploading media...</strong>
+                    <span id="pr-upload-status-percent">0%</span>
+                  </div>
+
+                  <div class="pr-upload-progress">
+                    <span id="pr-upload-progress-fill"></span>
+                  </div>
+
+                  <div id="pr-upload-status-text" class="pr-upload-status-text">
+                    Preparing upload...
+                  </div>
                 </div>
 
                 <div class="pr-store-feedback-stars" id="pr-store-feedback-stars">
@@ -587,6 +673,12 @@
     const reviewModalSuccess = portalHost.querySelector("#pr-review-modal-success");
     const reviewModalSuccessClose = portalHost.querySelector("#pr-review-modal-success-close");
 
+    const uploadStatusWrap = portalHost.querySelector("#pr-upload-status-wrap");
+    const uploadStatusTitle = portalHost.querySelector("#pr-upload-status-title");
+    const uploadStatusPercent = portalHost.querySelector("#pr-upload-status-percent");
+    const uploadProgressFill = portalHost.querySelector("#pr-upload-progress-fill");
+    const uploadStatusText = portalHost.querySelector("#pr-upload-status-text");
+
     const form = portalHost.querySelector("#product-review-form");
     const messageEl = portalHost.querySelector("#product-review-message");
     const submitBtn = portalHost.querySelector("#pr-review-modal-submit-btn");
@@ -633,6 +725,8 @@
     const reviewDetailContent = portalHost.querySelector("#pr-review-detail-content");
 
     let allReviews = [];
+    let serverTotalReviews = 0;
+    let serverAverageRating = 0;
     let currentFilter = "all";
     let currentSort = "newest";
     let currentSearch = "";
@@ -642,6 +736,10 @@
     let activeRating = 0;
     let currentStep = 1;
     let currentAnimating = false;
+    let currentPage = 1;
+    let hasMorePages = false;
+    let isFetchingReviews = false;
+    let isUploadingMedia = false;
 
     let reviewMediaEntries = [];
     let detailReview = null;
@@ -816,6 +914,176 @@
       }, 3000);
     }
 
+    function getUploadJobId(reviewId) {
+      return `${shop}__${reviewId}`;
+    }
+
+    function setUploadProgressUI({
+      hidden = false,
+      title = "Uploading media...",
+      percent = 0,
+      text = "Preparing upload...",
+    } = {}) {
+      if (!uploadStatusWrap) return;
+
+      uploadStatusWrap.hidden = hidden;
+
+      const safePercent = Math.max(0, Math.min(100, Math.round(percent || 0)));
+
+      if (uploadStatusTitle) uploadStatusTitle.textContent = title;
+      if (uploadStatusPercent) uploadStatusPercent.textContent = `${safePercent}%`;
+      if (uploadProgressFill) uploadProgressFill.style.width = `${safePercent}%`;
+      if (uploadStatusText) uploadStatusText.textContent = text;
+    }
+
+    function openUploadProgressScreen() {
+      if (!reviewModal) return;
+      reviewModal.hidden = false;
+      if (reviewModalFormShell) reviewModalFormShell.hidden = true;
+      if (reviewModalSuccess) reviewModalSuccess.hidden = false;
+      setBodyLock(true);
+    }
+
+    async function updateServerUploadStatus(reviewId, status, progress = 0, errorMessage = null) {
+      try {
+        await fetch(endpoint, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            action: "updateMediaUploadStatus",
+            reviewId,
+            status,
+            progress,
+            errorMessage,
+          }),
+        });
+      } catch (error) {
+        console.error("Failed to sync upload status:", error);
+      }
+    }
+
+    async function saveUploadJob(job) {
+      const payload = {
+        ...job,
+        id: getUploadJobId(job.reviewId),
+        shop,
+        endpoint,
+        reviewType,
+        targetId,
+        targetHandle,
+        createdAt: job.createdAt || Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      await idbPut(payload);
+      return payload;
+    }
+
+    function getTotalUploadBytes(job) {
+      const imageBytes = Array.isArray(job.imageFiles)
+        ? job.imageFiles.reduce((sum, file) => sum + Number(file?.size || 0), 0)
+        : 0;
+
+      const videoBytes = job.videoFile ? Number(job.videoFile.size || 0) : 0;
+      return imageBytes + videoBytes;
+    }
+
+    function getCompletedUploadBytes(job) {
+      let completed = 0;
+
+      const uploadedImageCount = Array.isArray(job.uploadedImageUrls)
+        ? job.uploadedImageUrls.length
+        : 0;
+
+      if (Array.isArray(job.imageFiles) && uploadedImageCount > 0) {
+        for (let i = 0; i < uploadedImageCount; i += 1) {
+          completed += Number(job.imageFiles[i]?.size || 0);
+        }
+      }
+
+      if (job.uploadedVideoUrl && job.videoFile) {
+        completed += Number(job.videoFile.size || 0);
+      }
+
+      return completed;
+    }
+
+    function uploadToCloudinaryWithProgress(file, resourceType, folder, onProgress) {
+      return new Promise((resolve, reject) => {
+        if (!cloudinaryCloudName || !cloudinaryUploadPreset) {
+          reject(new Error("Cloudinary is not configured."));
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("upload_preset", cloudinaryUploadPreset);
+        formData.append("folder", folder);
+
+        const xhr = new XMLHttpRequest();
+        xhr.open(
+          "POST",
+          `https://api.cloudinary.com/v1_1/${cloudinaryCloudName}/${resourceType}/upload`
+        );
+
+        xhr.upload.onprogress = function (event) {
+          if (event.lengthComputable && typeof onProgress === "function") {
+            onProgress(event.loaded, event.total);
+          }
+        };
+
+        xhr.onerror = function () {
+          reject(new Error(`${resourceType} upload failed`));
+        };
+
+        xhr.onabort = function () {
+          reject(new Error(`${resourceType} upload aborted`));
+        };
+
+        xhr.onload = function () {
+          try {
+            const result = JSON.parse(xhr.responseText || "{}");
+            if (xhr.status >= 200 && xhr.status < 300 && result.secure_url) {
+              resolve(result.secure_url);
+              return;
+            }
+            reject(new Error(result?.error?.message || `${resourceType} upload failed`));
+          } catch {
+            reject(new Error(`${resourceType} upload failed`));
+          }
+        };
+
+        xhr.send(formData);
+      });
+    }
+
+    async function attachUploadedMediaToReview(reviewId, reviewImages, reviewVideoUrl) {
+      const response = await fetch(endpoint, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          action: "attachMedia",
+          reviewId,
+          reviewImages,
+          reviewVideoUrl,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to attach uploaded media");
+      }
+
+      return result;
+    }
+
     function getStorageTargetKey() {
       const fallbackTargetId = reviewType === "store" ? "store" : targetId || targetHandle || "unknown";
       return `${shop}_${reviewType}_${fallbackTargetId}`;
@@ -864,7 +1132,7 @@
         items.push({
           type: "image",
           src: img,
-          thumbSrc: img,
+          thumbSrc: getCloudinaryThumb(img, 220, 220),
           title: review.title || "",
           reviewId: String(review.id || ""),
           mediaKey: `${review.id || "review"}_image_${imageIndex}`,
@@ -944,7 +1212,10 @@
       }
 
       if (mediaStripMeta) mediaStripMeta.textContent = "Loading...";
-      if (loadMoreBtn) loadMoreBtn.hidden = true;
+      if (loadMoreBtn) {
+        loadMoreBtn.hidden = true;
+        loadMoreBtn.disabled = true;
+      }
       if (resultsMetaEl) resultsMetaEl.textContent = "";
     }
 
@@ -967,7 +1238,10 @@
 
       if (mediaStripTrack) mediaStripTrack.innerHTML = "";
       if (mediaStripMeta) mediaStripMeta.textContent = "Unable to load media";
-      if (loadMoreBtn) loadMoreBtn.hidden = true;
+      if (loadMoreBtn) {
+        loadMoreBtn.hidden = true;
+        loadMoreBtn.disabled = false;
+      }
       if (resultsMetaEl) resultsMetaEl.textContent = "";
     }
 
@@ -1088,7 +1362,7 @@
             data-detail-media-index="${mediaIndex}"
             aria-label="Open review media"
           >
-            <img src="${escapeHtml(item.src)}" alt="Review media">
+            <img src="${escapeHtml(item.thumbSrc || item.src)}" alt="Review media" loading="lazy">
           </button>
         `;
       }
@@ -1102,7 +1376,7 @@
             data-detail-media-index="${mediaIndex}"
             aria-label="Open review media"
           >
-            <img src="${escapeHtml(item.thumbSrc)}" alt="Review video thumbnail">
+            <img src="${escapeHtml(item.thumbSrc)}" alt="Review video thumbnail" loading="lazy">
           </button>
         `;
       }
@@ -1196,24 +1470,55 @@
       `;
     }
 
+    function isClientFilteredView() {
+      return currentFilter !== "all" || currentSearch.trim() !== "" || currentSort !== "newest";
+    }
+
     function updateResultsMeta(totalMatched, totalVisible) {
       if (!resultsMetaEl) return;
+
       if (!totalMatched) {
         resultsMetaEl.textContent = "No reviews found";
         return;
       }
-      resultsMetaEl.textContent = `Showing ${totalVisible} of ${totalMatched} reviews`;
+
+      if (isClientFilteredView() && hasMorePages) {
+        resultsMetaEl.textContent = `Showing ${totalVisible} loaded reviews`;
+        return;
+      }
+
+      const referenceTotal = Number(serverTotalReviews || totalMatched || 0);
+      resultsMetaEl.textContent = `Showing ${totalVisible} of ${referenceTotal} reviews`;
     }
 
     function updateLoadMoreButton(totalMatched, totalVisible) {
       if (!loadMoreBtn) return;
-      const remaining = totalMatched - totalVisible;
-      loadMoreBtn.hidden = remaining <= 0;
 
-      if (!loadMoreBtn.hidden) {
-        const nextCount = Math.min(LOAD_MORE_STEP, remaining);
-        loadMoreBtn.textContent = `Load ${nextCount} more review${nextCount > 1 ? "s" : ""}`;
+      if (isFetchingReviews) {
+        loadMoreBtn.hidden = false;
+        loadMoreBtn.disabled = true;
+        loadMoreBtn.textContent = "Loading...";
+        return;
       }
+
+      if (totalVisible < totalMatched) {
+        const remainingLocal = totalMatched - totalVisible;
+        const nextCount = Math.min(LOAD_MORE_STEP, remainingLocal);
+        loadMoreBtn.hidden = false;
+        loadMoreBtn.disabled = false;
+        loadMoreBtn.textContent = `Load ${nextCount} more review${nextCount > 1 ? "s" : ""}`;
+        return;
+      }
+
+      if (hasMorePages) {
+        loadMoreBtn.hidden = false;
+        loadMoreBtn.disabled = false;
+        loadMoreBtn.textContent = "Load more reviews";
+        return;
+      }
+
+      loadMoreBtn.hidden = true;
+      loadMoreBtn.disabled = false;
     }
 
     function renderVisibleReviews() {
@@ -1225,7 +1530,7 @@
 
       updateResultsMeta(filteredSorted.length, totalVisible);
 
-      if (!allReviews.length) {
+      if (!allReviews.length && !serverTotalReviews) {
         renderEmptyState();
         if (loadMoreBtn) loadMoreBtn.hidden = true;
         return;
@@ -1242,7 +1547,8 @@
             <p>Try changing the filter, search, or sort option.</p>
           </div>
         `;
-        if (loadMoreBtn) loadMoreBtn.hidden = true;
+        if (loadMoreBtn) loadMoreBtn.hidden = !hasMorePages;
+        updateLoadMoreButton(filteredSorted.length, totalVisible);
         return;
       }
 
@@ -1265,14 +1571,11 @@
         });
       });
 
-      const totalReviews = allReviews.length;
-      const averageRating =
-        totalReviews > 0
-          ? allReviews.reduce((sum, review) => sum + (Number(review.rating) || 0), 0) / totalReviews
-          : 0;
+      const totalReviews = Number(serverTotalReviews || allReviews.length || 0);
+      const averageRating = Number(serverAverageRating || 0);
 
       mediaStripMeta.textContent = reviewMediaEntries.length
-        ? `${renderStars(Math.round(averageRating))} ${averageRating.toFixed(1)} • ${totalReviews} review${totalReviews !== 1 ? "s" : ""}`
+        ? `${renderStars(Math.round(averageRating || 0))} ${(averageRating || 0).toFixed(1)} • ${totalReviews} review${totalReviews !== 1 ? "s" : ""}`
         : "No photo or video reviews yet";
 
       if (!reviewMediaEntries.length) {
@@ -1286,13 +1589,9 @@
     }
 
     function renderReviewsState() {
-      const totalReviews = Number(allReviews.length) || 0;
-      const averageRating =
-        totalReviews > 0
-          ? allReviews.reduce((sum, review) => sum + (Number(review.rating) || 0), 0) / totalReviews
-          : 0;
-
-      if (summaryEl) summaryEl.innerHTML = renderSummary(averageRating, totalReviews);
+      if (summaryEl) {
+        summaryEl.innerHTML = renderSummary(serverAverageRating, serverTotalReviews);
+      }
       renderMediaStrip();
       renderVisibleReviews();
     }
@@ -1447,6 +1746,21 @@
         return;
       }
 
+      const oversizedImage = validFiles.find(
+        (file) => file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024
+      );
+
+      if (oversizedImage) {
+        setFieldError(
+          "reviewImages",
+          `Each image should be ${MAX_IMAGE_SIZE_MB}MB or less.`,
+          uploadDropzone
+        );
+        uploadDropzone?.classList.add("pr-invalid");
+        showToast(`Each image should be ${MAX_IMAGE_SIZE_MB}MB or less.`, "error");
+        return;
+      }
+
       const existingMap = new Map(selectedImages.map((file) => [getFileUniqueKey(file), file]));
 
       validFiles.forEach((file) => {
@@ -1572,46 +1886,233 @@
       });
     }
 
-    function fileToDataUrl(file) {
+    function loadImageElement(blobUrl) {
       return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = blobUrl;
       });
     }
 
-    async function uploadVideoToCloudinary(file) {
-      if (!cloudinaryCloudName || !cloudinaryUploadPreset) {
-        throw new Error("Cloudinary is not configured.");
+    async function compressImage(file, maxWidth = 1600, quality = 0.8) {
+      let imageSource;
+      let objectUrl = null;
+
+      try {
+        if ("createImageBitmap" in window) {
+          imageSource = await createImageBitmap(file);
+        } else {
+          objectUrl = URL.createObjectURL(file);
+          imageSource = await loadImageElement(objectUrl);
+        }
+
+        let width = imageSource.width;
+        let height = imageSource.height;
+
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Canvas is not supported");
+        ctx.drawImage(imageSource, 0, 0, width, height);
+
+        return await new Promise((resolve, reject) => {
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                reject(new Error("Failed to compress image."));
+                return;
+              }
+
+              resolve(
+                new File(
+                  [blob],
+                  file.name.replace(/\.(png|jpg|jpeg)$/i, ".jpg"),
+                  { type: "image/jpeg" }
+                )
+              );
+            },
+            "image/jpeg",
+            quality
+          );
+        });
+      } finally {
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
       }
+    }
 
-      const uploadFormData = new FormData();
-      uploadFormData.append("file", file);
-      uploadFormData.append("upload_preset", cloudinaryUploadPreset);
-      uploadFormData.append(
-        "folder",
-        `shopify-review-videos/${shop}/${reviewType}/${targetId || targetHandle || "store"}`
-      );
+    async function runUploadJob(job) {
+      if (!job?.reviewId) return;
+      if (ACTIVE_UPLOAD_JOBS.has(job.id)) return;
 
-      const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudinaryCloudName}/video/upload`, {
-        method: "POST",
-        body: uploadFormData,
-      });
+      ACTIVE_UPLOAD_JOBS.add(job.id);
+      isUploadingMedia = true;
 
-      const result = await response.json();
+      try {
+        job.status = "uploading";
+        await saveUploadJob(job);
+        await updateServerUploadStatus(job.reviewId, "uploading", job.progress || 0, null);
 
-      if (!response.ok || !result.secure_url) {
-        throw new Error(result.error?.message || "Video upload failed");
+        const totalBytes = Math.max(1, getTotalUploadBytes(job));
+        let completedBytes = getCompletedUploadBytes(job);
+
+        const imageFiles = Array.isArray(job.imageFiles) ? job.imageFiles : [];
+        const uploadedImageUrls = Array.isArray(job.uploadedImageUrls) ? job.uploadedImageUrls : [];
+        job.uploadedImageUrls = uploadedImageUrls;
+
+        for (let i = uploadedImageUrls.length; i < imageFiles.length; i += 1) {
+          const originalFile = imageFiles[i];
+          const compressedFile = await compressImage(originalFile);
+
+          const uploadedUrl = await uploadToCloudinaryWithProgress(
+            compressedFile,
+            "image",
+            `shopify-review-images/${shop}/${reviewType}/${targetId || targetHandle || "store"}`,
+            (loaded, total) => {
+              const currentLoaded = total ? Math.min(loaded, total) : loaded;
+              const percent = Math.round(((completedBytes + currentLoaded) / totalBytes) * 100);
+
+              setUploadProgressUI({
+                hidden: false,
+                title: "Uploading media...",
+                percent,
+                text: `Uploading photo ${i + 1} of ${imageFiles.length}${job.videoFile ? " + 1 video" : ""}`,
+              });
+            }
+          );
+
+          job.uploadedImageUrls.push(uploadedUrl);
+          completedBytes += Number(originalFile.size || 0);
+          job.progress = Math.round((completedBytes / totalBytes) * 100);
+
+          await saveUploadJob(job);
+          await updateServerUploadStatus(job.reviewId, "uploading", job.progress, null);
+        }
+
+        if (job.videoFile && !job.uploadedVideoUrl) {
+          const videoFileLocal = job.videoFile;
+
+          const uploadedVideoUrl = await uploadToCloudinaryWithProgress(
+            videoFileLocal,
+            "video",
+            `shopify-review-videos/${shop}/${reviewType}/${targetId || targetHandle || "store"}`,
+            (loaded, total) => {
+              const currentLoaded = total ? Math.min(loaded, total) : loaded;
+              const percent = Math.round(((completedBytes + currentLoaded) / totalBytes) * 100);
+
+              setUploadProgressUI({
+                hidden: false,
+                title: "Uploading media...",
+                percent,
+                text: "Uploading video",
+              });
+            }
+          );
+
+          job.uploadedVideoUrl = uploadedVideoUrl;
+          completedBytes += Number(videoFileLocal.size || 0);
+          job.progress = Math.round((completedBytes / totalBytes) * 100);
+
+          await saveUploadJob(job);
+          await updateServerUploadStatus(job.reviewId, "uploading", job.progress, null);
+        }
+
+        setUploadProgressUI({
+          hidden: false,
+          title: "Finalizing upload...",
+          percent: 100,
+          text: "Attaching media to the review",
+        });
+
+        await attachUploadedMediaToReview(
+          job.reviewId,
+          job.uploadedImageUrls || [],
+          job.uploadedVideoUrl || null
+        );
+
+        await updateServerUploadStatus(job.reviewId, "completed", 100, null);
+        await idbDelete(job.id);
+
+        setUploadProgressUI({
+          hidden: false,
+          title: "Upload complete",
+          percent: 100,
+          text: "Photos and video attached successfully",
+        });
+
+        showToast("Media uploaded successfully.", "success");
+        await loadReviews({ page: 1, append: false });
+
+        setTimeout(() => {
+          setUploadProgressUI({ hidden: true });
+        }, 1600);
+      } catch (error) {
+        const errorMessage = error?.message || "Media upload failed";
+
+        job.status = "failed";
+        job.errorMessage = errorMessage;
+        job.progress = Math.max(0, Math.min(100, Number(job.progress || 0)));
+
+        await saveUploadJob(job);
+        await updateServerUploadStatus(
+          job.reviewId,
+          "failed",
+          Number(job.progress || 0),
+          errorMessage
+        );
+
+        setUploadProgressUI({
+          hidden: false,
+          title: "Upload failed",
+          percent: Number(job.progress || 0),
+          text: `${errorMessage}. Page reopen/refresh par retry ho jayega.`,
+        });
+
+        showToast(errorMessage, "error");
+      } finally {
+        ACTIVE_UPLOAD_JOBS.delete(job.id);
+        isUploadingMedia = ACTIVE_UPLOAD_JOBS.size > 0;
       }
+    }
 
-      return result.secure_url;
+    async function resumePendingUploads() {
+      try {
+        const jobs = await idbGetAll();
+        const scopedJobs = jobs.filter(
+          (job) => job.shop === shop && job.endpoint === endpoint
+        );
+
+        if (scopedJobs.length) {
+          openUploadProgressScreen();
+          setUploadProgressUI({
+            hidden: false,
+            title: "Resuming upload...",
+            percent: 0,
+            text: "Pending media upload found. Resuming now...",
+          });
+          showToast("Pending media upload resumed.", "success");
+        }
+
+        for (const job of scopedJobs) {
+          if (!job?.reviewId) continue;
+          await runUploadJob(job);
+        }
+      } catch (error) {
+        console.error("Failed to resume uploads:", error);
+      }
     }
 
     function validateCommonTargets(showErrors = true) {
       let isValid = true;
 
-      if (reviewType === "product" && !targetId) {
+      if (reviewType === "product" && !targetId && !productId) {
         isValid = false;
         if (showErrors && messageEl) {
           messageEl.className = "pr-message-box pr-message-error";
@@ -1710,6 +2211,26 @@
           }
         } else {
           clearFieldError("reviewImages", uploadDropzone);
+        }
+
+        const hasOversizedImage = selectedImages.some(
+          (file) => file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024
+        );
+
+        if (hasOversizedImage) {
+          isValid = false;
+          if (showErrors) {
+            setFieldError("reviewImages", `Each image should be ${MAX_IMAGE_SIZE_MB}MB or less.`, uploadDropzone);
+          }
+        }
+
+        if (selectedVideoFile && selectedVideoFile.size > MAX_VIDEO_SIZE_MB * 1024 * 1024) {
+          isValid = false;
+          if (showErrors) {
+            setFieldError("reviewVideo", `Video size should be ${MAX_VIDEO_SIZE_MB}MB or less.`, videoDropzone);
+          }
+        } else {
+          clearFieldError("reviewVideo", videoDropzone);
         }
 
         if (youtubeUrl) {
@@ -1879,6 +2400,7 @@
 
       reviewModalFormShell.hidden = false;
       reviewModalSuccess.hidden = true;
+      setUploadProgressUI({ hidden: true });
       resetStepFlow();
       updateRatingPreview();
     }
@@ -2006,7 +2528,7 @@
       if (!item) return;
 
       if (item.type === "image") {
-        reviewDetailStage.innerHTML = `<img src="${escapeHtml(item.src)}" alt="Review media">`;
+        reviewDetailStage.innerHTML = `<img src="${escapeHtml(getCloudinaryThumb(item.src, 1000, 1000))}" alt="Review media">`;
       } else if (item.type === "video") {
         reviewDetailStage.innerHTML = `<video src="${escapeHtml(item.src)}" controls playsinline></video>`;
       } else {
@@ -2030,7 +2552,7 @@
           const isActive = index === detailMediaIndex ? "is-active" : "";
           const thumbInner =
             item.type === "image"
-              ? `<img src="${escapeHtml(item.src)}" alt="Review media thumbnail">`
+              ? `<img src="${escapeHtml(getCloudinaryThumb(item.src, 120, 120))}" alt="Review media thumbnail">`
               : item.type === "youtube"
               ? `<img src="${escapeHtml(item.thumbSrc)}" alt="Review video thumbnail">`
               : `<video src="${escapeHtml(item.src)}" muted playsinline preload="metadata"></video>`;
@@ -2250,11 +2772,13 @@
       });
     }
 
-    function buildReviewsUrl() {
+    function buildReviewsUrl(page = 1, limit = PAGE_SIZE) {
       const params = new URLSearchParams();
       params.set("shop", shop);
       params.set("approvedOnly", "true");
       params.set("reviewType", reviewType);
+      params.set("page", String(page));
+      params.set("limit", String(limit));
 
       if (reviewType === "product") {
         params.set("targetId", targetId || productId);
@@ -2266,11 +2790,34 @@
       return `${endpoint}?${params.toString()}`;
     }
 
-    async function loadReviews() {
-      renderLoadingState();
+    function mergeUniqueReviews(existingReviews, incomingReviews) {
+      const map = new Map();
+
+      existingReviews.forEach((review) => {
+        map.set(String(review.id), review);
+      });
+
+      incomingReviews.forEach((review) => {
+        map.set(String(review.id), review);
+      });
+
+      return Array.from(map.values());
+    }
+
+    async function loadReviews({ page = 1, append = false } = {}) {
+      if (isFetchingReviews) return;
+      isFetchingReviews = true;
+
+      if (!append) {
+        renderLoadingState();
+      } else if (loadMoreBtn) {
+        loadMoreBtn.hidden = false;
+        loadMoreBtn.disabled = true;
+        loadMoreBtn.textContent = "Loading...";
+      }
 
       try {
-        const response = await fetch(buildReviewsUrl(), {
+        const response = await fetch(buildReviewsUrl(page, PAGE_SIZE), {
           method: "GET",
           headers: { Accept: "application/json" },
         });
@@ -2282,10 +2829,29 @@
           return;
         }
 
-        allReviews = Array.isArray(result?.data) ? result.data : [];
+        const incomingReviews = Array.isArray(result?.data) ? result.data : [];
+        serverTotalReviews = Number(result?.totalReviews || 0);
+        serverAverageRating = Number(result?.averageRating || 0);
+
+        if (append) {
+          allReviews = mergeUniqueReviews(allReviews, incomingReviews);
+        } else {
+          allReviews = incomingReviews;
+          visibleCount = DEFAULT_VISIBLE_COUNT;
+        }
+
+        currentPage = page;
+        hasMorePages = allReviews.length < serverTotalReviews;
+
         renderReviewsState();
       } catch {
         renderErrorState("Failed to load reviews");
+      } finally {
+        isFetchingReviews = false;
+        updateLoadMoreButton(
+          getFilteredSortedReviews().length,
+          Math.min(visibleCount, getFilteredSortedReviews().length)
+        );
       }
     }
 
@@ -2307,9 +2873,21 @@
       renderVisibleReviews();
     });
 
-    loadMoreBtn?.addEventListener("click", () => {
-      visibleCount += LOAD_MORE_STEP;
-      renderVisibleReviews();
+    loadMoreBtn?.addEventListener("click", async () => {
+      const filteredSorted = getFilteredSortedReviews();
+      const totalVisible = Math.min(visibleCount, filteredSorted.length);
+
+      if (totalVisible < filteredSorted.length) {
+        visibleCount += LOAD_MORE_STEP;
+        renderVisibleReviews();
+        return;
+      }
+
+      if (hasMorePages && !isFetchingReviews) {
+        await loadReviews({ page: currentPage + 1, append: true });
+        visibleCount += LOAD_MORE_STEP;
+        renderVisibleReviews();
+      }
     });
 
     successStars.forEach((star) => {
@@ -2360,37 +2938,16 @@
         }
 
         const formData = new FormData(form);
-
-        let imageUrls = [];
-        if (selectedImages.length) {
-          imageUrls = await Promise.all(selectedImages.map(fileToDataUrl));
-        }
-
-        let uploadedVideoUrl = null;
         const youtubeUrl = formData.get("reviewYoutubeUrl")?.toString().trim() || "";
         const normalizedYoutubeUrl = youtubeUrl ? normalizeYoutubeEmbedUrl(youtubeUrl) : "";
-
-        if (selectedVideoFile) {
-          try {
-            uploadedVideoUrl = await uploadVideoToCloudinary(selectedVideoFile);
-          } catch (error) {
-            if (messageEl) {
-              messageEl.className = "pr-message-box pr-message-error";
-              messageEl.textContent = error.message || "Video upload failed.";
-            }
-
-            showToast(error.message || "Video upload failed.", "error");
-
-            if (submitBtn) {
-              submitBtn.disabled = false;
-              submitBtn.textContent = "Submit review";
-            }
-            return;
-          }
-        }
-
         const useAnonymous = Boolean(anonymousInput?.checked);
-        const customerName = useAnonymous ? "Anonymous" : formData.get("customerName")?.toString().trim();
+        const customerName = useAnonymous
+          ? "Anonymous"
+          : formData.get("customerName")?.toString().trim();
+
+        const imageFilesForUpload = [...selectedImages];
+        const videoFileForUpload = selectedVideoFile;
+        const hasPendingMedia = imageFilesForUpload.length > 0 || Boolean(videoFileForUpload);
 
         const payload = {
           shop,
@@ -2405,9 +2962,10 @@
           rating: Number(ratingInput?.value),
           title: formData.get("title")?.toString().trim(),
           message: formData.get("message")?.toString().trim(),
-          reviewImages: imageUrls,
-          reviewVideoUrl: uploadedVideoUrl,
-          reviewYoutubeUrl: normalizedYoutubeUrl || youtubeUrl,
+          reviewImages: [],
+          reviewVideoUrl: null,
+          reviewYoutubeUrl: normalizedYoutubeUrl || null,
+          hasPendingMedia,
         };
 
         try {
@@ -2437,9 +2995,36 @@
             return;
           }
 
-          await loadReviews();
+          const createdReviewId = result?.data?.id;
+
           showToast("Thanks for sharing your feedback!", "success");
           showSuccessScreen();
+
+          if (createdReviewId && hasPendingMedia) {
+            const job = await saveUploadJob({
+              reviewId: createdReviewId,
+              imageFiles: imageFilesForUpload,
+              videoFile: videoFileForUpload,
+              uploadedImageUrls: [],
+              uploadedVideoUrl: null,
+              progress: 0,
+              status: "queued",
+              errorMessage: null,
+            });
+
+            await updateServerUploadStatus(createdReviewId, "queued", 0, null);
+
+            setUploadProgressUI({
+              hidden: false,
+              title: "Upload queued",
+              percent: 0,
+              text: "Media upload is starting...",
+            });
+
+            runUploadJob(job);
+          } else {
+            setUploadProgressUI({ hidden: true });
+          }
         } catch {
           if (messageEl) {
             messageEl.className = "pr-message-box pr-message-error";
@@ -2469,6 +3054,16 @@
       }
     });
 
+    if (!window.__prBeforeUnloadBound) {
+      window.__prBeforeUnloadBound = true;
+
+      window.addEventListener("beforeunload", function (e) {
+        if (ACTIVE_UPLOAD_JOBS.size <= 0) return;
+        e.preventDefault();
+        e.returnValue = "";
+      });
+    }
+
     bindStarSelector();
     bindImageUploader();
     bindVideoUploader();
@@ -2480,11 +3075,13 @@
 
     updateStarUI(0);
     updateRatingPreview();
+    setUploadProgressUI({ hidden: true });
 
     if (titleCount) titleCount.textContent = "0 / 80";
     if (messageCount) messageCount.textContent = "0 / 1000";
 
-    loadReviews();
+    loadReviews({ page: 1, append: false });
+    resumePendingUploads();
   }
 
   window.ProductReviewsMain = {

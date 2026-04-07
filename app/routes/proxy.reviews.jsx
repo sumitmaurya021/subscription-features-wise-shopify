@@ -2,6 +2,7 @@ import { json } from "@remix-run/node";
 import prisma from "../db.server";
 
 const MAX_REVIEW_IMAGES = 4;
+const MAX_PAGE_SIZE = 24;
 
 function safeParseImages(value) {
   if (!value) return [];
@@ -82,6 +83,16 @@ function normalizeNullableString(value) {
 
   const parsed = String(value).trim();
   return parsed || null;
+}
+
+function normalizeUploadStatus(value) {
+  const status = String(value || "").trim().toLowerCase();
+
+  if (["none", "queued", "uploading", "completed", "failed"].includes(status)) {
+    return status;
+  }
+
+  return "none";
 }
 
 function parseCsvIds(value) {
@@ -260,6 +271,12 @@ function normalizeReview(review) {
     reviewYoutubeUrl: review.reviewYoutubeUrl || null,
     helpfulCount: Number(review.helpfulCount || 0),
     isPinned: Boolean(review.isPinned),
+    mediaUploadStatus: normalizeUploadStatus(review.mediaUploadStatus || "none"),
+    mediaUploadProgress: Math.max(
+      0,
+      Math.min(100, Number(review.mediaUploadProgress || 0))
+    ),
+    mediaUploadError: review.mediaUploadError || null,
     createdAt:
       review.createdAt instanceof Date
         ? review.createdAt.toISOString()
@@ -363,61 +380,71 @@ function buildLoaderWhere({
   return where;
 }
 
-function sortNormalizedReviews(reviews, sort) {
-  const items = [...reviews];
+function combineWhereWithAnd(baseWhere, extraCondition) {
+  if (!extraCondition) return baseWhere;
+  if (!baseWhere || !Object.keys(baseWhere).length) return extraCondition;
+  return {
+    AND: [baseWhere, extraCondition],
+  };
+}
+
+function buildExtraLoaderFilters({
+  onlyMedia,
+  mediaType,
+  reviewTypeFilter,
+}) {
+  const conditions = [];
+
+  if (reviewTypeFilter) {
+    conditions.push({
+      reviewType: normalizeReviewType(reviewTypeFilter),
+    });
+  }
+
+  if (mediaType === "uploaded") {
+    conditions.push({
+      reviewVideoUrl: { not: null },
+    });
+  } else if (mediaType === "youtube") {
+    conditions.push({
+      reviewYoutubeUrl: { not: null },
+    });
+  }
+
+  if (onlyMedia) {
+    conditions.push({
+      OR: [
+        { reviewImages: { not: null } },
+        { reviewVideoUrl: { not: null } },
+        { reviewYoutubeUrl: { not: null } },
+      ],
+    });
+  }
+
+  if (!conditions.length) return null;
+  if (conditions.length === 1) return conditions[0];
+
+  return {
+    AND: conditions,
+  };
+}
+
+function buildOrderBy(sort) {
   const normalizedSort = String(sort || "default").trim().toLowerCase();
 
-  const getTime = (value) => {
-    if (!value) return 0;
-    const raw = /^\d+$/.test(String(value)) ? Number(value) : value;
-    const date = new Date(raw);
-    return Number.isNaN(date.getTime()) ? 0 : date.getTime();
-  };
-
   if (normalizedSort === "oldest") {
-    items.sort((a, b) => {
-      if (Boolean(b.isPinned) !== Boolean(a.isPinned)) {
-        return Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned));
-      }
-      return getTime(a.createdAt) - getTime(b.createdAt);
-    });
-    return items;
+    return [{ isPinned: "desc" }, { createdAt: "asc" }];
   }
 
-  if (normalizedSort === "highest_rating") {
-    items.sort((a, b) => {
-      if (Boolean(b.isPinned) !== Boolean(a.isPinned)) {
-        return Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned));
-      }
-      if (Number(b.rating || 0) !== Number(a.rating || 0)) {
-        return Number(b.rating || 0) - Number(a.rating || 0);
-      }
-      return getTime(b.createdAt) - getTime(a.createdAt);
-    });
-    return items;
+  if (normalizedSort === "highest_rating" || normalizedSort === "highest") {
+    return [{ isPinned: "desc" }, { rating: "desc" }, { createdAt: "desc" }];
   }
 
-  if (normalizedSort === "lowest_rating") {
-    items.sort((a, b) => {
-      if (Boolean(b.isPinned) !== Boolean(a.isPinned)) {
-        return Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned));
-      }
-      if (Number(a.rating || 0) !== Number(b.rating || 0)) {
-        return Number(a.rating || 0) - Number(b.rating || 0);
-      }
-      return getTime(b.createdAt) - getTime(a.createdAt);
-    });
-    return items;
+  if (normalizedSort === "lowest_rating" || normalizedSort === "lowest") {
+    return [{ isPinned: "desc" }, { rating: "asc" }, { createdAt: "desc" }];
   }
 
-  items.sort((a, b) => {
-    if (Boolean(b.isPinned) !== Boolean(a.isPinned)) {
-      return Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned));
-    }
-    return getTime(b.createdAt) - getTime(a.createdAt);
-  });
-
-  return items;
+  return [{ isPinned: "desc" }, { createdAt: "desc" }];
 }
 
 export const loader = async ({ request }) => {
@@ -459,7 +486,11 @@ export const loader = async ({ request }) => {
 
     const parsedStarRating = starRatingParam ? Number(starRatingParam) : null;
     const parsedMinRating = minRatingParam ? Number(minRatingParam) : null;
-    const parsedLimit = limitParam ? Number(limitParam) : null;
+    const parsedLimitRaw = limitParam ? Number(limitParam) : null;
+    const parsedLimit =
+      parsedLimitRaw !== null && !Number.isNaN(parsedLimitRaw) && parsedLimitRaw > 0
+        ? Math.min(parsedLimitRaw, MAX_PAGE_SIZE)
+        : null;
     const parsedPage = Math.max(1, Number(pageParam) || 1);
 
     const reviewType = inferReviewType({
@@ -525,7 +556,7 @@ export const loader = async ({ request }) => {
       );
     }
 
-    const where = buildLoaderWhere({
+    const baseWhere = buildLoaderWhere({
       reviewType,
       shop,
       productId,
@@ -539,56 +570,36 @@ export const loader = async ({ request }) => {
       parsedMinRating,
     });
 
-    const reviews = await prisma.review.findMany({
-      where,
-      orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
+    const extraFilters = buildExtraLoaderFilters({
+      onlyMedia,
+      mediaType,
+      reviewTypeFilter,
     });
 
-    let filteredReviews = reviews.map(normalizeReview);
+    const where = combineWhereWithAnd(baseWhere, extraFilters);
+    const orderBy = buildOrderBy(sort);
 
-    if (reviewTypeFilter) {
-      const normalizedTypeFilter = normalizeReviewType(reviewTypeFilter);
-      filteredReviews = filteredReviews.filter(
-        (review) => review.reviewType === normalizedTypeFilter
-      );
-    }
+    const skip = parsedLimit ? (parsedPage - 1) * parsedLimit : undefined;
+    const take = parsedLimit || undefined;
 
-    if (mediaType === "uploaded") {
-      filteredReviews = filteredReviews.filter((review) =>
-        Boolean(review.reviewVideoUrl)
-      );
-    } else if (mediaType === "youtube") {
-      filteredReviews = filteredReviews.filter((review) =>
-        Boolean(review.reviewYoutubeUrl)
-      );
-    }
+    const [totalReviews, aggregateResult, reviews] = await Promise.all([
+      prisma.review.count({ where }),
+      prisma.review.aggregate({
+        where,
+        _avg: {
+          rating: true,
+        },
+      }),
+      prisma.review.findMany({
+        where,
+        orderBy,
+        skip,
+        take,
+      }),
+    ]);
 
-    if (onlyMedia) {
-      filteredReviews = filteredReviews.filter(
-        (review) =>
-          (Array.isArray(review.reviewImages) && review.reviewImages.length > 0) ||
-          Boolean(review.reviewVideoUrl) ||
-          Boolean(review.reviewYoutubeUrl)
-      );
-    }
-
-    filteredReviews = sortNormalizedReviews(filteredReviews, sort);
-
-    const totalReviews = filteredReviews.length;
-    const averageRating =
-      totalReviews > 0
-        ? filteredReviews.reduce(
-            (sum, item) => sum + (Number(item.rating) || 0),
-            0
-          ) / totalReviews
-        : 0;
-
-    let paginatedReviews = filteredReviews;
-
-    if (parsedLimit !== null && !Number.isNaN(parsedLimit) && parsedLimit > 0) {
-      const start = (parsedPage - 1) * parsedLimit;
-      paginatedReviews = filteredReviews.slice(start, start + parsedLimit);
-    }
+    const normalizedReviews = reviews.map(normalizeReview);
+    const averageRating = Number(aggregateResult?._avg?.rating || 0);
 
     return json(
       {
@@ -596,11 +607,11 @@ export const loader = async ({ request }) => {
         message: "Reviews fetched successfully",
         totalReviews,
         averageRating: Number(averageRating.toFixed(2)),
-        data: paginatedReviews,
+        data: normalizedReviews,
       },
       {
         headers: {
-          "Cache-Control": "no-store",
+          "Cache-Control": "public, max-age=30, stale-while-revalidate=120",
         },
       }
     );
@@ -634,6 +645,7 @@ export const action = async ({ request }) => {
         reviewImages,
         reviewVideoUrl,
         reviewYoutubeUrl,
+        hasPendingMedia,
       } = body;
 
       if (!shop || !customerName || !rating || !message) {
@@ -727,6 +739,10 @@ export const action = async ({ request }) => {
           helpfulCount: 0,
           status: "pending",
           isPinned: false,
+
+          mediaUploadStatus: hasPendingMedia ? "queued" : "none",
+          mediaUploadProgress: hasPendingMedia ? 0 : 100,
+          mediaUploadError: null,
         },
       });
 
@@ -739,6 +755,111 @@ export const action = async ({ request }) => {
 
     if (request.method === "PUT") {
       const body = await request.json();
+
+      if (body.action === "updateMediaUploadStatus") {
+        const { reviewId, status, progress, errorMessage } = body;
+
+        if (!reviewId) {
+          return json(
+            { success: false, message: "reviewId is required" },
+            { status: 400 }
+          );
+        }
+
+        const normalizedStatus = normalizeUploadStatus(status);
+        const normalizedProgress = Math.max(
+          0,
+          Math.min(100, Number(progress || 0))
+        );
+
+        const existingReview = await prisma.review.findUnique({
+          where: { id: String(reviewId) },
+        });
+
+        if (!existingReview) {
+          return json(
+            { success: false, message: "Review not found" },
+            { status: 404 }
+          );
+        }
+
+        const updatedReview = await prisma.review.update({
+          where: { id: String(reviewId) },
+          data: {
+            mediaUploadStatus: normalizedStatus,
+            mediaUploadProgress: normalizedProgress,
+            mediaUploadError: errorMessage ? String(errorMessage).trim() : null,
+          },
+        });
+
+        return json({
+          success: true,
+          message: "Upload status updated",
+          data: normalizeReview(updatedReview),
+        });
+      }
+
+      if (body.action === "attachMedia") {
+        const { reviewId, reviewImages, reviewVideoUrl } = body;
+
+        if (!reviewId) {
+          return json(
+            { success: false, message: "reviewId is required" },
+            { status: 400 }
+          );
+        }
+
+        let normalizedImages = [];
+
+        if (Array.isArray(reviewImages)) {
+          normalizedImages = reviewImages.filter(
+            (item) => typeof item === "string" && item.trim() !== ""
+          );
+        }
+
+        if (normalizedImages.length > MAX_REVIEW_IMAGES) {
+          return json(
+            {
+              success: false,
+              message: `You can upload up to ${MAX_REVIEW_IMAGES} images only`,
+            },
+            { status: 400 }
+          );
+        }
+
+        const existingReview = await prisma.review.findUnique({
+          where: { id: String(reviewId) },
+        });
+
+        if (!existingReview) {
+          return json(
+            { success: false, message: "Review not found" },
+            { status: 404 }
+          );
+        }
+
+        const existingImages = safeParseImages(existingReview.reviewImages);
+        const mergedImages = [...existingImages, ...normalizedImages].slice(0, MAX_REVIEW_IMAGES);
+
+        const updatedReview = await prisma.review.update({
+          where: { id: String(reviewId) },
+          data: {
+            reviewImages: mergedImages.length ? JSON.stringify(mergedImages) : null,
+            reviewVideoUrl:
+              normalizeVideoUrl(reviewVideoUrl) || existingReview.reviewVideoUrl,
+            mediaUploadStatus: "completed",
+            mediaUploadProgress: 100,
+            mediaUploadError: null,
+          },
+        });
+
+        return json({
+          success: true,
+          message: "Review media attached successfully",
+          data: normalizeReview(updatedReview),
+        });
+      }
+
       const { reviewId, increment } = body;
 
       if (!reviewId || typeof increment !== "boolean") {
