@@ -52,6 +52,9 @@ model Review {
   reviewYoutubeUrl String?
   helpfulCount     Int      @default(0)
   status           String   @default("pending")
+  mediaUploadStatus   String   @default("none")
+  mediaUploadProgress Int      @default(0)
+  mediaUploadError    String?
   isPinned         Boolean  @default(false)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -59,6 +62,11 @@ model Review {
   @@index([shop, reviewType, targetId])
   @@index([shop, reviewType, targetHandle])
   @@index([shop, productId])
+  @@index([shop, reviewType, status, createdAt])
+  @@index([shop, reviewType, targetId, status, createdAt])
+  @@index([shop, reviewType, targetHandle, status, createdAt])
+  @@index([shop, reviewType, productId, status, createdAt])
+  @@index([isPinned, createdAt])
 }
 
 model WishlistItem {
