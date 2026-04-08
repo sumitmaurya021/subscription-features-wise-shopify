@@ -69,7 +69,7 @@
     if (!elements.length) return;
 
     const safeRating = Math.max(0, Math.min(5, Number(ratingValue) || 0));
-    const filledCount = Math.floor(safeRating);
+    const filledCount = Math.round(safeRating);
 
     elements.forEach((starEl, index) => {
       if (index < filledCount) {
@@ -127,30 +127,40 @@
       trigger.classList.add("frt-hide-on-open");
     }
 
-    function updateTopSummary(items) {
-      const total = items.length;
-      const average = getAverageRating(items);
+    function updateTopSummary({ items = [], total = null, average = null } = {}) {
+      const resolvedTotal = Math.max(
+        0,
+        Number.isFinite(Number(total)) ? Number(total) : items.length
+      );
+
+      const resolvedAverage = Math.max(
+        0,
+        Math.min(
+          5,
+          Number.isFinite(Number(average)) ? Number(average) : getAverageRating(items)
+        )
+      );
 
       if (triggerRatingValue) {
-        triggerRatingValue.textContent = total ? average.toFixed(1) : "--";
+        triggerRatingValue.textContent = resolvedTotal ? resolvedAverage.toFixed(1) : "--";
       }
 
       if (triggerRatingCount) {
-        triggerRatingCount.textContent = total
-          ? `${total} review${total !== 1 ? "s" : ""}`
+        triggerRatingCount.textContent = resolvedTotal
+          ? `${resolvedTotal} review${resolvedTotal !== 1 ? "s" : ""}`
           : "No reviews";
       }
 
-      setFilledStars(triggerStars, average);
-      setFilledStars(summaryStars, average);
+      setFilledStars(triggerStars, resolvedAverage);
+      setFilledStars(summaryStars, resolvedAverage);
 
       if (summaryRating) {
-        summaryRating.textContent = total ? average.toFixed(1) : "--";
+        summaryRating.textContent = resolvedTotal ? resolvedAverage.toFixed(1) : "--";
       }
 
       if (summaryCount) {
-        summaryCount.textContent = total
-          ? `${total} approved store review${total !== 1 ? "s" : ""}`
+        summaryCount.textContent = resolvedTotal
+          ? `${resolvedTotal} approved store review${resolvedTotal !== 1 ? "s" : ""}`
           : "No approved store reviews yet";
       }
     }
@@ -321,7 +331,6 @@
       params.set("reviewType", reviewType);
       params.set("approvedOnly", "true");
       params.set("limit", String(maxReviews));
-
       return `${endpoint}?${params.toString()}`;
     }
 
@@ -334,12 +343,18 @@
           headers: {
             Accept: "application/json",
           },
+          credentials: "same-origin",
         });
+
+        const contentType = response.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) {
+          throw new Error("Non-JSON response received from reviews endpoint.");
+        }
 
         const result = await response.json();
 
         if (!response.ok || !result.success) {
-          updateTopSummary([]);
+          updateTopSummary({ items: [], total: 0, average: 0 });
           showError(result.message || "Failed to load store reviews.");
           return;
         }
@@ -351,10 +366,23 @@
             )
           : [];
 
-        updateTopSummary(reviews);
+        const totalReviews = Number(result.totalReviews || reviews.length || 0);
+        const averageRating = Number(
+          result.averageRating !== undefined && result.averageRating !== null
+            ? result.averageRating
+            : getAverageRating(reviews)
+        );
+
+        updateTopSummary({
+          items: reviews,
+          total: totalReviews,
+          average: averageRating,
+        });
+
         renderReviews(reviews);
       } catch (error) {
-        updateTopSummary([]);
+        console.error("Floating reviews load error:", error);
+        updateTopSummary({ items: [], total: 0, average: 0 });
         showError("Failed to load store reviews.");
       }
     }

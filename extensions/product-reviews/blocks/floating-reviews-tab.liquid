@@ -38,6 +38,7 @@
     aria-expanded="false"
     aria-controls="frt-panel-{{ block.id }}"
     aria-label="{{ block.settings.tab_label | escape }}"
+    aria-haspopup="dialog"
   >
     <span class="frt-trigger-inner">
       <span class="frt-trigger-gloss"></span>
@@ -54,6 +55,10 @@
       <span class="frt-trigger-middle">
         <span class="frt-rating-value">--</span>
       </span>
+
+      {% comment %} <span class="frt-trigger-bottom">
+        <span class="frt-rating-count">Loading...</span>
+      </span> {% endcomment %}
     </span>
   </button>
 
