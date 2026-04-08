@@ -394,6 +394,16 @@
     let autoplayTimer = null;
     let isHovered = false;
     let isDestroyed = false;
+    let startX = 0;
+    let moved = false;
+
+    if (!root.hasAttribute("tabindex")) {
+      root.setAttribute("tabindex", "0");
+    }
+
+    function setState(state) {
+      root.dataset.tcState = state || "ready";
+    }
 
     function matchesCurrentProduct(review) {
       if (!currentProductId && !currentProductHandle) return false;
@@ -546,6 +556,7 @@
     }
 
     function showLoading() {
+      setState("loading");
       if (loadingEl) loadingEl.hidden = false;
       if (emptyEl) emptyEl.hidden = true;
     }
@@ -555,6 +566,7 @@
     }
 
     function showEmpty() {
+      setState("empty");
       hideLoading();
 
       if (track) {
@@ -589,6 +601,16 @@
       });
     }
 
+    function updateSlidesA11y() {
+      if (!track) return;
+      const slides = Array.from(track.querySelectorAll(".tc-slide"));
+
+      slides.forEach(function (slide, index) {
+        const active = index === currentIndex;
+        slide.setAttribute("aria-hidden", active ? "false" : "true");
+      });
+    }
+
     function updateTrackPosition(animate) {
       if (!track) return;
 
@@ -600,11 +622,11 @@
           if (!track) return;
           track.style.transition = "";
         });
-
-        return;
+      } else {
+        track.style.transform = "translateX(-" + currentIndex * 100 + "%)";
       }
 
-      track.style.transform = "translateX(-" + currentIndex * 100 + "%)";
+      updateSlidesA11y();
     }
 
     function goToSlide(index, animate) {
@@ -654,6 +676,7 @@
     function renderSlides(items) {
       if (!track || !templateEl) return;
 
+      setState("ready");
       hideLoading();
       hideEmpty();
 
@@ -880,12 +903,19 @@
         isHovered = false;
         startAutoplay();
       });
+
+      widget.addEventListener("focusin", function () {
+        isHovered = true;
+        stopAutoplay();
+      });
+
+      widget.addEventListener("focusout", function () {
+        isHovered = false;
+        startAutoplay();
+      });
     }
 
     if (viewport) {
-      let startX = 0;
-      let moved = false;
-
       viewport.addEventListener(
         "touchstart",
         function (event) {

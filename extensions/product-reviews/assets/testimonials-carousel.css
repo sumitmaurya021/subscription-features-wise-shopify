@@ -2,12 +2,12 @@
   --tc-max-width: 1100px;
   --tc-card-color: #f9f9f9;
   --tc-accent-color: #108474;
-  --tc-text-color: #000000;
-  --tc-arrows-color: #000000;
+  --tc-text-color: #111111;
+  --tc-arrows-color: #111111;
   --tc-content-max-width: 860px;
-  --tc-card-padding-x: 28px;
-  --tc-card-padding-y: 36px;
-  --tc-card-padding-x-mobile: 16px;
+  --tc-card-padding-x: 42px;
+  --tc-card-padding-y: 44px;
+  --tc-card-padding-x-mobile: 18px;
   --tc-card-padding-y-mobile: 28px;
   --tc-padding-top-mobile: 0px;
   --tc-padding-bottom-mobile: 0px;
@@ -21,6 +21,7 @@
 
   width: 100%;
   color: var(--tc-text-color);
+  position: relative;
 }
 
 .tc-root *,
@@ -51,37 +52,45 @@
 
 .tc-header {
   text-align: center;
-  margin-bottom: 18px;
-  padding-inline: 12px;
+  margin-bottom: 24px;
+  padding-inline: 14px;
 }
 
 .tc-heading {
   margin: 0;
-  font-size: 18px;
-  line-height: 1.25;
-  font-weight: 700;
+  font-size: clamp(24px, 2.6vw, 38px);
+  line-height: 1.12;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   color: var(--tc-text-color);
   word-break: break-word;
 }
 
 .tc-header-rating {
-  margin-top: 8px;
+  margin-top: 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 6px;
-  color: var(--tc-text-color);
-  font-size: 11px;
-  line-height: 1.3;
-  font-weight: 500;
+  gap: 8px;
   max-width: 100%;
+  min-height: 42px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+  color: var(--tc-text-color);
+  font-size: 13px;
+  line-height: 1.3;
+  font-weight: 600;
+  backdrop-filter: blur(8px);
 }
 
 .tc-header-stars {
-  color: #000000;
-  letter-spacing: 1px;
-  font-size: 12px;
+  color: var(--tc-accent-color);
+  letter-spacing: 1.5px;
+  font-size: 14px;
   line-height: 1;
   white-space: nowrap;
 }
@@ -121,7 +130,7 @@
 .tc-track {
   display: flex;
   width: 100%;
-  transition: transform 0.45s ease;
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
 }
 
@@ -141,6 +150,22 @@
   padding: var(--tc-card-padding-y) var(--tc-card-padding-x);
   margin: 0 auto;
   overflow: hidden;
+  border: 1px solid rgba(17, 17, 17, 0.06);
+}
+
+.tc-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(16, 132, 116, 0) 0%,
+    rgba(16, 132, 116, 0.18) 50%,
+    rgba(16, 132, 116, 0) 100%
+  );
+  pointer-events: none;
 }
 
 .tc-card-content {
@@ -150,11 +175,12 @@
 }
 
 .tc-review-message {
-  margin: 0 auto 18px;
+  margin: 0 auto 22px;
   max-width: 100%;
   color: var(--tc-text-color);
-  line-height: 1.5;
-  font-weight: 400;
+  line-height: 1.72;
+  font-weight: 500;
+  letter-spacing: 0.005em;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -164,27 +190,30 @@
 
 .tc-review-stars {
   color: var(--tc-accent-color);
-  letter-spacing: 2px;
+  letter-spacing: 3px;
   line-height: 1;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   white-space: nowrap;
+  font-weight: 700;
 }
 
 .tc-review-author-row {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
   margin-bottom: 10px;
   min-width: 0;
 }
 
 .tc-review-author {
-  font-weight: 700;
+  font-weight: 800;
   color: var(--tc-text-color);
   line-height: 1.3;
   word-break: break-word;
+  font-size: clamp(15px, 1.15vw, 18px);
+  letter-spacing: -0.01em;
 }
 
 .tc-review-verified {
@@ -194,6 +223,10 @@
   gap: 6px;
   min-width: 0;
   max-width: 100%;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(16, 132, 116, 0.08);
+  border: 1px solid rgba(16, 132, 116, 0.1);
 }
 
 .tc-verified-icon {
@@ -239,7 +272,7 @@
 .tc-verified-label {
   font-size: var(--tc-verified-label-size);
   line-height: 1.2;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--tc-verified-label-color);
   word-break: break-word;
 }
@@ -254,12 +287,17 @@
 
 .tc-review-product {
   color: var(--tc-text-color);
-  opacity: 0.88;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  line-height: 1.35;
+  opacity: 0.72;
+  text-decoration: none;
+  line-height: 1.45;
   overflow-wrap: anywhere;
   word-break: break-word;
+  font-weight: 600;
+}
+
+.tc-review-product::before {
+  content: "— ";
+  opacity: 0.55;
 }
 
 .tc-quote-mark {
@@ -267,27 +305,28 @@
   display: inline-flex;
   justify-content: center;
   align-items: center;
-  margin: 0 auto 14px;
+  margin: 0 auto 16px;
   color: var(--tc-accent-color);
-  line-height: 0.9;
-  font-weight: 700;
+  line-height: 0.85;
+  font-weight: 800;
   max-width: 100%;
+  opacity: 0.9;
 }
 
 .tc-quote-size--small .tc-quote-mark {
-  font-size: 40px;
+  font-size: 44px;
 }
 
 .tc-quote-size--medium .tc-quote-mark {
-  font-size: 52px;
+  font-size: 58px;
 }
 
 .tc-quote-size--large .tc-quote-mark {
-  font-size: 64px;
+  font-size: 72px;
 }
 
 .tc-quote-size--extra-large .tc-quote-mark {
-  font-size: 78px;
+  font-size: 86px;
 }
 
 .tc-quote-size--hidden .tc-quote-mark {
@@ -323,11 +362,11 @@
 }
 
 .tc-product-size--small .tc-review-product {
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .tc-product-size--medium .tc-review-product {
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .tc-product-size--large .tc-review-product {
@@ -343,45 +382,45 @@
 }
 
 .tc-text-size--extra-small .tc-review-message {
-  font-size: 13px;
+  font-size: clamp(14px, 1vw, 16px);
   -webkit-line-clamp: 4;
 }
 
 .tc-text-size--small .tc-review-message {
-  font-size: 15px;
+  font-size: clamp(15px, 1.15vw, 18px);
   -webkit-line-clamp: 4;
 }
 
 .tc-text-size--medium .tc-review-message {
-  font-size: 17px;
+  font-size: clamp(17px, 1.35vw, 21px);
   -webkit-line-clamp: 4;
 }
 
 .tc-text-size--large .tc-review-message {
-  font-size: 19px;
+  font-size: clamp(19px, 1.6vw, 24px);
   -webkit-line-clamp: 4;
 }
 
 .tc-text-size--extra-large .tc-review-message {
-  font-size: 22px;
+  font-size: clamp(21px, 1.9vw, 28px);
   -webkit-line-clamp: 4;
 }
 
 .tc-text-size--huge .tc-review-message {
-  font-size: 26px;
+  font-size: clamp(24px, 2.3vw, 34px);
   -webkit-line-clamp: 4;
 }
 
 .tc-stars-size--small .tc-review-stars {
-  font-size: 16px;
+  font-size: clamp(17px, 1.3vw, 19px);
 }
 
 .tc-stars-size--medium .tc-review-stars {
-  font-size: 21px;
+  font-size: clamp(21px, 1.7vw, 25px);
 }
 
 .tc-stars-size--large .tc-review-stars {
-  font-size: 26px;
+  font-size: clamp(25px, 2vw, 31px);
 }
 
 .tc-stars-size--hidden .tc-review-stars {
@@ -389,19 +428,19 @@
 }
 
 .tc-card-height--compact .tc-card {
-  min-height: 240px;
+  min-height: 260px;
 }
 
 .tc-card-height--medium .tc-card {
-  min-height: 310px;
+  min-height: 340px;
 }
 
 .tc-card-height--tall .tc-card {
-  min-height: 390px;
+  min-height: 420px;
 }
 
 .tc-card-height--extra-tall .tc-card {
-  min-height: 470px;
+  min-height: 500px;
 }
 
 .tc-corner--square .tc-card,
@@ -411,35 +450,37 @@
 
 .tc-corner--soft .tc-card,
 .tc-corner--soft .tc-empty-inner {
-  border-radius: 16px;
+  border-radius: 18px;
 }
 
 .tc-corner--round .tc-card,
 .tc-corner--round .tc-empty-inner {
-  border-radius: 26px;
+  border-radius: 28px;
 }
 
 .tc-corner--extra-round .tc-card,
 .tc-corner--extra-round .tc-empty-inner {
-  border-radius: 38px;
+  border-radius: 40px;
 }
 
 .tc-has-border .tc-card {
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(17, 17, 17, 0.12);
 }
 
 .tc-has-shadow .tc-card {
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.12);
 }
 
 .tc-arrow {
-  border: 0;
-  background: transparent;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  background: rgba(255, 255, 255, 0.92);
   color: var(--tc-arrows-color);
   cursor: pointer;
   padding: 0;
   margin: 0;
-  transition: transform 0.18s ease, opacity 0.18s ease;
+  border-radius: 999px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -447,26 +488,29 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 34px;
+  font-size: 28px;
   line-height: 1;
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
 }
 
 .tc-arrow:hover {
-  transform: scale(1.08);
+  transform: translateY(-1px) scale(1.04);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.16);
 }
 
 .tc-arrow:disabled {
   opacity: 0.35;
   cursor: default;
   transform: none;
+  box-shadow: none;
 }
 
 .tc-arrow:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(16, 132, 116, 0.18);
-  border-radius: 999px;
+  box-shadow:
+    0 0 0 4px rgba(16, 132, 116, 0.16),
+    0 12px 26px rgba(15, 23, 42, 0.14);
 }
 
 .tc-arrow--prev,
@@ -478,19 +522,19 @@
 }
 
 .tc-arrow--prev {
-  left: -8px;
+  left: -16px;
 }
 
 .tc-arrow--next {
-  right: -8px;
+  right: -16px;
 }
 
 .tc-bottom-arrows {
-  margin-top: 22px;
+  margin-top: 24px;
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 18px;
+  gap: 14px;
 }
 
 .tc-arrows-position--sides .tc-arrow--prev,
@@ -529,7 +573,7 @@
   height: 12px;
   border-radius: 999px;
   background: #e5e7eb;
-  margin: 0 auto 10px;
+  margin: 0 auto 12px;
   position: relative;
   overflow: hidden;
 }
@@ -542,35 +586,35 @@
   background: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.8) 50%,
+    rgba(255, 255, 255, 0.82) 50%,
     rgba(255, 255, 255, 0) 100%
   );
   animation: tcShimmer 1.2s infinite;
 }
 
 .tc-loading-line--lg {
-  width: 68%;
+  width: 72%;
 }
 
 .tc-loading-line--md {
-  width: 52%;
+  width: 54%;
 }
 
 .tc-loading-line--sm {
-  width: 22%;
-  margin-top: 6px;
+  width: 26%;
+  margin-top: 8px;
 }
 
 .tc-loading-line--xs {
-  width: 28%;
+  width: 32%;
   margin-bottom: 0;
 }
 
 .tc-loading-stars {
-  margin: 16px auto 12px;
+  margin: 18px auto 14px;
   color: var(--tc-accent-color);
   font-size: 20px;
-  letter-spacing: 2px;
+  letter-spacing: 3px;
   line-height: 1;
 }
 
@@ -579,38 +623,38 @@
 }
 
 .tc-empty-inner {
-  background: #f8fafc;
+  background: linear-gradient(180deg, #fbfcfd 0%, #f8fafc 100%);
   border: 1px dashed #cbd5e1;
-  padding: 34px 20px;
+  padding: 40px 20px;
   text-align: center;
 }
 
 .tc-empty-icon {
-  width: 52px;
-  height: 52px;
+  width: 56px;
+  height: 56px;
   border-radius: 999px;
   background: rgba(16, 132, 116, 0.12);
   color: var(--tc-accent-color);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
+  font-size: 25px;
   line-height: 1;
-  margin: 0 auto 12px;
+  margin: 0 auto 14px;
 }
 
 .tc-empty-title {
-  margin: 0 0 8px;
-  font-size: 18px;
+  margin: 0 0 10px;
+  font-size: 20px;
   line-height: 1.3;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--tc-text-color);
 }
 
 .tc-empty-text {
   margin: 0;
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.7;
   color: #6b7280;
 }
 
@@ -621,12 +665,28 @@
 }
 
 @media screen and (max-width: 1199px) {
-  .tc-arrows-position--sides .tc-arrow--prev {
-    left: 4px;
+  .tc-arrow--prev {
+    left: -6px;
   }
 
-  .tc-arrows-position--sides .tc-arrow--next {
-    right: 4px;
+  .tc-arrow--next {
+    right: -6px;
+  }
+
+  .tc-card-height--compact .tc-card {
+    min-height: 245px;
+  }
+
+  .tc-card-height--medium .tc-card {
+    min-height: 320px;
+  }
+
+  .tc-card-height--tall .tc-card {
+    min-height: 390px;
+  }
+
+  .tc-card-height--extra-tall .tc-card {
+    min-height: 460px;
   }
 }
 
@@ -636,22 +696,26 @@
     padding-bottom: var(--tc-padding-bottom-mobile) !important;
   }
 
-  .tc-heading {
-    font-size: 16px;
-  }
-
   .tc-header {
-    margin-bottom: 14px;
+    margin-bottom: 16px;
     padding-inline: 8px;
   }
 
+  .tc-heading {
+    font-size: clamp(20px, 6.4vw, 28px);
+    line-height: 1.18;
+  }
+
   .tc-header-rating {
-    font-size: 10px;
-    gap: 4px;
+    margin-top: 10px;
+    gap: 5px;
+    min-height: 36px;
+    padding: 8px 12px;
+    font-size: 11px;
   }
 
   .tc-header-stars {
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .tc-card {
@@ -660,6 +724,11 @@
 
   .tc-card-content {
     max-width: 100%;
+  }
+
+  .tc-review-message {
+    line-height: 1.6;
+    margin-bottom: 18px;
   }
 
   .tc-text-size--extra-small .tc-review-message,
@@ -672,7 +741,7 @@
   }
 
   .tc-text-size--extra-small .tc-review-message {
-    font-size: 12px;
+    font-size: 13px;
   }
 
   .tc-text-size--small .tc-review-message {
@@ -680,15 +749,15 @@
   }
 
   .tc-text-size--medium .tc-review-message {
-    font-size: 15px;
+    font-size: 16px;
   }
 
   .tc-text-size--large .tc-review-message {
-    font-size: 17px;
+    font-size: 18px;
   }
 
   .tc-text-size--extra-large .tc-review-message {
-    font-size: 19px;
+    font-size: 20px;
   }
 
   .tc-text-size--huge .tc-review-message {
@@ -696,35 +765,35 @@
   }
 
   .tc-card-height--compact .tc-card {
-    min-height: 210px;
+    min-height: 220px;
   }
 
   .tc-card-height--medium .tc-card {
-    min-height: 260px;
+    min-height: 280px;
   }
 
   .tc-card-height--tall .tc-card {
-    min-height: 320px;
+    min-height: 340px;
   }
 
   .tc-card-height--extra-tall .tc-card {
-    min-height: 380px;
+    min-height: 400px;
   }
 
   .tc-quote-size--small .tc-quote-mark {
-    font-size: 32px;
+    font-size: 34px;
   }
 
   .tc-quote-size--medium .tc-quote-mark {
-    font-size: 42px;
+    font-size: 44px;
   }
 
   .tc-quote-size--large .tc-quote-mark {
-    font-size: 52px;
+    font-size: 54px;
   }
 
   .tc-quote-size--extra-large .tc-quote-mark {
-    font-size: 64px;
+    font-size: 66px;
   }
 
   .tc-review-author {
@@ -732,7 +801,7 @@
   }
 
   .tc-product-size--small .tc-review-product {
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .tc-product-size--medium .tc-review-product {
@@ -740,17 +809,17 @@
   }
 
   .tc-product-size--large .tc-review-product {
-    font-size: 14px;
+    font-size: 13px;
   }
 
   .tc-product-size--extra-large .tc-review-product {
-    font-size: 16px;
+    font-size: 15px;
   }
 
   .tc-arrow span {
-    width: 36px;
-    height: 36px;
-    font-size: 30px;
+    width: 42px;
+    height: 42px;
+    font-size: 25px;
   }
 
   .tc-arrows-position--sides .tc-arrow--prev,
@@ -760,5 +829,10 @@
 
   .tc-arrows-position--sides .tc-bottom-arrows {
     display: flex;
+  }
+
+  .tc-bottom-arrows {
+    margin-top: 18px;
+    gap: 12px;
   }
 }
