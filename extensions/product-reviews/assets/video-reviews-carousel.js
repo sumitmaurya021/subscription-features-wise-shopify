@@ -17,26 +17,28 @@
     }
 
     const promise = new Promise((resolve, reject) => {
-      const existing = Array.from(document.querySelectorAll("script")).find(
+      const existingScript = Array.from(document.scripts).find(
         (script) => script.dataset.prvcAppScript === src
       );
 
-      if (existing) {
-        existing.addEventListener(
-          "load",
-          () => {
-            if (window.VideoReviewsCarouselApp) {
-              resolve(window.VideoReviewsCarouselApp);
-            } else {
-              reject(
-                new Error("Video reviews carousel app loaded but API missing.")
-              );
-            }
-          },
-          { once: true }
-        );
+      const resolveApp = () => {
+        if (window.VideoReviewsCarouselApp) {
+          resolve(window.VideoReviewsCarouselApp);
+        } else {
+          reject(
+            new Error("Video reviews carousel app loaded but API missing.")
+          );
+        }
+      };
 
-        existing.addEventListener(
+      if (existingScript) {
+        if (existingScript.dataset.loaded === "true") {
+          resolveApp();
+          return;
+        }
+
+        existingScript.addEventListener("load", resolveApp, { once: true });
+        existingScript.addEventListener(
           "error",
           () =>
             reject(
@@ -54,13 +56,8 @@
       script.dataset.prvcAppScript = src;
 
       script.onload = () => {
-        if (window.VideoReviewsCarouselApp) {
-          resolve(window.VideoReviewsCarouselApp);
-        } else {
-          reject(
-            new Error("Video reviews carousel app loaded but API missing.")
-          );
-        }
+        script.dataset.loaded = "true";
+        resolveApp();
       };
 
       script.onerror = () => {
@@ -68,53 +65,65 @@
       };
 
       document.head.appendChild(script);
+    }).catch((error) => {
+      loadedScripts.delete(src);
+      throw error;
     });
 
     loadedScripts.set(src, promise);
     return promise;
   }
 
-  function bootRoot(root) {
-    if (!root || root.dataset.prvcBooted === "true") return;
+  function startRoot(root) {
+    if (!root) return;
+    if (root.dataset.prvcBooted === "true") return;
+
     root.dataset.prvcBooted = "true";
 
     const appScript = root.dataset.appScript || "";
 
-    const start = () => {
-      loadScriptOnce(appScript)
-        .then((app) => {
-          if (!app || typeof app.initRoot !== "function") {
-            throw new Error("VideoReviewsCarouselApp.initRoot() missing.");
-          }
-          app.initRoot(root);
-        })
-        .catch((error) => {
-          console.error("Video reviews carousel bootstrap error:", error);
-        });
-    };
+    loadScriptOnce(appScript)
+      .then((app) => {
+        if (!app || typeof app.initRoot !== "function") {
+          throw new Error("VideoReviewsCarouselApp.initRoot() missing.");
+        }
+        app.initRoot(root);
+      })
+      .catch((error) => {
+        root.dataset.prvcBooted = "false";
+        console.error("Video reviews carousel bootstrap error:", error);
+      });
+  }
 
-    if ("IntersectionObserver" in window) {
-      const observer = new IntersectionObserver(
-        (entries) => {
-          const entry = entries[0];
-          if (!entry || !entry.isIntersecting) return;
-          observer.disconnect();
-          start();
-        },
-        { rootMargin: "250px 0px" }
-      );
+  function observeRoot(root) {
+    if (!root || root.dataset.prvcObserved === "true") return;
 
-      observer.observe(root);
+    root.dataset.prvcObserved = "true";
+
+    if (!("IntersectionObserver" in window)) {
+      startRoot(root);
       return;
     }
 
-    start();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry || !entry.isIntersecting) return;
+        observer.disconnect();
+        startRoot(root);
+      },
+      { rootMargin: "250px 0px" }
+    );
+
+    observer.observe(root);
   }
 
-  function initAll(scope = document) {
-    const roots = Array.from((scope || document).querySelectorAll(".prvc-root"));
+  function initAll(scope) {
+    const context = scope || document;
+    const roots = Array.from(context.querySelectorAll(".prvc-root"));
     if (!roots.length) return;
-    roots.forEach(bootRoot);
+
+    roots.forEach(observeRoot);
   }
 
   if (document.readyState === "loading") {
