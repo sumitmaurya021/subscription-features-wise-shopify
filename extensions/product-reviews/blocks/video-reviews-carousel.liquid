@@ -2,29 +2,7 @@
   id="prvc-root-{{ block.id }}"
   class="prvc-root"
   data-block-id="{{ block.id }}"
-  data-shop="{{ shop.permanent_domain }}"
-  data-endpoint="/apps/reviews"
   data-app-script="{{ 'video-reviews-carousel-main.js' | asset_url }}"
-  data-product-id="{{ product.id }}"
-  data-selected-product-id="{% if block.settings.custom_product != blank %}{{ block.settings.custom_product.id }}{% endif %}"
-  data-show-sample="{{ block.settings.show_sample_reviews }}"
-  data-review-selection="{{ block.settings.review_selection }}"
-  data-star-rating="{{ block.settings.star_rating }}"
-  data-review-type="{{ block.settings.review_type }}"
-  data-max-reviews="{{ block.settings.maximum_review_number }}"
-  data-show-reviewer-name="{{ block.settings.show_reviewer_name }}"
-  data-stars-size="{{ block.settings.stars_size }}"
-  data-text-size="{{ block.settings.text_size }}"
-  data-arrows-position="{{ block.settings.arrows_position }}"
-  data-max-width="{{ block.settings.maximum_width }}"
-  data-corner-style="{{ block.settings.corner_styling }}"
-  data-show-drop-shadow="{{ block.settings.show_drop_shadow }}"
-  data-show-border="{{ block.settings.show_border }}"
-  data-autoplay-media="{{ block.settings.autoplay_media }}"
-  data-transition-speed="{{ block.settings.transition_speed }}"
-  data-carousel-style="{{ block.settings.carousel_style }}"
-  data-header-text="{{ block.settings.header_text | escape }}"
-  data-show-average-rating="{{ block.settings.show_average_rating }}"
   style="
     --prvc-max-width: {{ block.settings.maximum_width }}px;
     --prvc-header-color: {{ block.settings.header_text_color }};
@@ -32,9 +10,30 @@
     --prvc-stars-color: {{ block.settings.stars_color }};
     --prvc-text-color: {{ block.settings.text_color }};
     --prvc-arrow-color: {{ block.settings.arrows_color }};
+    --prvc-section-pt: {{ block.settings.padding_top }}px;
+    --prvc-section-pb: {{ block.settings.padding_bottom }}px;
   "
   {{ block.shopify_attributes }}
 >
+  <script type="application/json" data-prvc-config>
+    {
+      "shop": {{ shop.permanent_domain | json }},
+      "endpoint": {{ '/apps/reviews' | json }},
+      "productId": {{ product.id | json }},
+      "selectedProductId": {% if block.settings.custom_product != blank %}{{ block.settings.custom_product.id | json }}{% else %}null{% endif %},
+      "showSampleReviews": {{ block.settings.show_sample_reviews | json }},
+      "reviewSelection": {{ block.settings.review_selection | json }},
+      "starRating": {{ block.settings.star_rating | json }},
+      "reviewType": {{ block.settings.review_type | json }},
+      "maxReviews": {{ block.settings.maximum_review_number | json }},
+      "showReviewerName": {{ block.settings.show_reviewer_name | json }},
+      "autoplayMedia": {{ block.settings.autoplay_media | json }},
+      "transitionSpeed": {{ block.settings.transition_speed | json }},
+      "headerText": {{ block.settings.header_text | json }},
+      "showAverageRating": {{ block.settings.show_average_rating | json }}
+    }
+  </script>
+
   <div
     class="
       prvc-shell
@@ -80,5 +79,136 @@
 </div>
 
 {% schema %}
-{"name":"Videos Carousel","target":"section","templates":["product","index","collection","page"],"javascript":"video-reviews-carousel.js","stylesheet":"video-reviews-carousel.css","settings":[{"type":"checkbox","id":"show_sample_reviews","label":"Show sample reviews (Preview only)","default":false},{"type":"select","id":"review_selection","label":"Reviews selection","default":"current_product","options":[{"value":"current_product","label":"Current product"},{"value":"all_reviews","label":"All reviews"},{"value":"custom_product","label":"Custom product"}]},{"type":"product","id":"custom_product","label":"Select products (when Reviews Selection = Custom product)"},{"type":"select","id":"star_rating","label":"Star rating","default":"all","options":[{"value":"all","label":"All"},{"value":"5","label":"5 stars"},{"value":"4","label":"4 stars"},{"value":"3","label":"3 stars"},{"value":"2","label":"2 stars"},{"value":"1","label":"1 star"}]},{"type":"select","id":"review_type","label":"Review type","default":"any","options":[{"value":"any","label":"Any review"},{"value":"uploaded","label":"Uploaded video only"},{"value":"youtube","label":"YouTube only"}]},{"type":"range","id":"maximum_review_number","label":"Maximum review number","min":3,"max":30,"step":1,"default":9},{"type":"checkbox","id":"show_reviewer_name","label":"Show reviewer name","default":true},{"type":"select","id":"stars_size","label":"Stars size","default":"medium","options":[{"value":"small","label":"Small"},{"value":"medium","label":"Medium"},{"value":"large","label":"Large"}]},{"type":"select","id":"text_size","label":"Text size","default":"medium","options":[{"value":"small","label":"Small"},{"value":"medium","label":"Medium"},{"value":"large","label":"Large"}]},{"type":"select","id":"arrows_position","label":"Arrows position","default":"bottom","options":[{"value":"bottom","label":"Bottom"},{"value":"sides","label":"Sides"}]},{"type":"range","id":"maximum_width","label":"Maximum width","min":700,"max":1400,"step":20,"unit":"px","default":1100},{"type":"select","id":"corner_styling","label":"Corner styling","default":"extra_round","options":[{"value":"medium","label":"Medium"},{"value":"large","label":"Large"},{"value":"extra_round","label":"Extra round"}]},{"type":"color","id":"header_text_color","label":"Header text color","default":"#000000"},{"type":"color","id":"card_color","label":"Card color","default":"#7D7D7D"},{"type":"color","id":"stars_color","label":"Stars color","default":"#0F8E87"},{"type":"color","id":"text_color","label":"Text color","default":"#FFFFFF"},{"type":"color","id":"arrows_color","label":"Arrows color","default":"#000000"},{"type":"checkbox","id":"show_drop_shadow","label":"Show drop shadow","default":false},{"type":"checkbox","id":"show_border","label":"Show border","default":false},{"type":"checkbox","id":"autoplay_media","label":"Autoplay media","default":false},{"type":"range","id":"transition_speed","label":"Transition speed","min":3,"max":60,"step":1,"unit":"s","default":6},{"type":"select","id":"carousel_style","label":"Carousel style","default":"highlight","options":[{"value":"highlight","label":"Highlight"},{"value":"standard","label":"Standard"}]},{"type":"text","id":"header_text","label":"Header text","default":"Real customer stories"},{"type":"checkbox","id":"show_average_rating","label":"Average rating text","default":true}]}
+{
+  "name": "Videos Carousel",
+  "target": "section",
+  "templates": ["product", "index", "collection", "page"],
+  "javascript": "video-reviews-carousel.js",
+  "stylesheet": "video-reviews-carousel.css",
+  "settings": [
+    { "type": "checkbox", "id": "show_sample_reviews", "label": "Show sample reviews (Preview only)", "default": false },
+
+    {
+      "type": "select",
+      "id": "review_selection",
+      "label": "Reviews selection",
+      "default": "current_product",
+      "options": [
+        { "value": "current_product", "label": "Current product" },
+        { "value": "all_reviews", "label": "All reviews" },
+        { "value": "custom_product", "label": "Custom product" }
+      ]
+    },
+
+    { "type": "product", "id": "custom_product", "label": "Select product (when Reviews selection = Custom product)" },
+
+    {
+      "type": "select",
+      "id": "star_rating",
+      "label": "Star rating",
+      "default": "all",
+      "options": [
+        { "value": "all", "label": "All" },
+        { "value": "5", "label": "5 stars" },
+        { "value": "4", "label": "4 stars" },
+        { "value": "3", "label": "3 stars" },
+        { "value": "2", "label": "2 stars" },
+        { "value": "1", "label": "1 star" }
+      ]
+    },
+
+    {
+      "type": "select",
+      "id": "review_type",
+      "label": "Review type",
+      "default": "any",
+      "options": [
+        { "value": "any", "label": "Any review" },
+        { "value": "uploaded", "label": "Uploaded video only" },
+        { "value": "youtube", "label": "YouTube only" }
+      ]
+    },
+
+    { "type": "range", "id": "maximum_review_number", "label": "Maximum review number", "min": 3, "max": 30, "step": 1, "default": 9 },
+    { "type": "checkbox", "id": "show_reviewer_name", "label": "Show reviewer name", "default": true },
+
+    {
+      "type": "select",
+      "id": "stars_size",
+      "label": "Stars size",
+      "default": "medium",
+      "options": [
+        { "value": "small", "label": "Small" },
+        { "value": "medium", "label": "Medium" },
+        { "value": "large", "label": "Large" }
+      ]
+    },
+
+    {
+      "type": "select",
+      "id": "text_size",
+      "label": "Text size",
+      "default": "medium",
+      "options": [
+        { "value": "small", "label": "Small" },
+        { "value": "medium", "label": "Medium" },
+        { "value": "large", "label": "Large" }
+      ]
+    },
+
+    {
+      "type": "select",
+      "id": "arrows_position",
+      "label": "Arrows position",
+      "default": "bottom",
+      "options": [
+        { "value": "bottom", "label": "Bottom" },
+        { "value": "sides", "label": "Sides" }
+      ]
+    },
+
+    { "type": "range", "id": "maximum_width", "label": "Maximum width", "min": 700, "max": 1400, "step": 20, "unit": "px", "default": 1100 },
+
+    {
+      "type": "select",
+      "id": "corner_styling",
+      "label": "Corner styling",
+      "default": "extra_round",
+      "options": [
+        { "value": "medium", "label": "Medium" },
+        { "value": "large", "label": "Large" },
+        { "value": "extra_round", "label": "Extra round" }
+      ]
+    },
+
+    { "type": "color", "id": "header_text_color", "label": "Header text color", "default": "#000000" },
+    { "type": "color", "id": "card_color", "label": "Card color", "default": "#7D7D7D" },
+    { "type": "color", "id": "stars_color", "label": "Stars color", "default": "#0F8E87" },
+    { "type": "color", "id": "text_color", "label": "Text color", "default": "#FFFFFF" },
+    { "type": "color", "id": "arrows_color", "label": "Arrows color", "default": "#000000" },
+
+    { "type": "checkbox", "id": "show_drop_shadow", "label": "Show drop shadow", "default": false },
+    { "type": "checkbox", "id": "show_border", "label": "Show border", "default": false },
+    { "type": "checkbox", "id": "autoplay_media", "label": "Autoplay media", "default": false },
+
+    { "type": "range", "id": "transition_speed", "label": "Transition speed", "min": 3, "max": 60, "step": 1, "unit": "s", "default": 6 },
+
+    {
+      "type": "select",
+      "id": "carousel_style",
+      "label": "Carousel style",
+      "default": "highlight",
+      "options": [
+        { "value": "highlight", "label": "Highlight" },
+        { "value": "standard", "label": "Standard" }
+      ]
+    },
+
+    { "type": "text", "id": "header_text", "label": "Header text", "default": "Real customer stories" },
+    { "type": "checkbox", "id": "show_average_rating", "label": "Average rating text", "default": true },
+
+    { "type": "range", "id": "padding_top", "label": "Padding top", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 28 },
+    { "type": "range", "id": "padding_bottom", "label": "Padding bottom", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 20 }
+  ]
+}
 {% endschema %}

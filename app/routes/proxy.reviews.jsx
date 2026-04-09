@@ -2,7 +2,7 @@ import { json } from "@remix-run/node";
 import prisma from "../db.server";
 
 const MAX_REVIEW_IMAGES = 4;
-const MAX_PAGE_SIZE = 24;
+const MAX_PAGE_SIZE = 250;
 
 function safeParseImages(value) {
   if (!value) return [];
@@ -512,12 +512,14 @@ export const loader = async ({ request }) => {
         Boolean(targetId) ||
         targetIds.length > 0;
 
-      if (!hasProductScope) {
+      const hasShopScope = Boolean(shop);
+
+      if (!hasProductScope && !hasShopScope) {
         return json(
           {
             success: false,
             message:
-              "For product reviews, productId, productIds, targetId, or targetIds is required",
+              "For product reviews, shop or productId/productIds/targetId/targetIds is required",
             totalReviews: 0,
             averageRating: 0,
             data: [],
@@ -839,7 +841,10 @@ export const action = async ({ request }) => {
         }
 
         const existingImages = safeParseImages(existingReview.reviewImages);
-        const mergedImages = [...existingImages, ...normalizedImages].slice(0, MAX_REVIEW_IMAGES);
+        const mergedImages = [...existingImages, ...normalizedImages].slice(
+          0,
+          MAX_REVIEW_IMAGES
+        );
 
         const updatedReview = await prisma.review.update({
           where: { id: String(reviewId) },

@@ -22,6 +22,11 @@
       );
 
       if (existing) {
+        if (window.FloatingReviewsTabApp) {
+          resolve(window.FloatingReviewsTabApp);
+          return;
+        }
+
         existing.addEventListener(
           "load",
           () => {
@@ -36,8 +41,7 @@
 
         existing.addEventListener(
           "error",
-          () =>
-            reject(new Error("Failed to load floating reviews tab app script.")),
+          () => reject(new Error("Failed to load floating reviews tab app script.")),
           { once: true }
         );
         return;
@@ -74,35 +78,16 @@
 
     const appScript = root.dataset.appScript || "";
 
-    const start = () => {
-      loadScriptOnce(appScript)
-        .then((app) => {
-          if (!app || typeof app.initRoot !== "function") {
-            throw new Error("FloatingReviewsTabApp.initRoot() missing.");
-          }
-          app.initRoot(root);
-        })
-        .catch((error) => {
-          console.error("Floating reviews tab bootstrap error:", error);
-        });
-    };
-
-    if ("IntersectionObserver" in window) {
-      const observer = new IntersectionObserver(
-        (entries) => {
-          const entry = entries[0];
-          if (!entry || !entry.isIntersecting) return;
-          observer.disconnect();
-          start();
-        },
-        { rootMargin: "250px 0px" }
-      );
-
-      observer.observe(root);
-      return;
-    }
-
-    start();
+    loadScriptOnce(appScript)
+      .then((app) => {
+        if (!app || typeof app.initRoot !== "function") {
+          throw new Error("FloatingReviewsTabApp.initRoot() missing.");
+        }
+        app.initRoot(root);
+      })
+      .catch((error) => {
+        console.error("Floating reviews tab bootstrap error:", error);
+      });
   }
 
   function initAll(scope = document) {
@@ -111,17 +96,47 @@
     roots.forEach(bootRoot);
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener(
-      "DOMContentLoaded",
-      () => {
-        initAll(document);
-      },
-      { once: true }
-    );
-  } else {
-    initAll(document);
+  function observeLateRoots() {
+    if (window.__frtObserverStarted) return;
+    window.__frtObserverStarted = true;
+
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (!(node instanceof Element)) return;
+
+          if (node.matches && node.matches(".frt-root")) {
+            bootRoot(node);
+            return;
+          }
+
+          if (node.querySelectorAll) {
+            initAll(node);
+          }
+        });
+      });
+    });
+
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
   }
+
+  function start() {
+    initAll(document);
+    observeLateRoots();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", start, { once: true });
+  } else {
+    start();
+  }
+
+  window.addEventListener("pageshow", () => {
+    initAll(document);
+  });
 
   document.addEventListener("shopify:section:load", (event) => {
     initAll(event.target || document);
@@ -129,5 +144,9 @@
 
   document.addEventListener("shopify:block:select", (event) => {
     initAll(event.target || document);
+  });
+
+  document.addEventListener("shopify:section:reorder", () => {
+    initAll(document);
   });
 })();

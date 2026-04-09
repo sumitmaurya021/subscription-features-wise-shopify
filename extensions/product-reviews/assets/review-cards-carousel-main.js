@@ -21,6 +21,9 @@
       reviewYoutubeUrl: null,
       createdAt: new Date().toISOString(),
       isPinned: true,
+      reviewType: "product",
+      productId: "101",
+      targetId: "101",
     },
     {
       id: "sample-2",
@@ -36,6 +39,9 @@
       reviewYoutubeUrl: null,
       createdAt: new Date().toISOString(),
       isPinned: false,
+      reviewType: "product",
+      productId: "101",
+      targetId: "101",
     },
     {
       id: "sample-3",
@@ -49,11 +55,14 @@
       reviewYoutubeUrl: null,
       createdAt: new Date().toISOString(),
       isPinned: false,
+      reviewType: "product",
+      productId: "102",
+      targetId: "102",
     },
     {
       id: "sample-4",
       customerName: "Aline D.",
-      productTitle: "Classic Cable Knit Sweater",
+      productTitle: "",
       rating: 5,
       message:
         "J'adore ce pull. Il est chaud, doux et très bien coupé. Il garde bien sa forme même après lavage.",
@@ -62,6 +71,9 @@
       reviewYoutubeUrl: null,
       createdAt: new Date().toISOString(),
       isPinned: false,
+      reviewType: "store",
+      productId: "",
+      targetId: "",
     },
     {
       id: "sample-5",
@@ -77,6 +89,9 @@
       reviewYoutubeUrl: null,
       createdAt: new Date().toISOString(),
       isPinned: false,
+      reviewType: "product",
+      productId: "103",
+      targetId: "103",
     },
   ];
 
@@ -163,8 +178,16 @@
   }
 
   function normalizeImages(review) {
-    if (Array.isArray(review?.reviewImages)) return review.reviewImages;
-    if (Array.isArray(review?.images)) return review.images;
+    if (Array.isArray(review?.reviewImages)) return review.reviewImages.filter(Boolean);
+
+    if (typeof review?.reviewImages === "string") {
+      try {
+        const parsed = JSON.parse(review.reviewImages);
+        if (Array.isArray(parsed)) return parsed.filter(Boolean);
+      } catch (_) {}
+    }
+
+    if (Array.isArray(review?.images)) return review.images.filter(Boolean);
     return [];
   }
 
@@ -174,6 +197,25 @@
     );
     const empty = "☆".repeat(5 - full.length);
     return `${full}${empty}`;
+  }
+
+  function normalizeReviewType(value) {
+    const type = safeText(value).trim().toLowerCase();
+    if (type === "product" || type === "collection" || type === "store") return type;
+    return "";
+  }
+
+  function normalizeId(value) {
+    return safeText(value).trim();
+  }
+
+  function getReviewProductId(review) {
+    return (
+      normalizeId(review?.productId) ||
+      (normalizeReviewType(review?.reviewType) === "product"
+        ? normalizeId(review?.targetId)
+        : "")
+    );
   }
 
   function getYoutubeIdFromUrl(url) {
@@ -213,7 +255,7 @@
   function getYoutubeEmbedUrl(url, autoplay = false) {
     const videoId = getYoutubeIdFromUrl(url);
     if (!videoId) return "";
-    return `https://www.youtube.com/embed/${videoId}?rel=0&playsinline=1&controls=0&modestbranding=1&disablekb=1${autoplay ? "&autoplay=1" : ""}`;
+    return `https://www.youtube.com/embed/${videoId}?rel=0&playsinline=1&controls=1&modestbranding=1&disablekb=0${autoplay ? "&autoplay=1" : ""}`;
   }
 
   function hasMedia(review) {
@@ -327,37 +369,49 @@
       transitionSpeed: parseNumber(root.dataset.transitionSpeed, 5) * 1000,
       headerText: safeText(root.dataset.headerText || "Customers are saying"),
       averageRatingText: parseBoolean(root.dataset.averageRatingText),
+      showVerifiedBadge: parseBoolean(root.dataset.showVerifiedBadge),
     };
   }
 
   function buildQueryUrl(config) {
     const params = new URLSearchParams();
     params.set("approvedOnly", "true");
-    params.set("limit", String(config.maxReviewNumber));
+    params.set("limit", String(Math.max(config.maxReviewNumber * 4, 80)));
 
-    const selection = config.reviewsSelection;
+    if (config.shop) {
+      params.set("shop", config.shop);
+    }
 
-    if (selection === "current_product" && config.currentProductId) {
+    if (config.reviewsSelection === "featured") {
+      params.set("featuredOnly", "true");
+    }
+
+    if (config.reviewsSelection === "store_reviews") {
+      params.set("reviewType", "store");
+    }
+
+    if (config.reviewsSelection === "product_reviews") {
+      params.set("reviewType", "product");
+    }
+
+    if (config.reviewsSelection === "current_product" && config.currentProductId) {
       params.set("productId", config.currentProductId);
-      if (config.shop) params.set("shop", config.shop);
-    } else if (
-      selection === "current_collection" &&
+    }
+
+    if (
+      config.reviewsSelection === "current_collection" &&
       config.currentCollectionProductIds.length
     ) {
       params.set("productIds", config.currentCollectionProductIds.join(","));
-      if (config.shop) params.set("shop", config.shop);
-    } else if (
-      selection === "custom_products" &&
+      params.set("reviewType", "product");
+    }
+
+    if (
+      config.reviewsSelection === "custom_products" &&
       config.customProductIds.length
     ) {
       params.set("productIds", config.customProductIds.join(","));
-      if (config.shop) params.set("shop", config.shop);
-    } else {
-      if (config.shop) params.set("shop", config.shop);
-
-      if (selection === "featured") {
-        params.set("featuredOnly", "true");
-      }
+      params.set("reviewType", "product");
     }
 
     if (config.starRating === "5_only") {
@@ -381,13 +435,95 @@
       },
     });
 
-    const result = await response.json();
+    let result = null;
 
-    if (!response.ok || !result.success) {
-      throw new Error(result.message || "Failed to fetch carousel reviews");
+    try {
+      result = await response.json();
+    } catch (_) {
+      throw new Error("Invalid response while loading reviews");
+    }
+
+    if (!response.ok || !result?.success) {
+      throw new Error(result?.message || "Failed to fetch carousel reviews");
     }
 
     return Array.isArray(result.data) ? result.data : [];
+  }
+
+  function applySelectionFilter(reviews, config) {
+    const selection = safeText(config.reviewsSelection || "all");
+    const currentProductId = normalizeId(config.currentProductId);
+    const currentCollectionIds = new Set(
+      config.currentCollectionProductIds.map(normalizeId).filter(Boolean)
+    );
+    const customProductIds = new Set(
+      config.customProductIds.map(normalizeId).filter(Boolean)
+    );
+
+    return reviews.filter((review) => {
+      const reviewType = normalizeReviewType(review?.reviewType);
+      const productId = getReviewProductId(review);
+
+      if (selection === "store_reviews") {
+        return reviewType === "store";
+      }
+
+      if (selection === "product_reviews") {
+        return reviewType === "product";
+      }
+
+      if (selection === "current_product") {
+        return productId && currentProductId && productId === currentProductId;
+      }
+
+      if (selection === "current_collection") {
+        return reviewType === "product" && productId && currentCollectionIds.has(productId);
+      }
+
+      if (selection === "featured") {
+        return Boolean(review?.isPinned);
+      }
+
+      if (selection === "custom_products") {
+        return reviewType === "product" && productId && customProductIds.has(productId);
+      }
+
+      return true;
+    });
+  }
+
+  function applyRatingFilter(reviews, config) {
+    return reviews.filter((review) => {
+      const rating = Number(review?.rating) || 0;
+
+      if (config.starRating === "5_only") return rating === 5;
+      if (config.starRating === "4_to_5") return rating >= 4;
+      if (config.starRating === "3_to_5") return rating >= 3;
+
+      return true;
+    });
+  }
+
+  function dedupeReviews(reviews) {
+    const seen = new Set();
+
+    return reviews.filter((review) => {
+      const id =
+        normalizeId(review?.id) ||
+        [
+          normalizeId(review?.shop),
+          normalizeReviewType(review?.reviewType),
+          normalizeId(review?.targetId),
+          normalizeId(review?.productId),
+          normalizeId(review?.customerEmail),
+          safeText(review?.createdAt),
+          safeText(review?.message),
+        ].join("::");
+
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
   }
 
   function sortReviews(reviews, config) {
@@ -423,6 +559,22 @@
     return list;
   }
 
+  function getVerifiedBadgeHtml() {
+    return `
+      <span
+        class="prcc-verified"
+        aria-label="Verified reviews"
+        title="Verified reviews"
+      >
+        <span class="prcc-verified-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+            <path d="M12 2.75l2.26 2.06 3.05-.18 1.23 2.8 2.67 1.48-.62 2.99 1.39 2.72-2.19 2.13-.34 3.04-2.99.58L12 21.25l-2.46-1.88-2.99-.58-.34-3.04-2.19-2.13 1.39-2.72-.62-2.99 2.67-1.48 1.23-2.8 3.05.18L12 2.75zM10.7 15.8l6.02-6.01-1.41-1.42-4.61 4.61-1.99-1.99-1.42 1.42 3.41 3.39z"></path>
+          </svg>
+        </span>
+      </span>
+    `;
+  }
+
   function renderHeader(config, reviews) {
     const count = reviews.length;
     const average =
@@ -442,8 +594,8 @@
               <div class="prcc-rating-line">
                 <span class="prcc-stars">${formatStars(Math.round(average))}</span>
                 <span class="prcc-average">${average.toFixed(2)}</span>
-                <span class="prcc-count">( ${count} )</span>
-                <span class="prcc-verified">Verified</span>
+                <span class="prcc-count">(${count})</span>
+                ${config.showVerifiedBadge ? getVerifiedBadgeHtml() : ""}
               </div>
             `
             : ""
@@ -565,6 +717,9 @@
     const video = media.querySelector(".prcc-video");
     if (video) {
       video.pause();
+      try {
+        video.currentTime = 0;
+      } catch (_) {}
     }
   }
 
@@ -613,7 +768,7 @@
       try {
         video.muted = false;
         await video.play();
-      } catch {
+      } catch (_) {
         try {
           video.muted = true;
           await video.play();
@@ -736,6 +891,9 @@
         reviews = [...SAMPLE_REVIEWS];
       }
 
+      reviews = dedupeReviews(reviews);
+      reviews = applySelectionFilter(reviews, config);
+      reviews = applyRatingFilter(reviews, config);
       reviews = sortReviews(reviews, config).slice(0, config.maxReviewNumber);
 
       if (!reviews.length) {

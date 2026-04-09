@@ -199,10 +199,11 @@
     }
 
     if (settings.widgetTheme === "vertical_sliding") {
-      return Math.max(
-        1,
-        Math.min(2, width < MOBILE_BREAKPOINT ? 1 : settings.tabletReviews)
-      );
+      if (width < MOBILE_BREAKPOINT) return 1;
+      if (width < TABLET_BREAKPOINT) {
+        return Math.max(1, Math.min(2, settings.tabletReviews));
+      }
+      return Math.max(1, Math.min(2, settings.desktopReviews));
     }
 
     if (width < MOBILE_BREAKPOINT) {
@@ -462,7 +463,9 @@
       if (resolvedTargetId) params.set("targetId", resolvedTargetId);
     } else if (settings.reviewType === "collection") {
       if (settings.targetId) params.set("targetId", settings.targetId);
-      if (settings.targetHandle) params.set("targetHandle", settings.targetHandle);
+      if (settings.targetHandle) {
+        params.set("targetHandle", settings.targetHandle);
+      }
     }
 
     if (settings.onlyMedia) params.set("onlyMedia", "true");
@@ -571,7 +574,175 @@
     return classes.join(" ");
   }
 
+  function renderCompactReviewCard(review, settings) {
+    const ratingHtml = settings.showReviewRating
+      ? `<div class="rcc-card-stars" aria-label="${escapeHtml(
+          String(review.rating || 0)
+        )} out of 5 stars">${escapeHtml(renderStars(review.rating))}</div>`
+      : "";
+
+    const titleHtml =
+      settings.showReviewTitle && review.title
+        ? `<h3 class="rcc-card-title">${escapeHtml(review.title)}</h3>`
+        : "";
+
+    const bodyHtml = settings.showReviewBody
+      ? `<div class="rcc-card-body">${escapeHtml(review.message || "")}</div>`
+      : "";
+
+    const reviewerHtml = settings.showReviewerName
+      ? `<div class="rcc-card-name">${escapeHtml(
+          review.customerName || "Anonymous"
+        )}</div>`
+      : "";
+
+    const dateHtml =
+      settings.showReviewDate && review.createdAt
+        ? `<div class="rcc-card-date">${escapeHtml(
+            formatDate(review.createdAt)
+          )}</div>`
+        : "";
+
+    return `
+      <article class="${getCardClasses(settings)}">
+        <div class="rcc-card-content">
+          <div class="rcc-card-top">
+            ${ratingHtml}
+          </div>
+          ${titleHtml}
+          ${bodyHtml}
+          ${reviewerHtml}
+          ${dateHtml}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderCenteredReviewCard(review, settings) {
+    const media = getPrimaryMedia(review, settings);
+    const targetName = getTargetName(review, settings);
+
+    const ratingHtml = settings.showReviewRating
+      ? `<div class="rcc-card-stars" aria-label="${escapeHtml(
+          String(review.rating || 0)
+        )} out of 5 stars">${escapeHtml(renderStars(review.rating))}</div>`
+      : "";
+
+    const titleHtml =
+      settings.showReviewTitle && review.title
+        ? `<h3 class="rcc-card-title">${escapeHtml(review.title)}</h3>`
+        : "";
+
+    const bodyHtml = settings.showReviewBody
+      ? `<div class="rcc-card-body">${escapeHtml(review.message || "")}</div>`
+      : "";
+
+    const reviewerHtml = settings.showReviewerName
+      ? `<div class="rcc-card-name">${escapeHtml(
+          review.customerName || "Anonymous"
+        )}</div>`
+      : "";
+
+    const dateHtml =
+      settings.showReviewDate && review.createdAt
+        ? `<div class="rcc-card-date">${escapeHtml(
+            formatDate(review.createdAt)
+          )}</div>`
+        : "";
+
+    const productHtml =
+      settings.showProductName && targetName
+        ? `<div class="rcc-card-target">${escapeHtml(targetName)}</div>`
+        : "";
+
+    const mediaHtml = media ? renderMedia(media, review, settings) : "";
+
+    return `
+      <article class="${getCardClasses(settings)}">
+        <div class="rcc-card-content">
+          <div class="rcc-card-top">
+            ${ratingHtml}
+          </div>
+          ${titleHtml}
+          ${bodyHtml}
+          ${reviewerHtml}
+          ${dateHtml}
+          ${productHtml}
+          ${mediaHtml}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderVerticalSlidingReviewCard(review, settings) {
+    const media = getPrimaryMedia(review, settings);
+    const targetName = getTargetName(review, settings);
+
+    const ratingColumn = settings.showReviewRating
+      ? `
+        <div class="rcc-card-top">
+          <div class="rcc-card-stars" aria-label="${escapeHtml(
+            String(review.rating || 0)
+          )} out of 5 stars">${escapeHtml(renderStars(review.rating))}</div>
+        </div>
+      `
+      : `<div class="rcc-card-top"></div>`;
+
+    const reviewerHtml = settings.showReviewerName
+      ? `<div class="rcc-card-name">${escapeHtml(
+          review.customerName || "Anonymous"
+        )}</div>`
+      : "";
+
+    const titleHtml =
+      settings.showReviewTitle && review.title
+        ? `<h3 class="rcc-card-title">${escapeHtml(review.title)}</h3>`
+        : "";
+
+    const bodyHtml = settings.showReviewBody
+      ? `<div class="rcc-card-body">${escapeHtml(review.message || "")}</div>`
+      : "";
+
+    const dateHtml =
+      settings.showReviewDate && review.createdAt
+        ? `<div class="rcc-card-date">${escapeHtml(
+            formatDate(review.createdAt)
+          )}</div>`
+        : "";
+
+    const productHtml =
+      settings.showProductName && targetName
+        ? `<div class="rcc-card-target">${escapeHtml(targetName)}</div>`
+        : "";
+
+    return `
+      <article class="${getCardClasses(settings)}">
+        ${renderMedia(media, review, settings)}
+        <div class="rcc-card-content">
+          ${reviewerHtml}
+          ${titleHtml}
+          ${bodyHtml}
+          ${dateHtml}
+          ${productHtml}
+        </div>
+        ${ratingColumn}
+      </article>
+    `;
+  }
+
   function renderReviewCard(review, settings) {
+    if (settings.widgetTheme === "compact") {
+      return renderCompactReviewCard(review, settings);
+    }
+
+    if (settings.widgetTheme === "centered") {
+      return renderCenteredReviewCard(review, settings);
+    }
+
+    if (settings.widgetTheme === "vertical_sliding") {
+      return renderVerticalSlidingReviewCard(review, settings);
+    }
+
     const media = getPrimaryMedia(review, settings);
     const targetName = getTargetName(review, settings);
 

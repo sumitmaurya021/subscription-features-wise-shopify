@@ -37,7 +37,6 @@
   function ensureSwiperScript() {
     if (window.Swiper) return Promise.resolve();
     if (swiperScriptPromise) return swiperScriptPromise;
-
     swiperScriptPromise = ensureScript(SWIPER_JS_URL, "prvc-swiper-js");
     return swiperScriptPromise;
   }
@@ -48,6 +47,7 @@
 
   function parseBoolean(value, fallback = false) {
     if (value === null || value === undefined || value === "") return fallback;
+    if (typeof value === "boolean") return value;
     return String(value).toLowerCase() === "true";
   }
 
@@ -100,7 +100,11 @@
         return parsed.pathname.split("/shorts/")[1]?.split(/[/?&#]/)[0] || "";
       }
     } catch (error) {
-      const match = text.match(/\/embed\/([^?&/]+)/);
+      const match =
+        text.match(
+          /(?:youtube\.com\/.*[?&]v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([^?&/]+)/
+        ) || text.match(/\/embed\/([^?&/]+)/);
+
       return match ? match[1] : "";
     }
 
@@ -118,7 +122,7 @@
     const videoId = getYoutubeId(url);
     if (!videoId) return "";
 
-    return `https://www.youtube.com/embed/${videoId}?rel=0&playsinline=1&mute=1&autoplay=${
+    return `https://www.youtube.com/embed/${videoId}?rel=0&playsinline=1&modestbranding=1&mute=1&autoplay=${
       autoplay ? "1" : "0"
     }`;
   }
@@ -127,22 +131,36 @@
     return Boolean(review?.reviewVideoUrl || review?.reviewYoutubeUrl);
   }
 
+  function readConfig(root) {
+    const configEl = root.querySelector("[data-prvc-config]");
+    if (!configEl) return null;
+
+    try {
+      return JSON.parse(configEl.textContent || "{}");
+    } catch (error) {
+      console.error("PRVC config parse error:", error);
+      return null;
+    }
+  }
+
   function getSettings(root) {
+    const config = readConfig(root) || {};
+
     return {
-      shop: root.dataset.shop || "",
-      endpoint: root.dataset.endpoint || "/apps/reviews",
-      productId: root.dataset.productId || "",
-      selectedProductId: root.dataset.selectedProductId || "",
-      showSampleReviews: parseBoolean(root.dataset.showSample),
-      reviewSelection: root.dataset.reviewSelection || "current_product",
-      starRating: root.dataset.starRating || "all",
-      reviewType: root.dataset.reviewType || "any",
-      maxReviews: clampNumber(root.dataset.maxReviews, 9, 3, 30),
-      showReviewerName: parseBoolean(root.dataset.showReviewerName),
-      autoplayMedia: parseBoolean(root.dataset.autoplayMedia),
-      transitionSpeed: clampNumber(root.dataset.transitionSpeed, 6, 3, 60),
-      headerText: root.dataset.headerText || "Real customer stories",
-      showAverageRating: parseBoolean(root.dataset.showAverageRating),
+      shop: safeText(config.shop),
+      endpoint: safeText(config.endpoint || "/apps/reviews"),
+      productId: safeText(config.productId),
+      selectedProductId: safeText(config.selectedProductId),
+      showSampleReviews: parseBoolean(config.showSampleReviews, false),
+      reviewSelection: safeText(config.reviewSelection || "current_product"),
+      starRating: safeText(config.starRating || "all"),
+      reviewType: safeText(config.reviewType || "any"),
+      maxReviews: clampNumber(config.maxReviews, 9, 3, 30),
+      showReviewerName: parseBoolean(config.showReviewerName, true),
+      autoplayMedia: parseBoolean(config.autoplayMedia, false),
+      transitionSpeed: clampNumber(config.transitionSpeed, 6, 3, 60),
+      headerText: safeText(config.headerText || "Real customer stories"),
+      showAverageRating: parseBoolean(config.showAverageRating, true),
     };
   }
 
@@ -160,17 +178,18 @@
 
     let swiperInstance = null;
     let currentReviews = [];
-    let resizeBound = false;
+    let currentActiveIndex = 0;
     let navBound = false;
     let mediaBound = false;
+    let resizeBound = false;
+    let isAnimating = false;
+    let resizeRaf = null;
 
     const sampleReviews = [
       {
         id: "sample-1",
         customerName: "Barbara S.",
         rating: 5,
-        title: "Looks amazing in real life",
-        message: "Really loved the quality and overall experience.",
         reviewVideoUrl: "",
         reviewYoutubeUrl: "",
       },
@@ -178,8 +197,6 @@
         id: "sample-2",
         customerName: "Haley Nixon",
         rating: 5,
-        title: "Beautiful finish and quality",
-        message: "Nice finish and value for money.",
         reviewVideoUrl: "",
         reviewYoutubeUrl: "",
       },
@@ -187,8 +204,6 @@
         id: "sample-3",
         customerName: "Casey Blake",
         rating: 5,
-        title: "Exactly what I wanted",
-        message: "Premium feel and super easy to use.",
         reviewVideoUrl: "",
         reviewYoutubeUrl: "",
       },
@@ -196,8 +211,6 @@
         id: "sample-4",
         customerName: "Regan Travis",
         rating: 5,
-        title: "Would definitely recommend",
-        message: "Looks premium and feels really good.",
         reviewVideoUrl: "",
         reviewYoutubeUrl: "",
       },
@@ -219,10 +232,8 @@
       const total = reviews.length;
       const computedAvg =
         total > 0
-          ? reviews.reduce(
-              (sum, item) => sum + (Number(item.rating) || 0),
-              0
-            ) / total
+          ? reviews.reduce((sum, item) => sum + (Number(item.rating) || 0), 0) /
+            total
           : 0;
 
       const avg =
@@ -236,9 +247,7 @@
           settings.showAverageRating
             ? `
               <div class="prvc-meta-row">
-                <span class="prvc-meta-stars">${renderStars(
-                  Math.round(avg || 0)
-                )}</span>
+                <span class="prvc-meta-stars">${renderStars(avg)}</span>
                 <span class="prvc-meta-text">${avg.toFixed(2)} ★ (${total})</span>
                 <span class="prvc-meta-verified">☑ Verified</span>
               </div>
@@ -257,6 +266,7 @@
               playsinline
               muted
               preload="metadata"
+              poster=""
               src="${escapeHtml(review.reviewVideoUrl)}"
             ></video>
             <span class="prvc-play-badge">▶</span>
@@ -268,7 +278,11 @@
         const thumb = getYoutubeThumb(review.reviewYoutubeUrl);
 
         return `
-          <div class="prvc-media" data-media-type="youtube">
+          <div
+            class="prvc-media"
+            data-media-type="youtube"
+            data-youtube-url="${escapeHtml(review.reviewYoutubeUrl)}"
+          >
             <div
               class="prvc-youtube-thumb"
               style="background-image:url('${escapeHtml(thumb)}');"
@@ -328,124 +342,164 @@
         swiperInstance.destroy(true, true);
         swiperInstance = null;
       }
+      isAnimating = false;
     }
 
     function showEmpty(message) {
       destroySwiper();
       currentReviews = [];
+      currentActiveIndex = 0;
 
-      if (loadingEl) {
-        loadingEl.hidden = true;
-      }
+      if (loadingEl) loadingEl.hidden = true;
 
-      if (swiperEl) {
-        swiperEl.hidden = false;
-        swiperEl.classList.add("prvc-single");
-        swiperEl.innerHTML = `
-          <div class="prvc-empty">
-            <h3>No video reviews yet</h3>
-            <p>${escapeHtml(message)}</p>
-          </div>
-        `;
-      }
+      swiperEl.hidden = false;
+      swiperEl.classList.add("prvc-single");
+      wrapperEl.innerHTML = "";
+
+      swiperEl.innerHTML = `
+        <div class="prvc-empty">
+          <h3>No video reviews yet</h3>
+          <p>${escapeHtml(message)}</p>
+        </div>
+      `;
 
       disableNav(true);
     }
 
-    function buildSlides(reviews) {
-      wrapperEl.innerHTML = reviews
-        .map((review, index) => renderSlide(review, index))
-        .join("");
+    function restoreSwiperMarkupIfNeeded() {
+      const existingWrapper = swiperEl.querySelector("[data-prvc-wrapper]");
+      if (existingWrapper) return existingWrapper;
+
+      swiperEl.innerHTML = `<div class="swiper-wrapper" data-prvc-wrapper></div>`;
+      return swiperEl.querySelector("[data-prvc-wrapper]");
     }
 
-    function refreshActiveMedia(activeIndex) {
-      if (!swiperEl || !currentReviews.length) return;
+    function buildSlides(reviews) {
+      const liveWrapper = restoreSwiperMarkupIfNeeded();
+      liveWrapper.innerHTML = reviews
+        .map((review, index) => renderSlide(review, index))
+        .join("");
+      return liveWrapper;
+    }
 
-      const allSlides = Array.from(
-        swiperEl.querySelectorAll(".swiper-slide.prvc-slide")
-      );
+    function getAllSlides() {
+      return Array.from(swiperEl.querySelectorAll(".prvc-slide"));
+    }
 
-      allSlides.forEach((slide) => {
-        const reviewIndex = Number(slide.getAttribute("data-review-index"));
-        const review = currentReviews[reviewIndex];
+    function getSlideByIndex(index) {
+      return swiperEl.querySelector(`.prvc-slide[data-review-index="${index}"]`);
+    }
 
-        if (!review) return;
+    function mountYoutubeIframe(mediaEl, url) {
+      if (!mediaEl || !url) return;
+      if (mediaEl.querySelector("iframe")) return;
 
-        const mediaContainer = slide.querySelector(".prvc-media");
-        if (!mediaContainer) return;
+      const embedUrl = getYoutubeEmbedUrl(url, settings.autoplayMedia);
+      mediaEl.innerHTML = `
+        <iframe
+          src="${escapeHtml(embedUrl)}"
+          title="Customer video review"
+          allow="autoplay; encrypted-media; picture-in-picture"
+          allowfullscreen
+          loading="lazy"
+        ></iframe>
+      `;
+    }
 
-        const isActive = reviewIndex === activeIndex;
+    function mountYoutubeThumb(mediaEl, url) {
+      if (!mediaEl || !url) return;
+      const thumb = getYoutubeThumb(url);
 
-        if (review.reviewYoutubeUrl) {
-          if (isActive) {
-            const embedUrl = getYoutubeEmbedUrl(
-              review.reviewYoutubeUrl,
-              settings.autoplayMedia
-            );
+      mediaEl.innerHTML = `
+        <div
+          class="prvc-youtube-thumb"
+          style="background-image:url('${escapeHtml(thumb)}');"
+        ></div>
+        <span class="prvc-play-badge">▶</span>
+      `;
+    }
 
-            mediaContainer.innerHTML = `
-              <iframe
-                src="${escapeHtml(embedUrl)}"
-                title="Customer video review"
-                allow="autoplay; encrypted-media; picture-in-picture"
-                allowfullscreen
-                loading="lazy"
-              ></iframe>
-            `;
-          } else {
-            const thumb = getYoutubeThumb(review.reviewYoutubeUrl);
+    function updateVideoState(mediaEl, isActive) {
+      if (!mediaEl) return;
 
-            mediaContainer.innerHTML = `
-              <div
-                class="prvc-youtube-thumb"
-                style="background-image:url('${escapeHtml(thumb)}');"
-              ></div>
-              <span class="prvc-play-badge">▶</span>
-            `;
-          }
+      const video = mediaEl.querySelector("video");
+      const badge = mediaEl.querySelector(".prvc-play-badge");
+      if (!video) return;
+
+      if (!video.dataset.prvcBound) {
+        video.dataset.prvcBound = "true";
+
+        video.addEventListener("play", () => {
+          if (badge) badge.classList.add("is-hidden");
+        });
+
+        video.addEventListener("pause", () => {
+          if (badge) badge.classList.remove("is-hidden");
+        });
+
+        video.addEventListener("ended", () => {
+          if (badge) badge.classList.remove("is-hidden");
+        });
+      }
+
+      if (isActive) {
+        if (settings.autoplayMedia) {
+          video.muted = true;
+          video.play().catch(() => {});
+          if (badge) badge.classList.add("is-hidden");
+        } else if (badge) {
+          badge.classList.remove("is-hidden");
         }
+      } else {
+        if (!video.paused) video.pause();
+        if (badge) badge.classList.remove("is-hidden");
+      }
+    }
 
-        if (review.reviewVideoUrl) {
-          const video = mediaContainer.querySelector("video");
-          const badge = mediaContainer.querySelector(".prvc-play-badge");
+    function updateSlideMedia(index, isActive) {
+      const review = currentReviews[index];
+      const slide = getSlideByIndex(index);
 
-          if (!video) return;
+      if (!review || !slide) return;
 
-          video.controls = false;
-          video.removeAttribute("controls");
+      const mediaEl = slide.querySelector(".prvc-media");
+      if (!mediaEl) return;
 
-          video.onplay = () => {
-            if (badge) badge.classList.add("is-hidden");
-          };
-
-          video.onpause = () => {
-            if (badge) badge.classList.remove("is-hidden");
-          };
-
-          video.onended = () => {
-            if (badge) badge.classList.remove("is-hidden");
-          };
-
-          if (isActive && settings.autoplayMedia) {
-            video.muted = true;
-            video.play().catch(() => {});
-            if (badge) badge.classList.add("is-hidden");
-          } else {
-            video.pause();
-            video.currentTime = 0;
-            if (badge) badge.classList.remove("is-hidden");
-          }
+      if (review.reviewYoutubeUrl) {
+        if (isActive) {
+          mountYoutubeIframe(mediaEl, review.reviewYoutubeUrl);
+        } else {
+          mountYoutubeThumb(mediaEl, review.reviewYoutubeUrl);
         }
-      });
+        return;
+      }
+
+      if (review.reviewVideoUrl) {
+        updateVideoState(mediaEl, isActive);
+      }
+    }
+
+    function setActiveMedia(newIndex, oldIndex) {
+      if (!currentReviews.length) return;
+
+      if (
+        typeof oldIndex === "number" &&
+        oldIndex >= 0 &&
+        oldIndex !== newIndex
+      ) {
+        updateSlideMedia(oldIndex, false);
+      }
+
+      updateSlideMedia(newIndex, true);
+      currentActiveIndex = newIndex;
     }
 
     function initSingleCenteredView(reviews) {
       destroySwiper();
       currentReviews = reviews;
+      currentActiveIndex = 0;
 
-      if (loadingEl) {
-        loadingEl.hidden = true;
-      }
+      if (loadingEl) loadingEl.hidden = true;
 
       swiperEl.hidden = false;
       swiperEl.classList.add("prvc-single");
@@ -457,17 +511,16 @@
         firstSlide.classList.add("swiper-slide-active");
       }
 
-      refreshActiveMedia(0);
+      setActiveMedia(0, -1);
       disableNav(true);
     }
 
     function initSwiper(reviews) {
       destroySwiper();
       currentReviews = reviews;
+      currentActiveIndex = 0;
 
-      if (loadingEl) {
-        loadingEl.hidden = true;
-      }
+      if (loadingEl) loadingEl.hidden = true;
 
       swiperEl.hidden = false;
       swiperEl.classList.remove("prvc-single");
@@ -480,17 +533,19 @@
       buildSlides(reviews);
 
       swiperInstance = new window.Swiper(swiperEl, {
-        loop: reviews.length > 5,
+        loop: false,
+        rewind: true,
         centeredSlides: true,
         centeredSlidesBounds: true,
         centerInsufficientSlides: true,
         watchOverflow: true,
-        watchSlidesProgress: true,
         grabCursor: true,
-        speed: 500,
-        initialSlide: reviews.length > 1 ? 1 : 0,
+        speed: 380,
         slidesPerView: "auto",
         spaceBetween: 16,
+        preloadImages: false,
+        updateOnWindowResize: false,
+        resistanceRatio: 0.85,
         autoplay: settings.autoplayMedia
           ? {
               delay: settings.transitionSpeed * 1000,
@@ -499,27 +554,27 @@
             }
           : false,
         breakpoints: {
-          576: {
-            spaceBetween: 16,
-          },
-          768: {
-            spaceBetween: 18,
-          },
-          990: {
-            spaceBetween: 22,
-          },
+          576: { spaceBetween: 16 },
+          768: { spaceBetween: 18 },
+          990: { spaceBetween: 22 },
         },
         on: {
           init(swiper) {
-            refreshActiveMedia(swiper.realIndex || 0);
+            const active = swiper.activeIndex || 0;
+            setActiveMedia(active, -1);
+            disableNav(reviews.length <= 1);
+          },
+          slideChangeTransitionStart() {
+            isAnimating = true;
           },
           slideChangeTransitionEnd(swiper) {
-            refreshActiveMedia(swiper.realIndex || 0);
+            const nextIndex = swiper.activeIndex || 0;
+            const prevIndex = currentActiveIndex;
+            setActiveMedia(nextIndex, prevIndex);
+            isAnimating = false;
           },
         },
       });
-
-      disableNav(reviews.length <= 1);
     }
 
     function bindNav() {
@@ -528,14 +583,14 @@
 
       prevButtons.forEach((btn) => {
         btn.addEventListener("click", () => {
-          if (!swiperInstance) return;
+          if (!swiperInstance || isAnimating) return;
           swiperInstance.slidePrev();
         });
       });
 
       nextButtons.forEach((btn) => {
         btn.addEventListener("click", () => {
-          if (!swiperInstance) return;
+          if (!swiperInstance || isAnimating) return;
           swiperInstance.slideNext();
         });
       });
@@ -550,14 +605,11 @@
         if (!slide) return;
 
         const reviewIndex = Number(slide.getAttribute("data-review-index"));
-        const activeIndex = swiperInstance ? swiperInstance.realIndex || 0 : 0;
+        const activeIndex = swiperInstance ? swiperInstance.activeIndex || 0 : 0;
 
         if (swiperInstance && reviewIndex !== activeIndex) {
-          if (swiperInstance.params.loop) {
-            swiperInstance.slideToLoop(reviewIndex);
-          } else {
-            swiperInstance.slideTo(reviewIndex);
-          }
+          if (isAnimating) return;
+          swiperInstance.slideTo(reviewIndex);
           return;
         }
 
@@ -584,10 +636,16 @@
       resizeBound = true;
 
       window.addEventListener("resize", () => {
-        if (swiperInstance) {
-          swiperInstance.update();
-          refreshActiveMedia(swiperInstance.realIndex || 0);
+        if (!swiperInstance) return;
+
+        if (resizeRaf) {
+          window.cancelAnimationFrame(resizeRaf);
         }
+
+        resizeRaf = window.requestAnimationFrame(() => {
+          swiperInstance.update();
+          resizeRaf = null;
+        });
       });
     }
 
@@ -604,7 +662,7 @@
           !settings.selectedProductId
         ) {
           showEmpty(
-            "Please select a product in widget settings when Reviews Selection is Custom product."
+            "Please select a product in widget settings when Reviews selection is Custom product."
           );
           return;
         }
@@ -634,9 +692,7 @@
 
         const response = await fetch(fetchUrl.toString(), {
           method: "GET",
-          headers: {
-            Accept: "application/json",
-          },
+          headers: { Accept: "application/json" },
         });
 
         const result = await response.json();

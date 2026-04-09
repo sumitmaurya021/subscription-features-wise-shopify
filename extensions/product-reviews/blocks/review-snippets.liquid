@@ -1,106 +1,90 @@
-{% liquid
-  assign resolved_review_type = 'store'
-  assign resolved_target_id = ''
-  assign resolved_target_handle = ''
-  assign resolved_target_title = shop.name
-  assign resolved_context_image = ''
-  assign add_to_cart_variant_id = ''
+{%- liquid
+assign s=block.settings
+assign src=s.review_selection | default:'current_product'
+assign t='store'
+assign id=''
+assign h=''
+assign ttl=shop.name
+assign vid=''
 
-  case block.settings.review_selection
-    when 'store_reviews'
-      assign resolved_review_type = 'store'
-      assign resolved_target_title = shop.name
-    when 'custom_product'
-      if block.settings.custom_product != blank
-        assign resolved_review_type = 'product'
-        assign resolved_target_id = block.settings.custom_product.id
-        assign resolved_target_handle = block.settings.custom_product.handle
-        assign resolved_target_title = block.settings.custom_product.title
-        if block.settings.custom_product.featured_image
-          assign resolved_context_image = block.settings.custom_product.featured_image | image_url: width: 500
-        endif
-        if block.settings.custom_product.selected_or_first_available_variant
-          assign add_to_cart_variant_id = block.settings.custom_product.selected_or_first_available_variant.id
-        endif
-      endif
-    when 'current_collection'
-      if collection
-        assign resolved_review_type = 'collection'
-        assign resolved_target_id = collection.id
-        assign resolved_target_handle = collection.handle
-        assign resolved_target_title = collection.title
-        if collection.image
-          assign resolved_context_image = collection.image | image_url: width: 500
-        endif
-      endif
-  endcase
-
-  if resolved_target_id == ''
-    if template.name == 'product' and product
-      assign resolved_review_type = 'product'
-      assign resolved_target_id = product.id
-      assign resolved_target_handle = product.handle
-      assign resolved_target_title = product.title
-      if product.featured_image
-        assign resolved_context_image = product.featured_image | image_url: width: 500
-      endif
-      if product.selected_or_first_available_variant
-        assign add_to_cart_variant_id = product.selected_or_first_available_variant.id
-      endif
-    elsif template.name == 'collection' and collection
-      assign resolved_review_type = 'collection'
-      assign resolved_target_id = collection.id
-      assign resolved_target_handle = collection.handle
-      assign resolved_target_title = collection.title
-      if collection.image
-        assign resolved_context_image = collection.image | image_url: width: 500
-      endif
+case src
+when 'custom_product'
+  if s.custom_product!=blank
+    assign t='product'
+    assign id=s.custom_product.id
+    assign h=s.custom_product.handle
+    assign ttl=s.custom_product.title
+    if s.custom_product.selected_or_first_available_variant
+      assign vid=s.custom_product.selected_or_first_available_variant.id
     endif
   endif
-
-  assign resolved_min_rating = ''
-  if block.settings.min_rating != blank and block.settings.min_rating != 'all'
-    assign resolved_min_rating = block.settings.min_rating
+when 'current_product'
+  if product
+    assign t='product'
+    assign id=product.id
+    assign h=product.handle
+    assign ttl=product.title
+    if product.selected_or_first_available_variant
+      assign vid=product.selected_or_first_available_variant.id
+    endif
   endif
-
-  assign can_show_add_to_cart = false
-  if block.settings.show_add_to_cart and resolved_review_type == 'product' and add_to_cart_variant_id != blank
-    assign can_show_add_to_cart = true
+when 'custom_collection'
+  if s.custom_collection!=blank
+    assign t='collection'
+    assign id=s.custom_collection.id
+    assign h=s.custom_collection.handle
+    assign ttl=s.custom_collection.title
   endif
-%}
+when 'current_collection'
+  if collection
+    assign t='collection'
+    assign id=collection.id
+    assign h=collection.handle
+    assign ttl=collection.title
+  endif
+endcase
 
-<div
-  id="rsn-root-{{ block.id }}"
-  class="rsn-root"
-  style="--rsn-card-bg:{{ block.settings.card_bg }};--rsn-text-color:{{ block.settings.text_color }};--rsn-star-color:{{ block.settings.star_color }};--rsn-arrow-bg:{{ block.settings.arrow_bg }};--rsn-arrow-color:{{ block.settings.arrow_color }};--rsn-border-color:{{ block.settings.border_color }};--rsn-card-radius:{{ block.settings.card_radius }}px;--rsn-card-padding:{{ block.settings.card_padding }}px;--rsn-card-max-width:{{ block.settings.card_max_width }}px;--rsn-card-min-height:{{ block.settings.card_min_height }}px;--rsn-name-size:{{ block.settings.reviewer_name_size }}px;--rsn-text-size:{{ block.settings.review_text_size }}px;--rsn-section-pad-top:{{ block.settings.section_padding_top }}px;--rsn-section-pad-bottom:{{ block.settings.section_padding_bottom }}px;--rsn-button-bg:{{ block.settings.button_bg }};--rsn-button-text:{{ block.settings.button_text_color }};--rsn-button-radius:{{ block.settings.button_radius }}px;"
-  data-block-id="{{ block.id }}"
-  data-shop="{{ shop.permanent_domain }}"
-  data-endpoint="/apps/reviews"
-  data-review-selection="{{ block.settings.review_selection }}"
-  data-review-type="{{ resolved_review_type }}"
-  data-target-id="{{ resolved_target_id }}"
-  data-target-handle="{{ resolved_target_handle }}"
-  data-target-title="{{ resolved_target_title | escape }}"
-  data-context-image="{{ resolved_context_image }}"
-  data-min-rating="{{ resolved_min_rating }}"
-  data-max-reviews="{{ block.settings.max_reviews }}"
-  data-show-arrows="{{ block.settings.show_arrows }}"
-  data-autoplay="{{ block.settings.autoplay }}"
-  data-autoplay-speed="{{ block.settings.autoplay_speed }}"
-  data-pause-on-hover="{{ block.settings.pause_on_hover }}"
-  data-show-reviewer-name="{{ block.settings.show_reviewer_name }}"
-  data-show-verified-badge="{{ block.settings.show_verified_badge }}"
-  data-excerpt-length="{{ block.settings.excerpt_length }}"
-  data-shadow-strength="{{ block.settings.shadow_strength }}"
-  data-empty-text="{{ block.settings.empty_text | escape }}"
-  data-show-add-to-cart="{{ can_show_add_to_cart }}"
-  data-add-to-cart-label="{{ block.settings.add_to_cart_label | escape }}"
-  data-add-to-cart-variant-id="{{ add_to_cart_variant_id }}"
-  data-redirect-to-cart="{{ block.settings.redirect_to_cart }}"
-  data-main-script="{{ 'review-snippets-main.js' | asset_url }}"
-  {{ block.shopify_attributes }}
-></div>
+if src=='store_reviews'
+  assign t='store'
+  assign id=''
+  assign h=''
+  assign ttl=shop.name
+  assign vid=''
+elsif id==blank
+  if template.name=='product' and product
+    assign t='product'
+    assign id=product.id
+    assign h=product.handle
+    assign ttl=product.title
+    if product.selected_or_first_available_variant
+      assign vid=product.selected_or_first_available_variant.id
+    endif
+  elsif template.name=='collection' and collection
+    assign t='collection'
+    assign id=collection.id
+    assign h=collection.handle
+    assign ttl=collection.title
+  else
+    assign t='store'
+    assign id=''
+    assign h=''
+    assign ttl=shop.name
+    assign vid=''
+  endif
+endif
+
+assign min=''
+if s.min_rating!=blank and s.min_rating!='all'
+  assign min=s.min_rating
+endif
+
+assign atc=false
+if s.show_add_to_cart and t=='product' and vid!=blank
+  assign atc=true
+endif
+-%}
+<div id="rsn-root-{{ block.id }}" class="rsn-root" style="padding-top:{{ s.section_padding_top }}px;padding-bottom:{{ s.section_padding_bottom }}px;--rsn-card-bg:{{ s.card_bg }};--rsn-text-color:{{ s.text_color }};--rsn-star-color:{{ s.star_color }};--rsn-arrow-bg:{{ s.arrow_bg }};--rsn-arrow-color:{{ s.arrow_color }};--rsn-border-color:{{ s.border_color }};--rsn-card-radius:{{ s.card_radius }}px;--rsn-card-padding:{{ s.card_padding }}px;--rsn-card-max-width:{{ s.card_max_width }}px;--rsn-card-min-height:{{ s.card_min_height }}px;--rsn-name-size:{{ s.reviewer_name_size }}px;--rsn-text-size:{{ s.review_text_size }}px;--rsn-button-bg:{{ s.button_bg }};--rsn-button-text:{{ s.button_text_color }};--rsn-button-radius:{{ s.button_radius }}px;" data-shop="{{ shop.permanent_domain }}" data-endpoint="/apps/reviews" data-review-type="{{ t }}" data-target-id="{{ id }}" data-target-handle="{{ h }}" data-target-title="{{ ttl | escape }}" data-min-rating="{{ min }}" data-max-reviews="{{ s.max_reviews }}" data-show-arrows="{{ s.show_arrows }}" data-autoplay="{{ s.autoplay }}" data-autoplay-speed="{{ s.autoplay_speed }}" data-pause-on-hover="{{ s.pause_on_hover }}" data-show-reviewer-name="{{ s.show_reviewer_name }}" data-show-verified-badge="{{ s.show_verified_badge }}" data-excerpt-length="{{ s.excerpt_length }}" data-shadow-strength="{{ s.shadow_strength }}" data-empty-text="{{ s.empty_text | escape }}" data-show-add-to-cart="{{ atc }}" data-add-to-cart-label="{{ s.add_to_cart_label | escape }}" data-add-to-cart-variant-id="{{ vid }}" data-redirect-to-cart="{{ s.redirect_to_cart }}" data-main-script="{{ 'review-snippets-main.js' | asset_url }}" {{ block.shopify_attributes }}></div>
 
 {% schema %}
-{"name":"Review Snippets","target":"section","templates":["product","collection","index"],"javascript":"review-snippets.js","stylesheet":"review-snippets.css","settings":[{"type":"header","content":"Review source"},{"type":"select","id":"review_selection","label":"Show reviews from","default":"current_product","options":[{"value":"current_product","label":"Current product"},{"value":"custom_product","label":"Custom product"},{"value":"current_collection","label":"Current collection"},{"value":"store_reviews","label":"Store reviews"}]},{"type":"product","id":"custom_product","label":"Custom product"},{"type":"select","id":"min_rating","label":"Minimum rating","default":"all","options":[{"value":"all","label":"All ratings"},{"value":"5","label":"5 stars only"},{"value":"4","label":"4 stars and above"},{"value":"3","label":"3 stars and above"}]},{"type":"range","id":"max_reviews","label":"Maximum reviews to load","min":3,"max":20,"step":1,"default":8},{"type":"range","id":"excerpt_length","label":"Review text length","min":60,"max":220,"step":10,"default":140},{"type":"text","id":"empty_text","label":"Empty state text","default":"No reviews available right now."},{"type":"header","content":"Slider behavior"},{"type":"checkbox","id":"show_arrows","label":"Show arrows","default":true},{"type":"checkbox","id":"autoplay","label":"Auto rotate","default":true},{"type":"range","id":"autoplay_speed","label":"Auto rotate speed (seconds)","min":3,"max":12,"step":1,"default":5},{"type":"checkbox","id":"pause_on_hover","label":"Pause on hover","default":true},{"type":"checkbox","id":"show_reviewer_name","label":"Show reviewer name","default":true},{"type":"checkbox","id":"show_verified_badge","label":"Show verified badge","default":false},{"type":"header","content":"Add to cart button"},{"type":"checkbox","id":"show_add_to_cart","label":"Show add to cart button","default":true},{"type":"text","id":"add_to_cart_label","label":"Button label","default":"Add to cart"},{"type":"checkbox","id":"redirect_to_cart","label":"Redirect to cart after add","default":true},{"type":"color","id":"button_bg","label":"Button background","default":"#111111"},{"type":"color","id":"button_text_color","label":"Button text color","default":"#ffffff"},{"type":"range","id":"button_radius","label":"Button radius","min":4,"max":30,"step":2,"default":12},{"type":"header","content":"Card layout"},{"type":"range","id":"card_max_width","label":"Card max width","min":280,"max":900,"step":10,"default":650},{"type":"range","id":"card_min_height","label":"Card minimum height","min":120,"max":260,"step":10,"default":180},{"type":"range","id":"card_padding","label":"Card padding","min":16,"max":40,"step":2,"default":24},{"type":"range","id":"card_radius","label":"Card corner radius","min":16,"max":40,"step":2,"default":24},{"type":"select","id":"shadow_strength","label":"Shadow strength","default":"medium","options":[{"value":"soft","label":"Soft"},{"value":"medium","label":"Medium"},{"value":"strong","label":"Strong"}]},{"type":"range","id":"section_padding_top","label":"Top spacing","min":0,"max":80,"step":4,"default":0},{"type":"range","id":"section_padding_bottom","label":"Bottom spacing","min":0,"max":80,"step":4,"default":0},{"type":"header","content":"Typography"},{"type":"range","id":"reviewer_name_size","label":"Reviewer name size","min":16,"max":34,"step":1,"default":22},{"type":"range","id":"review_text_size","label":"Review text size","min":14,"max":28,"step":1,"default":18},{"type":"header","content":"Colors"},{"type":"color","id":"card_bg","label":"Card background","default":"#ffffff"},{"type":"color","id":"text_color","label":"Text color","default":"#111111"},{"type":"color","id":"star_color","label":"Star color","default":"#178b7a"},{"type":"color","id":"arrow_bg","label":"Arrow background","default":"#ffffff"},{"type":"color","id":"arrow_color","label":"Arrow color","default":"#111111"},{"type":"color","id":"border_color","label":"Border color","default":"#e7ecea"}]}
+{"name":"Review Snippets","target":"section","templates":["product","collection","index"],"javascript":"review-snippets.js","stylesheet":"review-snippets.css","settings":[{"type":"header","content":"Review source"},{"type":"select","id":"review_selection","label":"Show reviews from","default":"current_product","options":[{"value":"current_product","label":"Current product"},{"value":"custom_product","label":"Custom product"},{"value":"current_collection","label":"Current collection"},{"value":"custom_collection","label":"Custom collection"},{"value":"store_reviews","label":"Store reviews"}]},{"type":"product","id":"custom_product","label":"Custom product"},{"type":"collection","id":"custom_collection","label":"Custom collection"},{"type":"select","id":"min_rating","label":"Minimum rating","default":"all","options":[{"value":"all","label":"All ratings"},{"value":"5","label":"5 stars only"},{"value":"4","label":"4 stars and above"},{"value":"3","label":"3 stars and above"}]},{"type":"range","id":"max_reviews","label":"Maximum reviews to load","min":3,"max":20,"step":1,"default":8},{"type":"range","id":"excerpt_length","label":"Review text length","min":60,"max":220,"step":10,"default":140},{"type":"text","id":"empty_text","label":"Empty state text","default":"No reviews available right now."},{"type":"header","content":"Slider behavior"},{"type":"checkbox","id":"show_arrows","label":"Show arrows","default":true},{"type":"checkbox","id":"autoplay","label":"Auto rotate","default":true},{"type":"range","id":"autoplay_speed","label":"Auto rotate speed (seconds)","min":3,"max":12,"step":1,"default":5},{"type":"checkbox","id":"pause_on_hover","label":"Pause on hover","default":true},{"type":"checkbox","id":"show_reviewer_name","label":"Show reviewer name","default":true},{"type":"checkbox","id":"show_verified_badge","label":"Show verified badge","default":false},{"type":"header","content":"Add to cart button"},{"type":"checkbox","id":"show_add_to_cart","label":"Show add to cart button","default":true},{"type":"text","id":"add_to_cart_label","label":"Button label","default":"Add to cart"},{"type":"checkbox","id":"redirect_to_cart","label":"Redirect to cart after add","default":true},{"type":"color","id":"button_bg","label":"Button background","default":"#111111"},{"type":"color","id":"button_text_color","label":"Button text color","default":"#ffffff"},{"type":"range","id":"button_radius","label":"Button radius","min":4,"max":30,"step":2,"default":12},{"type":"header","content":"Card layout"},{"type":"range","id":"card_max_width","label":"Card max width","min":280,"max":900,"step":10,"default":650},{"type":"range","id":"card_min_height","label":"Card minimum height","min":120,"max":260,"step":10,"default":180},{"type":"range","id":"card_padding","label":"Card padding","min":16,"max":40,"step":2,"default":24},{"type":"range","id":"card_radius","label":"Card corner radius","min":16,"max":40,"step":2,"default":24},{"type":"select","id":"shadow_strength","label":"Shadow strength","default":"medium","options":[{"value":"soft","label":"Soft"},{"value":"medium","label":"Medium"},{"value":"strong","label":"Strong"}]},{"type":"range","id":"section_padding_top","label":"Top spacing","min":0,"max":80,"step":4,"default":0},{"type":"range","id":"section_padding_bottom","label":"Bottom spacing","min":0,"max":80,"step":4,"default":0},{"type":"header","content":"Typography"},{"type":"range","id":"reviewer_name_size","label":"Reviewer name size","min":16,"max":34,"step":1,"default":22},{"type":"range","id":"review_text_size","label":"Review text size","min":14,"max":28,"step":1,"default":18},{"type":"header","content":"Colors"},{"type":"color","id":"card_bg","label":"Card background","default":"#ffffff"},{"type":"color","id":"text_color","label":"Text color","default":"#111111"},{"type":"color","id":"star_color","label":"Star color","default":"#178b7a"},{"type":"color","id":"arrow_bg","label":"Arrow background","default":"#ffffff"},{"type":"color","id":"arrow_color","label":"Arrow color","default":"#111111"},{"type":"color","id":"border_color","label":"Border color","default":"#e7ecea"}]}
 {% endschema %}
