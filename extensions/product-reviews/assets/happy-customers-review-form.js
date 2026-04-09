@@ -1,9 +1,12 @@
 (function () {
   const MAX_REVIEW_IMAGES = 4;
+  const MAX_IMAGE_SIZE_MB = 10;
   const MAX_VIDEO_SIZE_MB = 20;
   const TOTAL_STEPS = 4;
   const PRODUCT_FETCH_LIMIT = 24;
-  const PRODUCT_SEARCH_DEBOUNCE = 250;
+  const PRODUCT_SEARCH_DEBOUNCE = 220;
+  const IMAGE_MAX_DIMENSION = 1600;
+  const IMAGE_JPEG_QUALITY = 0.82;
 
   const RATING_LABELS = {
     1: "Poor",
@@ -28,11 +31,6 @@
 
   function toArray(value) {
     return Array.isArray(value) ? value : [];
-  }
-
-  function normalizeBoolean(value, fallback = false) {
-    if (value === undefined || value === null || value === "") return fallback;
-    return String(value).toLowerCase() === "true";
   }
 
   function getInitial(name = "") {
@@ -79,30 +77,84 @@
     }
   }
 
-  function getYoutubeVideoId(value) {
-    const embed = normalizeYoutubeEmbedUrl(value);
-    if (!embed) return "";
-
-    try {
-      const parsed = new URL(embed);
-      return parsed.pathname.split("/embed/")[1]?.split("/")[0] || "";
-    } catch {
-      return "";
-    }
-  }
-
-  function getYoutubeThumbnailUrl(value) {
-    const videoId = getYoutubeVideoId(value);
-    return videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : "";
-  }
-
-  function fileToDataUrl(file) {
+  function readFileAsDataUrl(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
+  }
+
+  function loadImageFromFile(file) {
+    return new Promise((resolve, reject) => {
+      const objectUrl = URL.createObjectURL(file);
+      const img = new Image();
+
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(img);
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("Failed to read image."));
+      };
+
+      img.src = objectUrl;
+    });
+  }
+
+  async function imageFileToOptimizedDataUrl(file) {
+    const maxBytes = MAX_IMAGE_SIZE_MB * 1024 * 1024;
+
+    if (file.size > maxBytes) {
+      throw new Error(`Each image should be ${MAX_IMAGE_SIZE_MB}MB or less.`);
+    }
+
+    if (!["image/jpeg", "image/jpg", "image/png"].includes(file.type)) {
+      throw new Error("Only JPG and PNG images are allowed.");
+    }
+
+    if (file.size <= 700 * 1024) {
+      return readFileAsDataUrl(file);
+    }
+
+    try {
+      const img = await loadImageFromFile(file);
+      const canvas = document.createElement("canvas");
+
+      let width = img.naturalWidth || img.width || 0;
+      let height = img.naturalHeight || img.height || 0;
+
+      if (!width || !height) {
+        return readFileAsDataUrl(file);
+      }
+
+      const ratio = Math.min(
+        1,
+        IMAGE_MAX_DIMENSION / Math.max(width, height)
+      );
+
+      width = Math.max(1, Math.round(width * ratio));
+      height = Math.max(1, Math.round(height * ratio));
+
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return readFileAsDataUrl(file);
+
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const outputType =
+        file.type === "image/png" ? "image/png" : "image/jpeg";
+      const quality = outputType === "image/png" ? undefined : IMAGE_JPEG_QUALITY;
+
+      return canvas.toDataURL(outputType, quality);
+    } catch {
+      return readFileAsDataUrl(file);
+    }
   }
 
   function normalizeImageUrl(product) {
@@ -150,12 +202,7 @@
     if (!id && !handle) return null;
     if (!title) return null;
 
-    return {
-      id,
-      handle,
-      title,
-      image,
-    };
+    return { id, handle, title, image };
   }
 
   function dedupeProducts(items) {
@@ -200,7 +247,7 @@
                 <div class="hcrf-selector-head">
                   <p class="hcrf-eyebrow">Write a review</p>
                   <h2 id="hcrf-dialog-title" class="hcrf-title">
-                    What would you like to review?
+                    Share your experience
                   </h2>
                   <p class="hcrf-subtitle">
                     Choose whether you want to review the store or a product.
@@ -214,7 +261,7 @@
                     data-hcrf-choice="store"
                   >
                     <span class="hcrf-choice-icon">🏬</span>
-                    <span class="hcrf-choice-title">Store review</span>
+                    <span class="hcrf-choice-title">Review the store</span>
                     <span class="hcrf-choice-copy">
                       Share your shopping experience with this store.
                     </span>
@@ -226,9 +273,9 @@
                     data-hcrf-choice="product"
                   >
                     <span class="hcrf-choice-icon">📦</span>
-                    <span class="hcrf-choice-title">Product review</span>
+                    <span class="hcrf-choice-title">Review a product</span>
                     <span class="hcrf-choice-copy">
-                      Select a product and review that specific item.
+                      Choose a product and review that specific item.
                     </span>
                   </button>
                 </div>
@@ -244,7 +291,7 @@
 
                   <div>
                     <p class="hcrf-eyebrow">Product review</p>
-                    <h2 class="hcrf-title">Select a product</h2>
+                    <h2 class="hcrf-title">Choose a product</h2>
                     <p class="hcrf-subtitle">
                       Search and choose the product you want to review.
                     </p>
@@ -303,7 +350,7 @@
                       <div class="hcrf-step-inner hcrf-step-inner--center">
                         <p class="hcrf-eyebrow" data-hcrf-current-type-label>Store review</p>
                         <h2 class="hcrf-title" data-hcrf-step-title>
-                          How would you rate this?
+                          Rate your experience
                         </h2>
 
                         <div class="hcrf-subject-card">
@@ -419,7 +466,7 @@
 
                     <section class="hcrf-step" data-hcrf-step="4" aria-hidden="true">
                       <div class="hcrf-step-inner">
-                        <h2 class="hcrf-title">Add photo or video</h2>
+                        <h2 class="hcrf-title">Add media & submit</h2>
 
                         <div class="hcrf-upload-grid">
                           <div class="hcrf-field">
@@ -434,7 +481,7 @@
                                 multiple
                               >
                               <div class="hcrf-dropzone-title">Click to upload <span>or drag and drop</span></div>
-                              <div class="hcrf-dropzone-subtext">JPG, PNG</div>
+                              <div class="hcrf-dropzone-subtext">JPG, PNG • up to ${MAX_REVIEW_IMAGES} images</div>
                             </div>
 
                             <div class="hcrf-preview-wrap" data-hcrf-image-preview-wrap hidden>
@@ -456,8 +503,10 @@
                                 accept="video/mp4,video/webm,video/quicktime"
                               >
                               <div class="hcrf-dropzone-title">Click to upload <span>or drag and drop</span></div>
-                              <div class="hcrf-dropzone-subtext">MP4, WEBM, MOV</div>
+                              <div class="hcrf-dropzone-subtext">MP4, WEBM, MOV • max ${MAX_VIDEO_SIZE_MB}MB</div>
                             </div>
+
+                            <div class="hcrf-helper-note" data-hcrf-video-upload-status></div>
 
                             <div class="hcrf-preview-wrap" data-hcrf-video-preview-wrap hidden>
                               <div class="hcrf-preview-label">Selected video</div>
@@ -526,9 +575,7 @@
   function getProductCardMarkup(product, index) {
     const image = product.image
       ? `<img src="${escapeHtml(product.image)}" alt="${escapeHtml(product.title)}" loading="lazy">`
-      : `<div class="hcrf-product-placeholder">${escapeHtml(
-          getInitial(product.title)
-        )}</div>`;
+      : `<div class="hcrf-product-placeholder">${escapeHtml(getInitial(product.title))}</div>`;
 
     return `
       <button
@@ -545,7 +592,7 @@
     `;
   }
 
-  async function uploadVideoToCloudinary(file, config, reviewType, targetKey) {
+  async function uploadVideoToCloudinary(file, config, reviewType, targetKey, signal) {
     const cloudinaryCloudName = safeText(config.cloudinaryCloudName).trim();
     const cloudinaryUploadPreset = safeText(config.cloudinaryUploadPreset).trim();
 
@@ -566,6 +613,7 @@
       {
         method: "POST",
         body: formData,
+        signal,
       }
     );
 
@@ -589,32 +637,30 @@
   }
 
   const HappyCustomersReviewFlow = {
-    async create({ root, host, config, onSubmitted }) {
-    const wrapper = document.createElement("div");
-    wrapper.className = "hcrf-root";
-    wrapper.innerHTML = getFlowMarkup();
+    async create({ root, config, onSubmitted }) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "hcrf-root";
+      wrapper.innerHTML = getFlowMarkup();
 
-    const rootStyles = window.getComputedStyle(root);
-    const accentColor = rootStyles.getPropertyValue("--hcr-accent").trim() || "#108474";
-    const buttonBg = rootStyles.getPropertyValue("--hcr-button-bg").trim() || accentColor;
-    const buttonText = rootStyles.getPropertyValue("--hcr-button-text").trim() || "#ffffff";
-    const textColor = rootStyles.getPropertyValue("--hcr-text").trim() || "#111827";
-    const subtextColor = rootStyles.getPropertyValue("--hcr-subtext").trim() || "#6b7280";
-    const borderColor = rootStyles.getPropertyValue("--hcr-border").trim() || "#e5e7eb";
+      const rootStyles = window.getComputedStyle(root);
+      const accentColor = rootStyles.getPropertyValue("--hcr-accent").trim() || "#108474";
+      const buttonBg = rootStyles.getPropertyValue("--hcr-button-bg").trim() || accentColor;
+      const buttonText = rootStyles.getPropertyValue("--hcr-button-text").trim() || "#ffffff";
+      const textColor = rootStyles.getPropertyValue("--hcr-text").trim() || "#111827";
+      const subtextColor = rootStyles.getPropertyValue("--hcr-subtext").trim() || "#6b7280";
+      const borderColor = rootStyles.getPropertyValue("--hcr-border").trim() || "#e5e7eb";
 
-    wrapper.style.setProperty("--hcr-accent", accentColor);
-    wrapper.style.setProperty("--hcr-button-bg", buttonBg);
-    wrapper.style.setProperty("--hcr-button-text", buttonText);
-    wrapper.style.setProperty("--hcr-text", textColor);
-    wrapper.style.setProperty("--hcr-subtext", subtextColor);
-    wrapper.style.setProperty("--hcr-border", borderColor);
+      wrapper.style.setProperty("--hcr-accent", accentColor);
+      wrapper.style.setProperty("--hcr-button-bg", buttonBg);
+      wrapper.style.setProperty("--hcr-button-text", buttonText);
+      wrapper.style.setProperty("--hcr-text", textColor);
+      wrapper.style.setProperty("--hcr-subtext", subtextColor);
+      wrapper.style.setProperty("--hcr-border", borderColor);
 
-    document.body.appendChild(wrapper);
+      document.body.appendChild(wrapper);
 
       const modal = wrapper.querySelector(".hcrf-modal");
-      const overlayCloseEls = Array.from(
-        wrapper.querySelectorAll("[data-hcrf-close]")
-      );
+      const overlayCloseEls = Array.from(wrapper.querySelectorAll("[data-hcrf-close]"));
 
       const screens = {
         selector: wrapper.querySelector('[data-hcrf-screen="selector"]'),
@@ -623,10 +669,7 @@
         success: wrapper.querySelector('[data-hcrf-screen="success"]'),
       };
 
-      const selectorButtons = Array.from(
-        wrapper.querySelectorAll("[data-hcrf-choice]")
-      );
-
+      const selectorButtons = Array.from(wrapper.querySelectorAll("[data-hcrf-choice]"));
       const backToSelectorBtn = wrapper.querySelector("[data-hcrf-back-to-selector]");
       const backFromFormBtn = wrapper.querySelector("[data-hcrf-back-from-form]");
       const successCloseBtn = wrapper.querySelector("[data-hcrf-success-close]");
@@ -640,12 +683,8 @@
       const toastEl = wrapper.querySelector("[data-hcrf-toast]");
 
       const progressFill = wrapper.querySelector("[data-hcrf-progress-fill]");
-      const stepDots = Array.from(
-        wrapper.querySelectorAll("[data-hcrf-step-dot]")
-      );
-      const stepEls = Array.from(
-        wrapper.querySelectorAll("[data-hcrf-step]")
-      );
+      const stepDots = Array.from(wrapper.querySelectorAll("[data-hcrf-step-dot]"));
+      const stepEls = Array.from(wrapper.querySelectorAll("[data-hcrf-step]"));
 
       const stepBackBtn = wrapper.querySelector("[data-hcrf-step-back]");
       const stepNextBtn = wrapper.querySelector("[data-hcrf-step-next]");
@@ -658,16 +697,10 @@
       const subjectMediaEl = wrapper.querySelector("[data-hcrf-subject-media]");
 
       const ratingInput = form.querySelector('input[name="rating"]');
-      const starButtons = Array.from(
-        wrapper.querySelectorAll("[data-hcrf-star]")
-      );
+      const starButtons = Array.from(wrapper.querySelectorAll("[data-hcrf-star]"));
       const ratingTextEl = wrapper.querySelector("[data-hcrf-rating-text]");
-      const ratingPreviewStarsEl = wrapper.querySelector(
-        "[data-hcrf-rating-preview-stars]"
-      );
-      const ratingPreviewLabelEl = wrapper.querySelector(
-        "[data-hcrf-rating-preview-label]"
-      );
+      const ratingPreviewStarsEl = wrapper.querySelector("[data-hcrf-rating-preview-stars]");
+      const ratingPreviewLabelEl = wrapper.querySelector("[data-hcrf-rating-preview-label]");
 
       const titleInput = form.querySelector('input[name="title"]');
       const titleCountEl = wrapper.querySelector("[data-hcrf-title-count]");
@@ -680,17 +713,14 @@
 
       const imageInput = form.querySelector('input[name="reviewImages"]');
       const imageDropzone = wrapper.querySelector("[data-hcrf-image-dropzone]");
-      const imagePreviewWrap = wrapper.querySelector(
-        "[data-hcrf-image-preview-wrap]"
-      );
+      const imagePreviewWrap = wrapper.querySelector("[data-hcrf-image-preview-wrap]");
       const imagePreviewEl = wrapper.querySelector("[data-hcrf-image-preview]");
 
       const videoInput = form.querySelector('input[name="reviewVideo"]');
       const videoDropzone = wrapper.querySelector("[data-hcrf-video-dropzone]");
-      const videoPreviewWrap = wrapper.querySelector(
-        "[data-hcrf-video-preview-wrap]"
-      );
+      const videoPreviewWrap = wrapper.querySelector("[data-hcrf-video-preview-wrap]");
       const videoPreviewEl = wrapper.querySelector("[data-hcrf-video-preview]");
+      const videoUploadStatusEl = wrapper.querySelector("[data-hcrf-video-upload-status]");
 
       const youtubeInput = form.querySelector('input[name="reviewYoutubeUrl"]');
 
@@ -710,20 +740,34 @@
         currentStep: 1,
         currentReviewType: "",
         selectedProduct: null,
+        formBackTarget: "selector",
+
         productsLoaded: false,
         productsLoading: false,
         allProducts: [],
         filteredProducts: [],
         productSearchTerm: "",
         productSearchTimer: null,
+        productSearchCache: new Map(),
+
         selectedImages: [],
+        imageEncodePromises: new Map(),
+        imagePreviewUrls: [],
+
         selectedVideoFile: null,
+        videoPreviewUrl: "",
+        videoUploadController: null,
+        videoUploadPromise: null,
+        videoUploadedUrl: "",
+        videoUploadError: "",
+
         activeRating: 0,
         submitting: false,
       };
 
       hiddenFields.shop.value = safeText(config.shop || "").trim();
-            function showToast(message, type = "success") {
+
+      function showToast(message, type = "success") {
         if (!toastEl) return;
 
         toastEl.hidden = false;
@@ -777,6 +821,109 @@
         ].forEach((field) => clearFieldError(field));
       }
 
+      function revokeImagePreviewUrls() {
+        state.imagePreviewUrls.forEach((url) => {
+          try {
+            URL.revokeObjectURL(url);
+          } catch {}
+        });
+        state.imagePreviewUrls = [];
+      }
+
+      function revokeVideoPreviewUrl() {
+        if (!state.videoPreviewUrl) return;
+        try {
+          URL.revokeObjectURL(state.videoPreviewUrl);
+        } catch {}
+        state.videoPreviewUrl = "";
+      }
+
+      function getUploadTargetKey() {
+        if (state.currentReviewType === "store") return "store";
+        return (
+          safeText(state.selectedProduct?.id).trim() ||
+          safeText(state.selectedProduct?.handle).trim() ||
+          safeText(hiddenFields.productId.value).trim() ||
+          "product"
+        );
+      }
+
+      function setVideoUploadStatus(message, type = "") {
+        if (!videoUploadStatusEl) return;
+        videoUploadStatusEl.textContent = message || "";
+        videoUploadStatusEl.className = "hcrf-helper-note";
+        if (type) videoUploadStatusEl.classList.add(`is-${type}`);
+      }
+
+      function resetVideoUploadState() {
+        if (state.videoUploadController) {
+          try {
+            state.videoUploadController.abort();
+          } catch {}
+        }
+
+        state.videoUploadController = null;
+        state.videoUploadPromise = null;
+        state.videoUploadedUrl = "";
+        state.videoUploadError = "";
+        setVideoUploadStatus("");
+      }
+
+      async function beginVideoUploadIfNeeded(file) {
+        const cloudinaryCloudName = safeText(config.cloudinaryCloudName).trim();
+        const cloudinaryUploadPreset = safeText(config.cloudinaryUploadPreset).trim();
+
+        if (!file) return null;
+        if (!cloudinaryCloudName || !cloudinaryUploadPreset) {
+          setVideoUploadStatus("Video will upload on submit.");
+          return null;
+        }
+
+        const reviewType = state.currentReviewType || "store";
+        const targetKey = getUploadTargetKey();
+
+        resetVideoUploadState();
+
+        const controller = new AbortController();
+        state.videoUploadController = controller;
+
+        setVideoUploadStatus("Uploading video in background...");
+        state.videoUploadPromise = uploadVideoToCloudinary(
+          file,
+          config,
+          reviewType,
+          targetKey,
+          controller.signal
+        )
+          .then((url) => {
+            if (state.selectedVideoFile !== file) return url;
+            state.videoUploadedUrl = url;
+            state.videoUploadError = "";
+            setVideoUploadStatus("Video uploaded successfully.", "success");
+            return url;
+          })
+          .catch((error) => {
+            if (controller.signal.aborted) return null;
+            if (state.selectedVideoFile !== file) return null;
+
+            state.videoUploadedUrl = "";
+            state.videoUploadError = error?.message || "Video upload failed.";
+            setVideoUploadStatus("Video upload failed. It will retry on submit.", "error");
+            return null;
+          });
+
+        return state.videoUploadPromise;
+      }
+
+      function warmImageEncodePromises(files) {
+        files.forEach((file) => {
+          const key = getFileUniqueKey(file);
+          if (!state.imageEncodePromises.has(key)) {
+            state.imageEncodePromises.set(key, imageFileToOptimizedDataUrl(file));
+          }
+        });
+      }
+
       function renderSubjectMedia() {
         if (!subjectMediaEl) return;
 
@@ -794,18 +941,14 @@
 
         if (selected && selected.image) {
           subjectMediaEl.innerHTML = `
-            <img src="${escapeHtml(selected.image)}" alt="${escapeHtml(
-              selected.title
-            )}">
+            <img src="${escapeHtml(selected.image)}" alt="${escapeHtml(selected.title)}">
           `;
           return;
         }
 
         subjectMediaEl.innerHTML = `
           <div class="hcrf-subject-placeholder">
-            <span>${escapeHtml(
-              getInitial(selected?.title || config.shopName || "P")
-            )}</span>
+            <span>${escapeHtml(getInitial(selected?.title || config.shopName || "P"))}</span>
           </div>
         `;
       }
@@ -874,15 +1017,23 @@
       }
 
       function updateStepButtons() {
-        if (stepBackBtn) stepBackBtn.hidden = state.currentStep === 1;
-        if (stepNextBtn) stepNextBtn.hidden = state.currentStep === TOTAL_STEPS;
-        if (submitBtn) submitBtn.hidden = state.currentStep !== TOTAL_STEPS;
-      }
+        const isLastStep = state.currentStep === TOTAL_STEPS;
+        const isFirstStep = state.currentStep === 1;
 
-      function getStepEl(step) {
-        return stepEls.find(
-          (item) => Number(item.getAttribute("data-hcrf-step")) === Number(step)
-        );
+        if (stepBackBtn) {
+          stepBackBtn.hidden = isFirstStep;
+          stepBackBtn.style.display = isFirstStep ? "none" : "inline-flex";
+        }
+
+        if (stepNextBtn) {
+          stepNextBtn.hidden = isLastStep;
+          stepNextBtn.style.display = isLastStep ? "none" : "inline-flex";
+        }
+
+        if (submitBtn) {
+          submitBtn.hidden = !isLastStep;
+          submitBtn.style.display = isLastStep ? "inline-flex" : "none";
+        }
       }
 
       function syncStepUI() {
@@ -914,18 +1065,99 @@
         if (productSearchInput) productSearchInput.value = "";
       }
 
+      function updateImageInputFiles() {
+        if (!imageInput) return;
+
+        const dt = new DataTransfer();
+        state.selectedImages.forEach((file) => dt.items.add(file));
+        imageInput.files = dt.files;
+      }
+
+      function renderImagePreview(files) {
+        if (!imagePreviewEl || !imagePreviewWrap) return;
+
+        revokeImagePreviewUrls();
+        imagePreviewEl.innerHTML = "";
+
+        if (!files.length) {
+          imagePreviewWrap.hidden = true;
+          return;
+        }
+
+        imagePreviewWrap.hidden = false;
+
+        files.forEach((file, index) => {
+          const previewUrl = URL.createObjectURL(file);
+          state.imagePreviewUrls.push(previewUrl);
+
+          const item = document.createElement("div");
+          item.className = "hcrf-image-item";
+          item.innerHTML = `
+            <img src="${escapeHtml(previewUrl)}" alt="Preview">
+            <button
+              type="button"
+              class="hcrf-image-remove"
+              data-hcrf-remove-image="${index}"
+              aria-label="Remove image"
+            >
+              ×
+            </button>
+          `;
+          imagePreviewEl.appendChild(item);
+        });
+      }
+
+      function renderVideoPreview(file) {
+        if (!videoPreviewEl || !videoPreviewWrap) return;
+
+        revokeVideoPreviewUrl();
+        videoPreviewEl.innerHTML = "";
+
+        if (!file) {
+          videoPreviewWrap.hidden = true;
+          return;
+        }
+
+        state.videoPreviewUrl = URL.createObjectURL(file);
+        videoPreviewWrap.hidden = false;
+        videoPreviewEl.innerHTML = `
+          <div class="hcrf-video-item">
+            <video src="${escapeHtml(state.videoPreviewUrl)}" controls playsinline preload="metadata"></video>
+            <button
+              type="button"
+              class="hcrf-video-remove"
+              data-hcrf-remove-video
+              aria-label="Remove video"
+            >
+              ×
+            </button>
+          </div>
+        `;
+      }
+
+      function getFileUniqueKey(file) {
+        return [file.name, file.size, file.lastModified, file.type].join("__");
+      }
+
       function resetFormState(keepTypeAndProduct = false) {
         form.reset();
         clearAllErrors();
         setMessage("");
 
+        revokeImagePreviewUrls();
+        revokeVideoPreviewUrl();
+
         state.selectedImages = [];
+        state.imageEncodePromises.clear();
         state.selectedVideoFile = null;
         state.activeRating = 0;
+
+        resetVideoUploadState();
 
         if (!keepTypeAndProduct) {
           state.currentReviewType = "";
           state.selectedProduct = null;
+          state.formBackTarget = "selector";
         }
 
         if (imagePreviewEl) imagePreviewEl.innerHTML = "";
@@ -966,6 +1198,7 @@
       function openStoreForm() {
         state.currentReviewType = "store";
         state.selectedProduct = null;
+        state.formBackTarget = "selector";
         resetFormState(true);
         syncSubjectUI();
         setScreen("form");
@@ -974,6 +1207,7 @@
       function openProductPicker() {
         state.currentReviewType = "product";
         state.selectedProduct = null;
+        state.formBackTarget = "selector";
         resetFormState(true);
         resetProductPickerState();
         syncSubjectUI();
@@ -982,12 +1216,11 @@
       }
 
       function backFromForm() {
-        if (state.currentReviewType === "product") {
+        if (state.formBackTarget === "productPicker") {
           setScreen("productPicker");
-          return;
+        } else {
+          setScreen("selector");
         }
-
-        setScreen("selector");
       }
 
       function setProductStatus(message) {
@@ -1036,11 +1269,8 @@
 
         try {
           const url = new URL(baseUrl, window.location.origin);
-
           url.searchParams.set("limit", String(PRODUCT_FETCH_LIMIT));
-          if (searchTerm) {
-            url.searchParams.set("q", searchTerm);
-          }
+          if (searchTerm) url.searchParams.set("q", searchTerm);
 
           const response = await fetch(url.toString(), {
             method: "GET",
@@ -1050,8 +1280,7 @@
           if (!response.ok) return [];
 
           const result = await response.json();
-          const products = Array.isArray(result?.products) ? result.products : [];
-          return dedupeProducts(products);
+          return dedupeProducts(Array.isArray(result?.products) ? result.products : []);
         } catch {
           return [];
         }
@@ -1115,7 +1344,13 @@
       }
 
       async function loadProducts(searchTerm = "") {
+        const normalizedSearch = safeText(searchTerm).trim().toLowerCase();
         if (state.productsLoading) return;
+
+        if (state.productSearchCache.has(normalizedSearch)) {
+          renderProducts(state.productSearchCache.get(normalizedSearch));
+          return;
+        }
 
         state.productsLoading = true;
         setProductStatus("Loading products...");
@@ -1124,33 +1359,32 @@
         try {
           let products = [];
 
-          if (searchTerm) {
-            products = await fetchPredictiveProducts(searchTerm);
-
-            if (!products.length) {
-              products = await fetchProductsJson(searchTerm);
-            }
+          if (normalizedSearch) {
+            products = await fetchPredictiveProducts(normalizedSearch);
+            if (!products.length) products = await fetchProductsJson(normalizedSearch);
           } else {
             if (state.productsLoaded && state.allProducts.length) {
               renderProducts(state.allProducts);
               state.productsLoading = false;
               return;
             }
-
             products = await fetchProductsJson("");
           }
 
           products = dedupeProducts(products);
 
-          if (!searchTerm) {
+          if (!normalizedSearch) {
             state.allProducts = products;
             state.productsLoaded = true;
-          } else if (!products.length && state.allProducts.length) {
-            filterProductsLocally(searchTerm);
+          }
+
+          if (!products.length && normalizedSearch && state.allProducts.length) {
+            filterProductsLocally(normalizedSearch);
             state.productsLoading = false;
             return;
           }
 
+          state.productSearchCache.set(normalizedSearch, products);
           renderProducts(products);
         } catch (error) {
           console.error("Product load error:", error);
@@ -1167,30 +1401,284 @@
 
         state.selectedProduct = selected;
         state.currentReviewType = "product";
+        state.formBackTarget = "productPicker";
         resetFormState(true);
         syncSubjectUI();
         setScreen("form");
       }
 
+      function updateRatingPreview() {
+        const numericValue = Number(ratingInput?.value || 0);
+
+        if (ratingPreviewStarsEl) {
+          ratingPreviewStarsEl.textContent = renderStars(numericValue);
+        }
+
+        if (ratingPreviewLabelEl) {
+          ratingPreviewLabelEl.textContent = numericValue
+            ? `${RATING_LABELS[numericValue]} • ${numericValue}/5`
+            : "No rating selected";
+        }
+      }
+
+      function updateStarUI(value) {
+        const numericValue = Number(value) || 0;
+        state.activeRating = numericValue;
+
+        if (ratingInput) {
+          ratingInput.value = numericValue ? String(numericValue) : "";
+        }
+
+        if (ratingTextEl) {
+          ratingTextEl.textContent = numericValue
+            ? RATING_LABELS[numericValue]
+            : "Select rating";
+        }
+
+        starButtons.forEach((btn) => {
+          const starValue = Number(btn.getAttribute("data-hcrf-star") || 0);
+          btn.classList.toggle("is-selected", starValue <= numericValue);
+        });
+
+        clearFieldError("rating", wrapper.querySelector("[data-hcrf-stars]"));
+        updateRatingPreview();
+      }
+
+      function handleSelectedImages(fileList) {
+        const incomingFiles = Array.from(fileList || []);
+        if (!incomingFiles.length) return;
+
+        const validFiles = incomingFiles.filter((file) =>
+          ["image/jpeg", "image/jpg", "image/png"].includes(file.type)
+        );
+
+        if (!validFiles.length) {
+          setFieldError("reviewImages", "Only JPG and PNG images are allowed.", imageDropzone);
+          showToast("Only JPG and PNG images are allowed.", "error");
+          return;
+        }
+
+        const tooLarge = validFiles.find(
+          (file) => file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024
+        );
+
+        if (tooLarge) {
+          setFieldError("reviewImages", `Each image should be ${MAX_IMAGE_SIZE_MB}MB or less.`, imageDropzone);
+          showToast(`Each image should be ${MAX_IMAGE_SIZE_MB}MB or less.`, "error");
+          return;
+        }
+
+        const existingMap = new Map(
+          state.selectedImages.map((file) => [getFileUniqueKey(file), file])
+        );
+
+        validFiles.forEach((file) => {
+          const key = getFileUniqueKey(file);
+          if (!existingMap.has(key)) {
+            existingMap.set(key, file);
+          }
+        });
+
+        const mergedFiles = Array.from(existingMap.values());
+
+        if (mergedFiles.length > MAX_REVIEW_IMAGES) {
+          state.selectedImages = mergedFiles.slice(0, MAX_REVIEW_IMAGES);
+          showToast(`You can upload up to ${MAX_REVIEW_IMAGES} images only.`, "error");
+        } else {
+          state.selectedImages = mergedFiles;
+        }
+
+        warmImageEncodePromises(state.selectedImages);
+        updateImageInputFiles();
+        renderImagePreview(state.selectedImages);
+        clearFieldError("reviewImages", imageDropzone);
+
+        if (imageInput) imageInput.value = "";
+      }
+
+      function handleSelectedVideo(file) {
+        if (!file) return;
+
+        const allowedTypes = ["video/mp4", "video/webm", "video/quicktime"];
+        const maxVideoSize = MAX_VIDEO_SIZE_MB * 1024 * 1024;
+
+        if (!allowedTypes.includes(file.type)) {
+          setFieldError("reviewVideo", "Only MP4, WEBM, and MOV videos are allowed.", videoDropzone);
+          showToast("Only MP4, WEBM, and MOV videos are allowed.", "error");
+          return;
+        }
+
+        if (file.size > maxVideoSize) {
+          setFieldError("reviewVideo", `Video size should be ${MAX_VIDEO_SIZE_MB}MB or less.`, videoDropzone);
+          showToast(`Video size should be ${MAX_VIDEO_SIZE_MB}MB or less.`, "error");
+          return;
+        }
+
+        state.selectedVideoFile = file;
+        renderVideoPreview(file);
+        clearFieldError("reviewVideo", videoDropzone);
+        beginVideoUploadIfNeeded(file).catch(() => {});
+      }
+
+      function bindDropzone(dropzoneEl, inputEl, onFiles) {
+        if (!dropzoneEl || !inputEl) return;
+
+        dropzoneEl.addEventListener("click", () => inputEl.click());
+
+        dropzoneEl.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            inputEl.click();
+          }
+        });
+
+        ["dragenter", "dragover"].forEach((eventName) => {
+          dropzoneEl.addEventListener(eventName, (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            dropzoneEl.classList.add("is-dragover");
+          });
+        });
+
+        ["dragleave", "dragend"].forEach((eventName) => {
+          dropzoneEl.addEventListener(eventName, (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            dropzoneEl.classList.remove("is-dragover");
+          });
+        });
+
+        dropzoneEl.addEventListener("drop", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          dropzoneEl.classList.remove("is-dragover");
+          const files = event.dataTransfer?.files;
+          if (files?.length) onFiles(files);
+        });
+      }
+
+      function validateStep(step, showErrors = true) {
+        let isValid = true;
+
+        const reviewType = safeText(hiddenFields.reviewType.value).trim();
+        const rating = Number(ratingInput?.value || 0);
+        const title = safeText(titleInput?.value).trim();
+        const message = safeText(messageInput?.value).trim();
+        const customerEmail = safeText(emailInput?.value).trim();
+        const customerName = safeText(nameInput?.value).trim();
+        const youtubeUrl = safeText(youtubeInput?.value).trim();
+
+        if (!reviewType) {
+          isValid = false;
+          if (showErrors) setMessage("Please choose store or product first.", "error");
+          return isValid;
+        }
+
+        if (reviewType === "product" && !safeText(hiddenFields.productId.value).trim()) {
+          isValid = false;
+          if (showErrors) setMessage("Please select a product first.", "error");
+          return isValid;
+        }
+
+        if (step === 1) {
+          if (!rating) {
+            isValid = false;
+            if (showErrors) {
+              setFieldError("rating", "Please select a rating.", wrapper.querySelector("[data-hcrf-stars]"));
+            }
+          } else {
+            clearFieldError("rating", wrapper.querySelector("[data-hcrf-stars]"));
+          }
+        }
+
+        if (step === 2) {
+          if (title.length > 80) {
+            isValid = false;
+            if (showErrors) setFieldError("title", "Title should be 80 characters or less.", titleInput);
+          } else {
+            clearFieldError("title", titleInput);
+          }
+
+          if (!message) {
+            isValid = false;
+            if (showErrors) setFieldError("message", "Review content is required.", messageInput);
+          } else if (message.length < 20) {
+            isValid = false;
+            if (showErrors) {
+              setFieldError("message", "Please write at least 20 characters for a better review.", messageInput);
+            }
+          } else {
+            clearFieldError("message", messageInput);
+          }
+        }
+
+        if (step === 3) {
+          if (!customerName && !anonymousInput?.checked) {
+            isValid = false;
+            if (showErrors) setFieldError("customerName", "Display name is required.", nameInput);
+          } else {
+            clearFieldError("customerName", nameInput);
+          }
+
+          if (customerEmail) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(customerEmail)) {
+              isValid = false;
+              if (showErrors) setFieldError("customerEmail", "Please enter a valid email.", emailInput);
+            } else {
+              clearFieldError("customerEmail", emailInput);
+            }
+          } else {
+            clearFieldError("customerEmail", emailInput);
+          }
+        }
+
+        if (step === 4) {
+          if (state.selectedImages.length > MAX_REVIEW_IMAGES) {
+            isValid = false;
+            if (showErrors) {
+              setFieldError("reviewImages", `You can upload up to ${MAX_REVIEW_IMAGES} images only.`, imageDropzone);
+            }
+          } else {
+            clearFieldError("reviewImages", imageDropzone);
+          }
+
+          if (youtubeUrl) {
+            const normalizedYoutube = normalizeYoutubeEmbedUrl(youtubeUrl);
+            if (!normalizedYoutube) {
+              isValid = false;
+              if (showErrors) setFieldError("reviewYoutubeUrl", "Please enter a valid YouTube link.", youtubeInput);
+            } else {
+              clearFieldError("reviewYoutubeUrl", youtubeInput);
+            }
+          } else {
+            clearFieldError("reviewYoutubeUrl", youtubeInput);
+          }
+        }
+
+        return isValid;
+      }
+
       selectorButtons.forEach((button) => {
         button.addEventListener("click", () => {
           const choice = button.getAttribute("data-hcrf-choice");
-          if (choice === "store") {
-            openStoreForm();
-          } else {
-            openProductPicker();
-          }
+          if (choice === "store") openStoreForm();
+          else openProductPicker();
         });
       });
 
       if (backToSelectorBtn) {
-        backToSelectorBtn.addEventListener("click", () => {
+        backToSelectorBtn.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
           setScreen("selector");
         });
       }
 
       if (backFromFormBtn) {
-        backFromFormBtn.addEventListener("click", () => {
+        backFromFormBtn.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
           backFromForm();
         });
       }
@@ -1240,48 +1728,11 @@
         });
       }
 
-      document.addEventListener("keydown", (event) => {
+      const documentKeydownHandler = (event) => {
         if (!state.isOpen) return;
-        if (event.key === "Escape") {
-          close();
-        }
-      });
-            function updateRatingPreview() {
-        const numericValue = Number(ratingInput?.value || 0);
-
-        if (ratingPreviewStarsEl) {
-          ratingPreviewStarsEl.textContent = renderStars(numericValue);
-        }
-
-        if (ratingPreviewLabelEl) {
-          ratingPreviewLabelEl.textContent = numericValue
-            ? `${RATING_LABELS[numericValue]} • ${numericValue}/5`
-            : "No rating selected";
-        }
-      }
-
-      function updateStarUI(value) {
-        const numericValue = Number(value) || 0;
-        state.activeRating = numericValue;
-
-        if (ratingInput) {
-          ratingInput.value = numericValue ? String(numericValue) : "";
-        }
-
-        if (ratingTextEl) {
-          ratingTextEl.textContent = numericValue
-            ? RATING_LABELS[numericValue]
-            : "Select rating";
-        }
-
-        starButtons.forEach((btn) => {
-          const starValue = Number(btn.getAttribute("data-hcrf-star") || 0);
-          btn.classList.toggle("is-selected", starValue <= numericValue);
-        });
-
-        clearFieldError("rating");
-        updateRatingPreview();
-      }
+        if (event.key === "Escape") close();
+      };
+      document.addEventListener("keydown", documentKeydownHandler);
 
       starButtons.forEach((btn) => {
         btn.addEventListener("mouseenter", () => {
@@ -1314,194 +1765,6 @@
         });
       }
 
-      function updateImageInputFiles() {
-        if (!imageInput) return;
-
-        const dt = new DataTransfer();
-        state.selectedImages.forEach((file) => dt.items.add(file));
-        imageInput.files = dt.files;
-      }
-
-      function renderImagePreview(files) {
-        if (!imagePreviewEl || !imagePreviewWrap) return;
-
-        imagePreviewEl.innerHTML = "";
-
-        if (!files.length) {
-          imagePreviewWrap.hidden = true;
-          return;
-        }
-
-        imagePreviewWrap.hidden = false;
-
-        files.forEach((file, index) => {
-          const reader = new FileReader();
-
-          reader.onload = (e) => {
-            const item = document.createElement("div");
-            item.className = "hcrf-image-item";
-            item.innerHTML = `
-              <img src="${escapeHtml(e.target?.result || "")}" alt="Preview">
-              <button
-                type="button"
-                class="hcrf-image-remove"
-                data-hcrf-remove-image="${index}"
-                aria-label="Remove image"
-              >
-                ×
-              </button>
-            `;
-            imagePreviewEl.appendChild(item);
-          };
-
-          reader.readAsDataURL(file);
-        });
-      }
-
-      function renderVideoPreview(file) {
-        if (!videoPreviewEl || !videoPreviewWrap) return;
-
-        videoPreviewEl.innerHTML = "";
-
-        if (!file) {
-          videoPreviewWrap.hidden = true;
-          return;
-        }
-
-        const videoUrl = URL.createObjectURL(file);
-        videoPreviewWrap.hidden = false;
-        videoPreviewEl.innerHTML = `
-          <div class="hcrf-video-item">
-            <video src="${videoUrl}" controls playsinline></video>
-            <button
-              type="button"
-              class="hcrf-video-remove"
-              data-hcrf-remove-video
-              aria-label="Remove video"
-            >
-              ×
-            </button>
-          </div>
-        `;
-      }
-
-      function getFileUniqueKey(file) {
-        return [file.name, file.size, file.lastModified, file.type].join("__");
-      }
-
-      function handleSelectedImages(fileList) {
-        const incomingFiles = Array.from(fileList || []);
-        if (!incomingFiles.length) return;
-
-        const validFiles = incomingFiles.filter((file) =>
-          ["image/jpeg", "image/jpg", "image/png"].includes(file.type)
-        );
-
-        if (!validFiles.length) {
-          setFieldError(
-            "reviewImages",
-            "Only JPG and PNG images are allowed.",
-            imageDropzone
-          );
-          showToast("Only JPG and PNG images are allowed.", "error");
-          return;
-        }
-
-        const existingMap = new Map(
-          state.selectedImages.map((file) => [getFileUniqueKey(file), file])
-        );
-
-        validFiles.forEach((file) => {
-          const key = getFileUniqueKey(file);
-          if (!existingMap.has(key)) {
-            existingMap.set(key, file);
-          }
-        });
-
-        const mergedFiles = Array.from(existingMap.values());
-
-        if (mergedFiles.length > MAX_REVIEW_IMAGES) {
-          state.selectedImages = mergedFiles.slice(0, MAX_REVIEW_IMAGES);
-          showToast(`You can upload up to ${MAX_REVIEW_IMAGES} images only.`, "error");
-        } else {
-          state.selectedImages = mergedFiles;
-        }
-
-        updateImageInputFiles();
-        renderImagePreview(state.selectedImages);
-        clearFieldError("reviewImages", imageDropzone);
-
-        if (imageInput) imageInput.value = "";
-      }
-
-      function handleSelectedVideo(file) {
-        if (!file) return;
-
-        const allowedTypes = ["video/mp4", "video/webm", "video/quicktime"];
-        const maxVideoSize = MAX_VIDEO_SIZE_MB * 1024 * 1024;
-
-        if (!allowedTypes.includes(file.type)) {
-          setFieldError(
-            "reviewVideo",
-            "Only MP4, WEBM, and MOV videos are allowed.",
-            videoDropzone
-          );
-          showToast("Only MP4, WEBM, and MOV videos are allowed.", "error");
-          return;
-        }
-
-        if (file.size > maxVideoSize) {
-          setFieldError(
-            "reviewVideo",
-            `Video size should be ${MAX_VIDEO_SIZE_MB}MB or less.`,
-            videoDropzone
-          );
-          showToast(`Video size should be ${MAX_VIDEO_SIZE_MB}MB or less.`, "error");
-          return;
-        }
-
-        state.selectedVideoFile = file;
-        renderVideoPreview(file);
-        clearFieldError("reviewVideo", videoDropzone);
-      }
-
-      function bindDropzone(dropzoneEl, inputEl, onFiles) {
-        if (!dropzoneEl || !inputEl) return;
-
-        dropzoneEl.addEventListener("click", () => inputEl.click());
-
-        dropzoneEl.addEventListener("keydown", (event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            inputEl.click();
-          }
-        });
-
-        ["dragenter", "dragover"].forEach((eventName) => {
-          dropzoneEl.addEventListener(eventName, (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            dropzoneEl.classList.add("is-dragover");
-          });
-        });
-
-        ["dragleave", "dragend"].forEach((eventName) => {
-          dropzoneEl.addEventListener(eventName, (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            dropzoneEl.classList.remove("is-dragover");
-          });
-        });
-
-        dropzoneEl.addEventListener("drop", (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          dropzoneEl.classList.remove("is-dragover");
-          const files = event.dataTransfer?.files;
-          if (files?.length) onFiles(files);
-        });
-      }
-
       if (imageInput) {
         imageInput.addEventListener("change", (event) => {
           handleSelectedImages(event.target.files);
@@ -1529,7 +1792,13 @@
           const index = Number(btn.getAttribute("data-hcrf-remove-image"));
           if (Number.isNaN(index)) return;
 
+          const removed = state.selectedImages[index];
           state.selectedImages.splice(index, 1);
+
+          if (removed) {
+            state.imageEncodePromises.delete(getFileUniqueKey(removed));
+          }
+
           updateImageInputFiles();
           renderImagePreview(state.selectedImages);
           clearFieldError("reviewImages", imageDropzone);
@@ -1544,149 +1813,33 @@
           state.selectedVideoFile = null;
           if (videoInput) videoInput.value = "";
           renderVideoPreview(null);
+          resetVideoUploadState();
           clearFieldError("reviewVideo", videoDropzone);
         });
       }
 
-      function validateStep(step, showErrors = true) {
-        let isValid = true;
-
-        const reviewType = safeText(hiddenFields.reviewType.value).trim();
-        const rating = Number(ratingInput?.value || 0);
-        const title = safeText(titleInput?.value).trim();
-        const message = safeText(messageInput?.value).trim();
-        const customerEmail = safeText(emailInput?.value).trim();
-        const customerName = safeText(nameInput?.value).trim();
-        const youtubeUrl = safeText(youtubeInput?.value).trim();
-
-        if (!reviewType) {
-          isValid = false;
-          if (showErrors) {
-            setMessage("Please choose store or product first.", "error");
-          }
-          return isValid;
-        }
-
-        if (reviewType === "product" && !safeText(hiddenFields.productId.value).trim()) {
-          isValid = false;
-          if (showErrors) {
-            setMessage("Please select a product first.", "error");
-          }
-          return isValid;
-        }
-
-        if (step === 1) {
-          if (!rating) {
-            isValid = false;
-            if (showErrors) setFieldError("rating", "Please select a rating.", starsWrap);
-          } else {
-            clearFieldError("rating", starsWrap);
-          }
-        }
-
-        if (step === 2) {
-          if (title.length > 80) {
-            isValid = false;
-            if (showErrors) {
-              setFieldError("title", "Title should be 80 characters or less.", titleInput);
-            }
-          } else {
-            clearFieldError("title", titleInput);
-          }
-
-          if (!message) {
-            isValid = false;
-            if (showErrors) {
-              setFieldError("message", "Review content is required.", messageInput);
-            }
-          } else if (message.length < 20) {
-            isValid = false;
-            if (showErrors) {
-              setFieldError(
-                "message",
-                "Please write at least 20 characters for a better review.",
-                messageInput
-              );
-            }
-          } else {
-            clearFieldError("message", messageInput);
-          }
-        }
-
-        if (step === 3) {
-          if (!customerName && !anonymousInput?.checked) {
-            isValid = false;
-            if (showErrors) {
-              setFieldError("customerName", "Display name is required.", nameInput);
-            }
-          } else {
-            clearFieldError("customerName", nameInput);
-          }
-
-          if (customerEmail) {
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(customerEmail)) {
-              isValid = false;
-              if (showErrors) {
-                setFieldError("customerEmail", "Please enter a valid email.", emailInput);
-              }
-            } else {
-              clearFieldError("customerEmail", emailInput);
-            }
-          } else {
-            clearFieldError("customerEmail", emailInput);
-          }
-        }
-
-        if (step === 4) {
-          if (state.selectedImages.length > MAX_REVIEW_IMAGES) {
-            isValid = false;
-            if (showErrors) {
-              setFieldError(
-                "reviewImages",
-                `You can upload up to ${MAX_REVIEW_IMAGES} images only.`,
-                imageDropzone
-              );
-            }
-          } else {
-            clearFieldError("reviewImages", imageDropzone);
-          }
-
-          if (youtubeUrl) {
-            const normalizedYoutube = normalizeYoutubeEmbedUrl(youtubeUrl);
-            if (!normalizedYoutube) {
-              isValid = false;
-              if (showErrors) {
-                setFieldError(
-                  "reviewYoutubeUrl",
-                  "Please enter a valid YouTube link.",
-                  youtubeInput
-                );
-              }
-            } else {
-              clearFieldError("reviewYoutubeUrl", youtubeInput);
-            }
-          } else {
-            clearFieldError("reviewYoutubeUrl", youtubeInput);
-          }
-        }
-
-        return isValid;
-      }
-
       if (stepBackBtn) {
-        stepBackBtn.addEventListener("click", () => {
-          goToStep(state.currentStep - 1);
+        stepBackBtn.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          if (state.currentStep > 1) {
+            goToStep(state.currentStep - 1);
+          }
         });
       }
 
       if (stepNextBtn) {
-        stepNextBtn.addEventListener("click", () => {
+        stepNextBtn.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
           const isValid = validateStep(state.currentStep, true);
           if (!isValid) {
             showToast("Please complete this step first.", "error");
             return;
           }
+
           goToStep(state.currentStep + 1);
         });
       }
@@ -1727,9 +1880,7 @@
 
       if (nameInput) {
         nameInput.addEventListener("input", () => {
-          if (nameInput.value.trim()) {
-            clearFieldError("customerName", nameInput);
-          }
+          if (nameInput.value.trim()) clearFieldError("customerName", nameInput);
         });
       }
 
@@ -1742,17 +1893,13 @@
           }
 
           const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-          if (emailRegex.test(value)) {
-            clearFieldError("customerEmail", emailInput);
-          }
+          if (emailRegex.test(value)) clearFieldError("customerEmail", emailInput);
         });
       }
 
       if (anonymousInput) {
         anonymousInput.addEventListener("change", () => {
-          if (anonymousInput.checked) {
-            clearFieldError("customerName", nameInput);
-          }
+          if (anonymousInput.checked) clearFieldError("customerName", nameInput);
         });
       }
 
@@ -1768,7 +1915,9 @@
             clearFieldError("reviewYoutubeUrl", youtubeInput);
           }
         });
-      }      if (form) {
+      }
+
+      if (form) {
         form.addEventListener("submit", async (event) => {
           event.preventDefault();
 
@@ -1810,23 +1959,34 @@
             let imageUrls = [];
             if (state.selectedImages.length) {
               imageUrls = await Promise.all(
-                state.selectedImages.map((file) => fileToDataUrl(file))
+                state.selectedImages.map((file) => {
+                  const key = getFileUniqueKey(file);
+                  const promise =
+                    state.imageEncodePromises.get(key) ||
+                    imageFileToOptimizedDataUrl(file);
+                  state.imageEncodePromises.set(key, promise);
+                  return promise;
+                })
               );
             }
 
             let uploadedVideoUrl = null;
             if (state.selectedVideoFile) {
-              const uploadTargetKey =
-                reviewType === "store"
-                  ? "store"
-                  : targetId || targetHandle || productId || "product";
+              if (state.videoUploadedUrl) {
+                uploadedVideoUrl = state.videoUploadedUrl;
+              } else if (state.videoUploadPromise) {
+                const maybeUrl = await state.videoUploadPromise;
+                if (maybeUrl) uploadedVideoUrl = maybeUrl;
+              }
 
-              uploadedVideoUrl = await uploadVideoToCloudinary(
-                state.selectedVideoFile,
-                config,
-                reviewType,
-                uploadTargetKey
-              );
+              if (!uploadedVideoUrl) {
+                uploadedVideoUrl = await uploadVideoToCloudinary(
+                  state.selectedVideoFile,
+                  config,
+                  reviewType,
+                  getUploadTargetKey()
+                );
+              }
             }
 
             const youtubeUrl = safeText(youtubeInput?.value).trim();
@@ -1850,10 +2010,8 @@
                   ? targetHandle || null
                   : null,
               targetTitle: targetTitle || null,
-
               productId: reviewType === "product" ? productId || null : null,
               productTitle: reviewType === "product" ? productTitle || null : null,
-
               customerName,
               customerEmail: safeText(emailInput?.value).trim() || null,
               rating: Number(ratingInput?.value || 0),
@@ -1876,8 +2034,7 @@
             const result = await response.json();
 
             if (!response.ok || !result.success) {
-              const errorMessage =
-                result.message || "Failed to submit review.";
+              const errorMessage = result.message || "Failed to submit review.";
               setMessage(errorMessage, "error");
               showToast(errorMessage, "error");
               return;
@@ -1924,6 +2081,11 @@
         close,
         destroy() {
           unlockBody();
+          document.removeEventListener("keydown", documentKeydownHandler);
+          clearTimeout(state.productSearchTimer);
+          revokeImagePreviewUrls();
+          revokeVideoPreviewUrl();
+          resetVideoUploadState();
           wrapper.remove();
         },
       };

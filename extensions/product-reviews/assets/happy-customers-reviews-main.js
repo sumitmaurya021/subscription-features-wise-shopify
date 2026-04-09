@@ -1,11 +1,15 @@
 (function (window, document) {
   if (window.HappyCustomersReviewsApp) return;
 
-  const FETCH_LIMIT = 50;
-  const MAX_FETCH_PAGES = 40;
+  const FETCH_LIMIT = 250;
+  const MAX_FETCH_PAGES = 120;
+  const SEARCH_DEBOUNCE = 180;
+  const REVIEW_CACHE_TTL = 2 * 60 * 1000;
+  const GALLERY_GAP = 8;
 
   const reviewFlowScriptPromises = new Map();
   const reviewFlowInstances = new WeakMap();
+  const reviewsMemoryCache = new Map();
 
   function loadReviewFlowScript(src) {
     if (!src) {
@@ -137,6 +141,7 @@
     const pageNumbersEl = root.querySelector(".hcr-page-numbers");
 
     const reviewTemplate = root.querySelector('[id^="hcr-review-card-template-"]');
+    const cacheKey = `hcr_reviews_cache__${shop}__${endpoint}`;
 
     const state = {
       allReviews: [],
@@ -149,10 +154,22 @@
       sortBy: normalizeSort(defaultSort),
       currentPage: 1,
       filteredReviews: [],
+      searchDebounce: null,
+      loadingController: null,
+      lastLoadedAt: 0,
+      initialCacheApplied: false,
       modal: {
         isOpen: false,
         entries: [],
         activeIndex: 0,
+        activeMediaIndex: 0,
+      },
+      gallery: {
+        currentIndex: 0,
+        itemsPerView: getGalleryItemsPerView(),
+        lastEntrySignature: "",
+        touchStartX: 0,
+        touchCurrentX: 0,
       },
     };
 
@@ -183,6 +200,175 @@
       return "most_recent";
     }
 
+    function getNow() {
+      return Date.now();
+    }
+
+    function getGalleryItemsPerView() {
+      const viewportWidth =
+        window.innerWidth || document.documentElement.clientWidth || 1200;
+
+      if (viewportWidth <= 479) return 3;
+      if (viewportWidth <= 767) return 4;
+      return 5;
+    }
+
+    function getGalleryMaxStartIndex() {
+      return Math.max(0, state.modal.entries.length - state.gallery.itemsPerView);
+    }
+
+    function clampGalleryIndex(index) {
+      return Math.max(0, Math.min(Number(index) || 0, getGalleryMaxStartIndex()));
+    }
+
+    function getGallerySlideBasis() {
+      return `calc((100% - ${GALLERY_GAP * (state.gallery.itemsPerView - 1)}px) / ${state.gallery.itemsPerView})`;
+    }
+
+    function getGalleryTranslateValue(index) {
+      return `calc(-${index} * ((100% - ${GALLERY_GAP * (state.gallery.itemsPerView - 1)}px) / ${state.gallery.itemsPerView} + ${GALLERY_GAP}px))`;
+    }
+
+    function syncGallerySliderUI() {
+      if (!mediaGridEl) return;
+
+      const track = mediaGridEl.querySelector(".hcr-media-track");
+      if (!track) return;
+
+      state.gallery.currentIndex = clampGalleryIndex(state.gallery.currentIndex);
+      track.style.transform = `translate3d(${getGalleryTranslateValue(
+        state.gallery.currentIndex
+      )}, 0, 0)`;
+
+      const prevBtn = mediaGridEl.querySelector(".hcr-media-nav--prev");
+      const nextBtn = mediaGridEl.querySelector(".hcr-media-nav--next");
+      const maxStartIndex = getGalleryMaxStartIndex();
+
+      if (prevBtn) {
+        prevBtn.disabled = state.gallery.currentIndex <= 0;
+        prevBtn.hidden = maxStartIndex <= 0;
+      }
+
+      if (nextBtn) {
+        nextBtn.disabled = state.gallery.currentIndex >= maxStartIndex;
+        nextBtn.hidden = maxStartIndex <= 0;
+      }
+
+      const dots = Array.from(
+        mediaGridEl.querySelectorAll(".hcr-media-slider-dot[data-gallery-page]")
+      );
+      dots.forEach((dot) => {
+        const dotIndex = Number(dot.getAttribute("data-gallery-page") || 0);
+        const active = dotIndex === state.gallery.currentIndex;
+        dot.classList.toggle("is-active", active);
+        dot.setAttribute("aria-pressed", active ? "true" : "false");
+      });
+
+      const counterEl = mediaGridEl.querySelector(".hcr-media-slider-counter");
+      if (counterEl) {
+        counterEl.hidden = state.modal.entries.length <= 0;
+        counterEl.textContent = `${state.modal.entries.length}/${state.modal.entries.length}`;
+      }
+    }
+
+    function goToGalleryIndex(index) {
+      state.gallery.currentIndex = clampGalleryIndex(index);
+      syncGallerySliderUI();
+    }
+
+    function getReviewCachePayload() {
+      const memoryPayload = reviewsMemoryCache.get(cacheKey);
+      if (
+        memoryPayload &&
+        memoryPayload.timestamp &&
+        getNow() - memoryPayload.timestamp < REVIEW_CACHE_TTL
+      ) {
+        return memoryPayload;
+      }
+
+      try {
+        const raw = window.sessionStorage.getItem(cacheKey);
+        if (!raw) return null;
+
+        const parsed = JSON.parse(raw);
+        if (
+          !parsed ||
+          !parsed.timestamp ||
+          getNow() - parsed.timestamp >= REVIEW_CACHE_TTL
+        ) {
+          return null;
+        }
+
+        return parsed;
+      } catch {
+        return null;
+      }
+    }
+
+    function saveReviewCachePayload(payload) {
+      if (!payload) return;
+
+      reviewsMemoryCache.set(cacheKey, payload);
+
+      try {
+        window.sessionStorage.setItem(cacheKey, JSON.stringify(payload));
+      } catch {}
+    }
+
+    function clearReviewCache() {
+      reviewsMemoryCache.delete(cacheKey);
+      try {
+        window.sessionStorage.removeItem(cacheKey);
+      } catch {}
+    }
+
+    function buildCachePayload() {
+      return {
+        timestamp: getNow(),
+        productReviews: state.productReviews,
+        storeReviews: state.storeReviews,
+      };
+    }
+
+    function applyCachedReviews(payload) {
+      if (!payload) return false;
+
+      const productItems = Array.isArray(payload.productReviews)
+        ? payload.productReviews
+        : [];
+      const storeItems = Array.isArray(payload.storeReviews)
+        ? payload.storeReviews
+        : [];
+
+      state.productReviews = productItems.filter((item) => {
+        return isApproved(item) && getReviewType(item) === "product";
+      });
+
+      state.storeReviews = storeItems.filter((item) => {
+        return isApproved(item) && getReviewType(item) === "store";
+      });
+
+      state.allReviews = [...state.productReviews, ...state.storeReviews];
+      state.lastLoadedAt = Number(payload.timestamp || getNow());
+
+      if (!state.productReviews.length && !state.storeReviews.length) {
+        return false;
+      }
+
+      state.initialCacheApplied = true;
+
+      if (showFilters && filtersPanel && filterToggleBtn) {
+        filterToggleBtn.hidden = false;
+      }
+
+      if (showSort && sortSelect) {
+        sortSelect.hidden = false;
+      }
+
+      applyAll();
+      return true;
+    }
+
     async function ensureReviewFlowInstance() {
       if (reviewFlowInstances.has(root)) {
         return reviewFlowInstances.get(root);
@@ -210,12 +396,17 @@
           fallbackWriteReviewUrl,
         },
         onSubmitted: async (payload = {}) => {
-          await loadReviews();
+          clearReviewCache();
+          await loadReviews({ force: true });
 
           if (payload.reviewType === "store") {
             setActiveTab("store");
           } else if (payload.reviewType === "product") {
             setActiveTab("product");
+          }
+
+          if (openReviewFlowBtn) {
+            openReviewFlowBtn.setAttribute("aria-expanded", "false");
           }
         },
       });
@@ -239,6 +430,7 @@
           throw new Error("Review flow instance is missing open().");
         }
 
+        openReviewFlowBtn.setAttribute("aria-expanded", "true");
         instance.open();
       } catch (error) {
         console.error("Happy Customers Review Flow Error:", error);
@@ -277,19 +469,40 @@
     }
 
     function getReviewType(review) {
-      const type = safeLower(
+      const explicitType = safeLower(
         review.reviewType || review.review_type || review.type || ""
       );
 
       if (
-        type === "store" ||
-        type === "store_review" ||
-        type === "store reviews"
+        explicitType === "store" ||
+        explicitType === "store_review" ||
+        explicitType === "store reviews"
       ) {
         return "store";
       }
 
-      return "product";
+      if (
+        explicitType === "product" ||
+        explicitType === "product_review" ||
+        explicitType === "product reviews"
+      ) {
+        return "product";
+      }
+
+      const hasProductIdentity = Boolean(
+        safeText(
+          review.productId ||
+            review.product_id ||
+            review.targetId ||
+            review.target_id ||
+            review.product?.id ||
+            review.productTitle ||
+            review.product_title ||
+            review.product?.title
+        ).trim()
+      );
+
+      return hasProductIdentity ? "product" : "store";
     }
 
     function isApproved(review) {
@@ -484,7 +697,7 @@
         }
 
         return "";
-      } catch (error) {
+      } catch {
         const embedMatch = raw.match(/youtube\.com\/embed\/([^?&/]+)/i);
         if (embedMatch?.[1]) return embedMatch[1];
 
@@ -796,8 +1009,6 @@
         const video = document.createElement("video");
         video.src = media.src;
         video.muted = true;
-        video.loop = true;
-        video.autoplay = true;
         video.playsInline = true;
         video.preload = "metadata";
         video.setAttribute("aria-label", safeText(altText || "Review media"));
@@ -818,11 +1029,9 @@
         const video = document.createElement("video");
         video.src = media.src;
         video.controls = true;
-        video.autoplay = true;
-        video.muted = true;
-        video.loop = true;
-        video.playsInline = true;
         video.preload = "metadata";
+        video.playsInline = true;
+        video.muted = true;
         video.setAttribute("aria-label", safeText(altText || "Review media"));
         return video;
       }
@@ -830,11 +1039,11 @@
       if (media.type === "youtube") {
         const iframe = document.createElement("iframe");
         const joiner = media.src.includes("?") ? "&" : "?";
-        iframe.src = `${media.src}${joiner}autoplay=1&rel=0&modestbranding=1`;
+        iframe.src = `${media.src}${joiner}rel=0&modestbranding=1`;
         iframe.title = safeText(altText || "Review media");
         iframe.setAttribute(
           "allow",
-          "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+          "accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
         );
         iframe.setAttribute("allowfullscreen", "true");
         iframe.setAttribute("frameborder", "0");
@@ -862,6 +1071,10 @@
         state.modal.activeIndex = 0;
       }
 
+      const activeEntry = state.modal.entries[state.modal.activeIndex];
+      const maxMediaIndex = Math.max(0, (activeEntry?.mediaItems?.length || 1) - 1);
+      state.modal.activeMediaIndex = Math.min(state.modal.activeMediaIndex, maxMediaIndex);
+
       if (state.modal.isOpen) {
         renderMediaModal();
       }
@@ -882,20 +1095,44 @@
 
       if (!mediaEntries.length) {
         mediaGalleryEl.hidden = true;
+        state.gallery.currentIndex = 0;
+        state.gallery.lastEntrySignature = "";
         return;
+      }
+
+      const entrySignature = mediaEntries.map((entry) => entry.id).join("||");
+      state.gallery.itemsPerView = getGalleryItemsPerView();
+
+      if (entrySignature !== state.gallery.lastEntrySignature) {
+        state.gallery.currentIndex = 0;
+        state.gallery.lastEntrySignature = entrySignature;
+      } else {
+        state.gallery.currentIndex = clampGalleryIndex(state.gallery.currentIndex);
       }
 
       mediaGalleryEl.hidden = false;
 
-      mediaEntries.slice(0, 4).forEach((entry, index) => {
+      const sliderEl = document.createElement("div");
+      sliderEl.className = "hcr-media-slider";
+
+      const viewportEl = document.createElement("div");
+      viewportEl.className = "hcr-media-viewport";
+
+      const trackEl = document.createElement("div");
+      trackEl.className = "hcr-media-track";
+      trackEl.style.gap = `${GALLERY_GAP}px`;
+
+      mediaEntries.forEach((entry, index) => {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "hcr-media-thumb";
-        button.setAttribute("data-review-index", String(index));
+        button.setAttribute("data-review-entry-index", String(index));
+        button.setAttribute("data-review-media-index", "0");
         button.setAttribute(
           "aria-label",
           `Open review from ${formatReviewerName(getCustomerName(entry.review))}`
         );
+        button.style.flex = `0 0 ${getGallerySlideBasis()}`;
 
         button.appendChild(
           createThumbMediaNode(
@@ -904,8 +1141,53 @@
           )
         );
 
-        mediaGridEl.appendChild(button);
+        trackEl.appendChild(button);
       });
+
+      viewportEl.appendChild(trackEl);
+
+      const prevBtn = document.createElement("button");
+      prevBtn.type = "button";
+      prevBtn.className = "hcr-media-nav hcr-media-nav--prev";
+      prevBtn.setAttribute("aria-label", "Previous media set");
+      prevBtn.innerHTML = "&#8249;";
+
+      const nextBtn = document.createElement("button");
+      nextBtn.type = "button";
+      nextBtn.className = "hcr-media-nav hcr-media-nav--next";
+      nextBtn.setAttribute("aria-label", "Next media set");
+      nextBtn.innerHTML = "&#8250;";
+
+      sliderEl.appendChild(prevBtn);
+      sliderEl.appendChild(viewportEl);
+      sliderEl.appendChild(nextBtn);
+
+      const footerEl = document.createElement("div");
+      footerEl.className = "hcr-media-slider-footer";
+
+      const dotsEl = document.createElement("div");
+      dotsEl.className = "hcr-media-slider-dots";
+
+      const totalPositions = getGalleryMaxStartIndex() + 1;
+      for (let index = 0; index < totalPositions; index += 1) {
+        const dot = document.createElement("button");
+        dot.type = "button";
+        dot.className = "hcr-media-slider-dot";
+        dot.setAttribute("data-gallery-page", String(index));
+        dot.setAttribute("aria-label", `Go to media set ${index + 1}`);
+        dotsEl.appendChild(dot);
+      }
+
+      const counterEl = document.createElement("div");
+      counterEl.className = "hcr-media-slider-counter";
+
+      footerEl.appendChild(dotsEl);
+      footerEl.appendChild(counterEl);
+
+      mediaGridEl.appendChild(sliderEl);
+      mediaGridEl.appendChild(footerEl);
+
+      syncGallerySliderUI();
     }
 
     function hideLoading() {
@@ -967,12 +1249,22 @@
       });
     }
 
+    function findModalEntryIndexByReviewId(reviewId) {
+      return state.modal.entries.findIndex((entry) => entry.id === reviewId);
+    }
+
+    function openModalForReviewMedia(reviewId, mediaIndex = 0) {
+      const entryIndex = findModalEntryIndexByReviewId(reviewId);
+      if (entryIndex === -1) return;
+      openMediaModal(entryIndex, mediaIndex);
+    }
+
     function renderReviewCards(items) {
       if (!reviewsListEl) return;
 
       reviewsListEl.innerHTML = "";
 
-      items.forEach((review) => {
+      items.forEach((review, index) => {
         let fragment = null;
 
         if (reviewTemplate && reviewTemplate.content) {
@@ -1017,7 +1309,8 @@
         const displayName = formatReviewerName(rawName);
         const title = getReviewTitle(review);
         const message = getReviewMessage(review);
-        const media = getReviewMediaItems(review).slice(0, 4);
+        const media = getReviewMediaItems(review).slice(0, 8);
+        const reviewId = getReviewId(review, `render-${index}`);
 
         if (starsEl) {
           starsEl.textContent = renderStarsText(getRatingValue(review));
@@ -1063,16 +1356,23 @@
           } else {
             mediaRowEl.hidden = false;
 
-            media.forEach((mediaItem) => {
-              const item = document.createElement("div");
-              item.className = "hcr-review-media-item";
-              item.appendChild(
+            media.forEach((mediaItem, mediaIndex) => {
+              const button = document.createElement("button");
+              button.type = "button";
+              button.className = "hcr-review-media-item hcr-review-media-button";
+              button.setAttribute("data-review-id", reviewId);
+              button.setAttribute("data-review-media-index", String(mediaIndex));
+              button.setAttribute(
+                "aria-label",
+                `Open media ${mediaIndex + 1} from review by ${displayName}`
+              );
+              button.appendChild(
                 createThumbMediaNode(
                   mediaItem,
                   title || getSourceLabel(review) || "Review media"
                 )
               );
-              mediaRowEl.appendChild(item);
+              mediaRowEl.appendChild(button);
             });
           }
         }
@@ -1170,48 +1470,58 @@
       state.ratingFilter = "all";
       state.selectedKeyword = "";
       state.searchTerm = "";
+      state.gallery.currentIndex = 0;
       if (searchInput) searchInput.value = "";
       applyAll();
     }
 
-    async function fetchReviewPage(reviewType, page) {
+    async function fetchReviewPage(reviewType, page, signal) {
       const params = new URLSearchParams();
       params.set("shop", shop);
       params.set("approvedOnly", "true");
-      params.set("reviewType", reviewType);
+      if (reviewType) params.set("reviewType", reviewType);
       params.set("limit", String(FETCH_LIMIT));
       params.set("page", String(page));
 
       const response = await fetch(`${endpoint}?${params.toString()}`, {
         method: "GET",
-        headers: {
-          Accept: "application/json",
-        },
+        headers: { Accept: "application/json" },
+        signal,
       });
 
       let result = {};
       try {
         result = await response.json();
-      } catch (error) {
+      } catch {
         result = {};
       }
 
       if (!response.ok || !result.success) {
-        throw new Error(result.message || `Failed to load ${reviewType} reviews.`);
+        throw new Error(result.message || `Failed to load ${reviewType || "reviews"}.`);
       }
 
       return Array.isArray(result.data) ? result.data : [];
     }
 
-    async function fetchAllReviewsByType(reviewType) {
+    async function fetchAllReviewsByType(reviewType, signal) {
       const allItems = [];
       const seenIds = new Set();
+      let emptyPages = 0;
 
       for (let page = 1; page <= MAX_FETCH_PAGES; page += 1) {
-        const items = await fetchReviewPage(reviewType, page);
+        if (signal?.aborted) {
+          throw new DOMException("Aborted", "AbortError");
+        }
 
-        if (!items.length) break;
+        const items = await fetchReviewPage(reviewType, page, signal);
 
+        if (!items.length) {
+          emptyPages += 1;
+          if (emptyPages >= 1) break;
+          continue;
+        }
+
+        emptyPages = 0;
         let newItemsCount = 0;
 
         items.forEach((item, index) => {
@@ -1223,41 +1533,143 @@
           newItemsCount += 1;
         });
 
-        if (newItemsCount === 0) break;
-        if (items.length < FETCH_LIMIT) break;
+        if (newItemsCount === 0) {
+          break;
+        }
       }
 
       return allItems;
     }
 
-    async function loadReviews() {
-      showLoading();
+    async function fetchFallbackAllApproved(signal) {
+      const allItems = [];
+      const seenIds = new Set();
+      let emptyPages = 0;
+
+      for (let page = 1; page <= MAX_FETCH_PAGES; page += 1) {
+        if (signal?.aborted) {
+          throw new DOMException("Aborted", "AbortError");
+        }
+
+        const items = await fetchReviewPage("", page, signal);
+
+        if (!items.length) {
+          emptyPages += 1;
+          if (emptyPages >= 1) break;
+          continue;
+        }
+
+        emptyPages = 0;
+        let newItemsCount = 0;
+
+        items.forEach((item, index) => {
+          const uniqueId = getReviewId(item, `fallback-${page}-${index}`);
+          if (seenIds.has(uniqueId)) return;
+
+          seenIds.add(uniqueId);
+          allItems.push(item);
+          newItemsCount += 1;
+        });
+
+        if (newItemsCount === 0) {
+          break;
+        }
+      }
+
+      return allItems;
+    }
+
+    function mergeMissingTypedReviews(typedItems, fallbackItems, expectedType) {
+      const merged = [];
+      const seenIds = new Set();
+
+      typedItems.forEach((item, index) => {
+        const id = getReviewId(item, `typed-${expectedType}-${index}`);
+        if (seenIds.has(id)) return;
+        seenIds.add(id);
+        merged.push(item);
+      });
+
+      fallbackItems.forEach((item, index) => {
+        if (getReviewType(item) !== expectedType) return;
+        const id = getReviewId(item, `fallback-${expectedType}-${index}`);
+        if (seenIds.has(id)) return;
+        seenIds.add(id);
+        merged.push(item);
+      });
+
+      return merged;
+    }
+
+    function normalizeLoadedReviews(productItems, storeItems) {
+      state.productReviews = productItems.filter((item) => {
+        return isApproved(item) && getReviewType(item) === "product";
+      });
+
+      state.storeReviews = storeItems.filter((item) => {
+        return isApproved(item) && getReviewType(item) === "store";
+      });
+
+      state.allReviews = [...state.productReviews, ...state.storeReviews];
+      state.lastLoadedAt = getNow();
+    }
+
+    async function loadReviews(options = {}) {
+      const { force = false } = options;
 
       if (!endpoint || !shop) {
         showEmpty();
         return;
       }
 
+      const cachedPayload = !force ? getReviewCachePayload() : null;
+      const didApplyCache = cachedPayload ? applyCachedReviews(cachedPayload) : false;
+
+      if (!didApplyCache) {
+        showLoading();
+      }
+
+      if (state.loadingController) {
+        try {
+          state.loadingController.abort();
+        } catch {}
+      }
+
+      const controller = new AbortController();
+      state.loadingController = controller;
+
       try {
         const settled = await Promise.allSettled([
-          fetchAllReviewsByType("product"),
-          fetchAllReviewsByType("store"),
+          fetchAllReviewsByType("product", controller.signal),
+          fetchAllReviewsByType("store", controller.signal),
+          fetchFallbackAllApproved(controller.signal),
         ]);
 
-        const productItems =
+        if (controller.signal.aborted) return;
+
+        const typedProductItems =
           settled[0].status === "fulfilled" ? settled[0].value : [];
-        const storeItems =
+        const typedStoreItems =
           settled[1].status === "fulfilled" ? settled[1].value : [];
+        const fallbackItems =
+          settled[2].status === "fulfilled" ? settled[2].value : [];
 
-        state.productReviews = productItems.filter((item) => {
-          return isApproved(item) && getReviewType(item) === "product";
-        });
+        const mergedProductItems = mergeMissingTypedReviews(
+          typedProductItems,
+          fallbackItems,
+          "product"
+        );
 
-        state.storeReviews = storeItems.filter((item) => {
-          return isApproved(item) && getReviewType(item) === "store";
-        });
+        const mergedStoreItems = mergeMissingTypedReviews(
+          typedStoreItems,
+          fallbackItems,
+          "store"
+        );
 
-        state.allReviews = [...state.productReviews, ...state.storeReviews];
+        normalizeLoadedReviews(mergedProductItems, mergedStoreItems);
+
+        const cachePayload = buildCachePayload();
+        saveReviewCachePayload(cachePayload);
 
         if (!state.productReviews.length && !state.storeReviews.length) {
           showEmpty();
@@ -1274,8 +1686,17 @@
 
         applyAll();
       } catch (error) {
+        if (error?.name === "AbortError") return;
+
         console.error("Happy Customers Reviews load error:", error);
-        showEmpty();
+
+        if (!didApplyCache) {
+          showEmpty();
+        }
+      } finally {
+        if (state.loadingController === controller) {
+          state.loadingController = null;
+        }
       }
     }
 
@@ -1350,12 +1771,14 @@
       refs.prevBtn.addEventListener("click", () => {
         if (state.modal.activeIndex <= 0) return;
         state.modal.activeIndex -= 1;
+        state.modal.activeMediaIndex = 0;
         renderMediaModal();
       });
 
       refs.nextBtn.addEventListener("click", () => {
         if (state.modal.activeIndex >= state.modal.entries.length - 1) return;
         state.modal.activeIndex += 1;
+        state.modal.activeMediaIndex = 0;
         renderMediaModal();
       });
 
@@ -1363,10 +1786,10 @@
         const target = event.target.closest(".hcr-media-modal__strip-item");
         if (!target) return;
 
-        const nextIndex = Number(target.getAttribute("data-review-index"));
-        if (Number.isNaN(nextIndex)) return;
+        const nextMediaIndex = Number(target.getAttribute("data-media-index"));
+        if (Number.isNaN(nextMediaIndex)) return;
 
-        state.modal.activeIndex = nextIndex;
+        state.modal.activeMediaIndex = nextMediaIndex;
         renderMediaModal();
       });
 
@@ -1380,6 +1803,7 @@
 
         if (event.key === "ArrowLeft" && state.modal.activeIndex > 0) {
           state.modal.activeIndex -= 1;
+          state.modal.activeMediaIndex = 0;
           renderMediaModal();
           return;
         }
@@ -1389,6 +1813,7 @@
           state.modal.activeIndex < state.modal.entries.length - 1
         ) {
           state.modal.activeIndex += 1;
+          state.modal.activeMediaIndex = 0;
           renderMediaModal();
         }
       });
@@ -1396,12 +1821,18 @@
       return refs;
     }
 
-    function openMediaModal(index) {
+    function openMediaModal(entryIndex, mediaIndex = 0) {
       if (!state.modal.entries.length || !modalRefs) return;
 
       state.modal.activeIndex = Math.max(
         0,
-        Math.min(index, state.modal.entries.length - 1)
+        Math.min(entryIndex, state.modal.entries.length - 1)
+      );
+
+      const entry = state.modal.entries[state.modal.activeIndex];
+      state.modal.activeMediaIndex = Math.max(
+        0,
+        Math.min(mediaIndex, Math.max(0, (entry?.mediaItems?.length || 1) - 1))
       );
 
       state.modal.isOpen = true;
@@ -1428,8 +1859,12 @@
 
       window.setTimeout(() => {
         if (state.modal.isOpen) return;
-        modalRefs.modalEl.hidden = true;
         modalRefs.stageEl.innerHTML = "";
+      }, 180);
+
+      window.setTimeout(() => {
+        if (state.modal.isOpen) return;
+        modalRefs.modalEl.hidden = true;
       }, 180);
     }
 
@@ -1445,7 +1880,15 @@
 
       const activeEntry = state.modal.entries[activeIndex];
       const review = activeEntry.review;
-      const previewMedia = activeEntry.previewMedia;
+      const mediaItems = Array.isArray(activeEntry.mediaItems) ? activeEntry.mediaItems : [];
+      const activeMediaIndex = Math.max(
+        0,
+        Math.min(state.modal.activeMediaIndex, Math.max(0, mediaItems.length - 1))
+      );
+
+      state.modal.activeMediaIndex = activeMediaIndex;
+
+      const activeMedia = mediaItems[activeMediaIndex] || activeEntry.previewMedia;
 
       const rawName = getCustomerName(review);
       const displayName = formatReviewerName(rawName);
@@ -1457,7 +1900,7 @@
       modalRefs.stageEl.innerHTML = "";
       modalRefs.stageEl.appendChild(
         createStageMediaNode(
-          previewMedia,
+          activeMedia,
           title || sourceLabel || "Review media"
         )
       );
@@ -1498,24 +1941,24 @@
 
       modalRefs.stripEl.innerHTML = "";
 
-      state.modal.entries.forEach((entry, index) => {
+      mediaItems.forEach((mediaItem, index) => {
         const stripBtn = document.createElement("button");
         stripBtn.type = "button";
         stripBtn.className = "hcr-media-modal__strip-item";
-        stripBtn.setAttribute("data-review-index", String(index));
+        stripBtn.setAttribute("data-media-index", String(index));
         stripBtn.setAttribute(
           "aria-label",
-          `Show review from ${formatReviewerName(getCustomerName(entry.review))}`
+          `Show media ${index + 1} from review by ${displayName}`
         );
 
-        if (index === activeIndex) {
+        if (index === activeMediaIndex) {
           stripBtn.classList.add("is-active");
         }
 
         stripBtn.appendChild(
           createThumbMediaNode(
-            entry.previewMedia,
-            getReviewTitle(entry.review) || getSourceLabel(entry.review)
+            mediaItem,
+            getReviewTitle(review) || getSourceLabel(review)
           )
         );
 
@@ -1534,6 +1977,7 @@
         const value = button.getAttribute("data-rating") || "all";
         state.ratingFilter = value;
         state.currentPage = 1;
+        state.gallery.currentIndex = 0;
         applyAll();
       });
     });
@@ -1546,20 +1990,20 @@
         const keyword = target.getAttribute("data-keyword") || "";
         state.selectedKeyword = state.selectedKeyword === keyword ? "" : keyword;
         state.currentPage = 1;
+        state.gallery.currentIndex = 0;
         applyAll();
       });
     }
 
     if (searchInput) {
-      let searchDebounce = null;
-
       searchInput.addEventListener("input", () => {
-        clearTimeout(searchDebounce);
-        searchDebounce = setTimeout(() => {
+        clearTimeout(state.searchDebounce);
+        state.searchDebounce = setTimeout(() => {
           state.searchTerm = safeText(searchInput.value).trim();
           state.currentPage = 1;
+          state.gallery.currentIndex = 0;
           applyAll();
-        }, 180);
+        }, SEARCH_DEBOUNCE);
       });
     }
 
@@ -1569,6 +2013,7 @@
         state.selectedKeyword = "";
         state.searchTerm = "";
         state.currentPage = 1;
+        state.gallery.currentIndex = 0;
         if (searchInput) searchInput.value = "";
         applyAll();
       });
@@ -1578,6 +2023,7 @@
       sortSelect.addEventListener("change", () => {
         state.sortBy = normalizeSort(sortSelect.value);
         state.currentPage = 1;
+        state.gallery.currentIndex = 0;
         applyAll();
       });
     }
@@ -1626,13 +2072,88 @@
 
     if (mediaGridEl) {
       mediaGridEl.addEventListener("click", (event) => {
-        const target = event.target.closest(".hcr-media-thumb[data-review-index]");
+        const navButton = event.target.closest(".hcr-media-nav");
+        if (navButton) {
+          if (navButton.classList.contains("hcr-media-nav--prev")) {
+            goToGalleryIndex(state.gallery.currentIndex - 1);
+          } else if (navButton.classList.contains("hcr-media-nav--next")) {
+            goToGalleryIndex(state.gallery.currentIndex + 1);
+          }
+          return;
+        }
+
+        const dotButton = event.target.closest(".hcr-media-slider-dot[data-gallery-page]");
+        if (dotButton) {
+          const pageIndex = Number(dotButton.getAttribute("data-gallery-page"));
+          if (!Number.isNaN(pageIndex)) {
+            goToGalleryIndex(pageIndex);
+          }
+          return;
+        }
+
+        const target = event.target.closest(".hcr-media-thumb[data-review-entry-index]");
         if (!target) return;
 
-        const reviewIndex = Number(target.getAttribute("data-review-index"));
-        if (Number.isNaN(reviewIndex)) return;
+        const entryIndex = Number(target.getAttribute("data-review-entry-index"));
+        const mediaIndex = Number(target.getAttribute("data-review-media-index") || 0);
 
-        openMediaModal(reviewIndex);
+        if (Number.isNaN(entryIndex)) return;
+
+        openMediaModal(entryIndex, Number.isNaN(mediaIndex) ? 0 : mediaIndex);
+      });
+
+      mediaGridEl.addEventListener(
+        "touchstart",
+        (event) => {
+          const sliderViewport = event.target.closest(".hcr-media-viewport");
+          if (!sliderViewport) return;
+          state.gallery.touchStartX = event.touches?.[0]?.clientX || 0;
+          state.gallery.touchCurrentX = state.gallery.touchStartX;
+        },
+        { passive: true }
+      );
+
+      mediaGridEl.addEventListener(
+        "touchmove",
+        (event) => {
+          state.gallery.touchCurrentX =
+            event.touches?.[0]?.clientX || state.gallery.touchCurrentX;
+        },
+        { passive: true }
+      );
+
+      mediaGridEl.addEventListener(
+        "touchend",
+        () => {
+          const deltaX = state.gallery.touchCurrentX - state.gallery.touchStartX;
+          if (Math.abs(deltaX) < 36) return;
+
+          if (deltaX < 0) {
+            goToGalleryIndex(state.gallery.currentIndex + 1);
+          } else {
+            goToGalleryIndex(state.gallery.currentIndex - 1);
+          }
+        },
+        { passive: true }
+      );
+    }
+
+    if (reviewsListEl) {
+      reviewsListEl.addEventListener("click", (event) => {
+        const target = event.target.closest(
+          ".hcr-review-media-button[data-review-id]"
+        );
+        if (!target) return;
+
+        const reviewId = target.getAttribute("data-review-id") || "";
+        const mediaIndex = Number(
+          target.getAttribute("data-review-media-index") || 0
+        );
+
+        openModalForReviewMedia(
+          reviewId,
+          Number.isNaN(mediaIndex) ? 0 : mediaIndex
+        );
       });
     }
 
@@ -1645,11 +2166,27 @@
       };
 
       if ("requestIdleCallback" in window) {
-        window.requestIdleCallback(preloadFlow, { timeout: 1500 });
+        window.requestIdleCallback(preloadFlow, { timeout: 1200 });
       } else {
-        window.setTimeout(preloadFlow, 1200);
+        window.setTimeout(preloadFlow, 900);
       }
     }
+
+    let resizeTimer = null;
+    window.addEventListener("resize", () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(() => {
+        const nextItemsPerView = getGalleryItemsPerView();
+
+        if (nextItemsPerView !== state.gallery.itemsPerView) {
+          state.gallery.itemsPerView = nextItemsPerView;
+          updateMediaGallery(state.filteredReviews);
+          return;
+        }
+
+        syncGallerySliderUI();
+      }, 120);
+    });
 
     loadReviews();
   }
