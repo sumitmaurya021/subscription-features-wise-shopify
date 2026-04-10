@@ -1,8 +1,6 @@
-# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
-
 client_id = "9d5e45a20a971b35817db5c8d68edfd0"
 name = "subscription-features-wise"
-application_url = "https://example.com"
+application_url = "https://subscription-features-wise-shopify.vercel.app"
 embedded = true
 
 [build]
@@ -31,15 +29,18 @@ api_version = "2026-04"
   topics = [ "inventory_levels/update" ]
   uri = "/webhooks/inventory-levels/update"
 
+  [[webhooks.subscriptions]]
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+  uri = "/webhooks/compliance"
+
 [access_scopes]
-# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_discounts,read_inventory,read_orders,read_products,write_discounts,write_metaobject_definitions,write_metaobjects,write_products"
+scopes = "read_discounts,read_inventory,read_orders,read_products,write_app_proxy,write_discounts,write_metaobject_definitions,write_metaobjects,write_products"
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [ "https://subscription-features-wise-shopify.vercel.app/api/auth" ]
 
 [app_proxy]
-url = "https://example.com/proxy/reviews"
+url = "/proxy/reviews"
 subpath = "reviews"
 prefix = "apps"
 

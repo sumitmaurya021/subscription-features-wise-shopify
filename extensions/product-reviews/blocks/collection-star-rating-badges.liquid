@@ -1,16 +1,4 @@
-{% if template.name == 'collection' %}
-  <div
-    id="pr-collection-star-rating-badges-{{ block.id }}"
-    class="pr-collection-star-rating-badges-root"
-    data-badge-type="collection"
-    data-shop="{{ shop.permanent_domain }}"
-    data-endpoint="/apps/reviews"
-    data-show-rating-number="{{ block.settings.show_rating_number }}"
-    data-show-review-count="{{ block.settings.show_review_count }}"
-    data-hide-when-no-reviews="{{ block.settings.hide_when_no_reviews }}"
-    {{ block.shopify_attributes }}
-  ></div>
-{% endif %}
+{% if template.name == 'collection' %}<div id="pr-collection-star-rating-badges-{{ block.id }}" class="pr-collection-star-rating-badges-root" data-badge-type="collection" data-shop="{{ shop.permanent_domain }}" data-endpoint="/apps/reviews" data-app-script="{{ 'star-rating-badge-main.js' | asset_url }}" data-show-rating-number="{{ block.settings.show_rating_number }}" data-show-review-count="{{ block.settings.show_review_count }}" data-hide-when-no-reviews="{{ block.settings.hide_when_no_reviews }}" data-star-size-desktop="{{ block.settings.star_size_desktop }}" data-star-size-mobile="{{ block.settings.star_size_mobile }}" data-star-color="{{ block.settings.star_color }}" data-star-base-color="{{ block.settings.star_base_color }}" {{ block.shopify_attributes }}></div>{% endif %}
 
 {% schema %}
 {
@@ -19,24 +7,16 @@
   "javascript": "star-rating-badge.js",
   "stylesheet": "star-rating-badge.css",
   "settings": [
-    {
-      "type": "checkbox",
-      "id": "show_rating_number",
-      "label": "Show rating number",
-      "default": true
-    },
-    {
-      "type": "checkbox",
-      "id": "show_review_count",
-      "label": "Show review count",
-      "default": true
-    },
-    {
-      "type": "checkbox",
-      "id": "hide_when_no_reviews",
-      "label": "Hide when no reviews",
-      "default": true
-    }
+    { "type": "header", "content": "Badge content" },
+    { "type": "checkbox", "id": "show_rating_number", "label": "Show rating number", "default": true },
+    { "type": "checkbox", "id": "show_review_count", "label": "Show review count", "default": true },
+    { "type": "checkbox", "id": "hide_when_no_reviews", "label": "Hide when no reviews", "default": true },
+
+    { "type": "header", "content": "Star style" },
+    { "type": "range", "id": "star_size_desktop", "label": "Star size desktop", "min": 10, "max": 28, "step": 1, "unit": "px", "default": 16 },
+    { "type": "range", "id": "star_size_mobile", "label": "Star size mobile", "min": 10, "max": 24, "step": 1, "unit": "px", "default": 14 },
+    { "type": "color", "id": "star_color", "label": "Star color", "default": "#0f766e" },
+    { "type": "color", "id": "star_base_color", "label": "Empty star color", "default": "#d1d5db" }
   ]
 }
 {% endschema %}

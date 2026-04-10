@@ -5,6 +5,7 @@
     ".pr-star-rating-badge-root[data-badge-type='product']";
   const COLLECTION_BADGE_ROOT_SELECTOR =
     ".pr-collection-star-rating-badges-root[data-badge-type='collection']";
+  const COLLECTION_HOST_SELECTOR = ".pr-star-badge-host--collection";
 
   const PRODUCT_CARD_SELECTORS = [
     ".card-wrapper",
@@ -16,6 +17,8 @@
     ".boost-sd__product-item",
     ".boost-pfs-filter-product-item",
     ".splide__slide",
+    ".swiper-slide",
+    ".product-item",
   ].join(",");
 
   const PRODUCT_TITLE_SELECTORS = [
@@ -24,6 +27,8 @@
     ".product-card__title",
     ".card__heading a",
     "a.full-unstyled-link",
+    ".product-item__title",
+    ".card-title",
   ].join(",");
 
   const PRODUCT_INFO_SELECTORS = [
@@ -32,18 +37,19 @@
     ".card__content",
     ".product-card__info",
     ".card-information__wrapper",
+    ".product-item__info",
   ].join(",");
 
   const PRODUCT_PRICE_SELECTORS = [
     ".price",
     ".price--on-sale",
     ".product-card__price",
+    ".price__container",
+    ".product-item__price",
   ].join(",");
 
-  function boolFromData(value, fallback) {
-    if (value === undefined || value === null || value === "") return fallback;
-    return String(value) === "true";
-  }
+  const reviewsRequestCache = new Map();
+  const handleToIdCache = new Map();
 
   function safeText(value) {
     return value === null || value === undefined ? "" : String(value);
@@ -58,9 +64,24 @@
       .replace(/'/g, "&#39;");
   }
 
+  function boolFromData(value, fallback) {
+    if (value === undefined || value === null || value === "") return fallback;
+    return String(value) === "true";
+  }
+
+  function numberFromData(value, fallback) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : fallback;
+  }
+
   function clampRating(value) {
     const numeric = Number(value) || 0;
     return Math.max(0, Math.min(5, numeric));
+  }
+
+  function normalizeColor(value, fallback) {
+    const color = safeText(value).trim();
+    return color || fallback;
   }
 
   function buildUrl(endpoint, params = {}) {
@@ -89,6 +110,26 @@
     return `${numericCount} review${numericCount === 1 ? "" : "s"}`;
   }
 
+  function getBadgeStyleVars(options = {}) {
+    const starSizeDesktop = Math.max(
+      10,
+      numberFromData(options.starSizeDesktop, 16)
+    );
+    const starSizeMobile = Math.max(
+      10,
+      numberFromData(options.starSizeMobile, 14)
+    );
+    const starColor = normalizeColor(options.starColor, "#0f766e");
+    const starBaseColor = normalizeColor(options.starBaseColor, "#d1d5db");
+
+    return [
+      `--pr-star-size-desktop:${starSizeDesktop}px`,
+      `--pr-star-size-mobile:${starSizeMobile}px`,
+      `--pr-star-fill:${starColor}`,
+      `--pr-star-base:${starBaseColor}`,
+    ].join(";");
+  }
+
   function buildBadgeMarkup({
     average = 0,
     count = 0,
@@ -96,6 +137,7 @@
     showReviewCount = true,
     href = "",
     extraClass = "",
+    styleVars = "",
   }) {
     const avg = clampRating(average);
     const fillWidth = `${(avg / 5) * 100}%`;
@@ -107,11 +149,16 @@
       ? `href="${escapeHtml(href)}"`
       : `type="button"`;
 
+    const shouldShowDivider = showRatingNumber && showReviewCount;
+
     return `
       <${tagName}
-        class="pr-star-badge ${extraClass} ${count > 0 ? "has-reviews" : "is-empty"}"
+        class="pr-star-badge ${escapeHtml(extraClass)} ${
+      count > 0 ? "has-reviews" : "is-empty"
+    }"
         ${tagAttrs}
         aria-label="${escapeHtml(reviewText)}"
+        style="${escapeHtml(styleVars)}"
       >
         <span class="pr-star-badge__stars" aria-hidden="true">
           <span class="pr-star-badge__stars-base">★★★★★</span>
@@ -119,12 +166,21 @@
         </span>
         ${
           showRatingNumber
-            ? `<span class="pr-star-badge__rating">${escapeHtml(ratingText)}</span>`
+            ? `<span class="pr-star-badge__rating">${escapeHtml(
+                ratingText
+              )}</span>`
+            : ""
+        }
+        ${
+          shouldShowDivider
+            ? `<span class="pr-star-badge__divider" aria-hidden="true"></span>`
             : ""
         }
         ${
           showReviewCount
-            ? `<span class="pr-star-badge__count">${escapeHtml(reviewText)}</span>`
+            ? `<span class="pr-star-badge__count">${escapeHtml(
+                reviewText
+              )}</span>`
             : ""
         }
       </${tagName}>
@@ -137,28 +193,44 @@
       approvedOnly: "true",
     };
 
-    if (productId) {
-      params.productId = productId;
-    }
-
+    if (productId) params.productId = productId;
     if (productIds && productIds.length) {
       params.productIds = productIds.join(",");
     }
 
-    const response = await fetch(buildUrl(endpoint, params), {
+    const cacheKey = JSON.stringify({
+      endpoint,
+      shop,
+      productId: safeText(productId),
+      productIds: Array.isArray(productIds) ? [...productIds].sort() : [],
+    });
+
+    if (reviewsRequestCache.has(cacheKey)) {
+      return reviewsRequestCache.get(cacheKey);
+    }
+
+    const requestPromise = fetch(buildUrl(endpoint, params), {
       method: "GET",
       headers: {
         Accept: "application/json",
       },
-    });
+    })
+      .then(async (response) => {
+        const result = await response.json();
 
-    const result = await response.json();
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || "Failed to load badge reviews");
+        }
 
-    if (!response.ok || !result.success) {
-      throw new Error(result.message || "Failed to load badge reviews");
-    }
+        return result;
+      })
+      .catch((error) => {
+        reviewsRequestCache.delete(cacheKey);
+        throw error;
+      });
 
-    return result;
+    reviewsRequestCache.set(cacheKey, requestPromise);
+    return requestPromise;
   }
 
   function groupReviewsByProductId(reviews) {
@@ -181,13 +253,31 @@
   function scrollToReviewsSection(root) {
     const targetSelector = root.dataset.scrollTarget || "#product-reviews-root";
     const target = document.querySelector(targetSelector);
-
     if (!target) return;
 
     target.scrollIntoView({
       behavior: "smooth",
       block: "start",
     });
+  }
+
+  function applyRootStyleVars(root) {
+    if (!root) return;
+
+    const styleVars = getBadgeStyleVars({
+      starSizeDesktop: root.dataset.starSizeDesktop,
+      starSizeMobile: root.dataset.starSizeMobile,
+      starColor: root.dataset.starColor,
+      starBaseColor: root.dataset.starBaseColor,
+    });
+
+    styleVars.split(";").forEach((entry) => {
+      const [key, value] = entry.split(":");
+      if (!key || !value) return;
+      root.style.setProperty(key.trim(), value.trim());
+    });
+
+    return styleVars;
   }
 
   async function initProductBadge(root) {
@@ -201,8 +291,11 @@
     const showReviewCount = boolFromData(root.dataset.showReviewCount, true);
     const hideWhenNoReviews = boolFromData(root.dataset.hideWhenNoReviews, true);
     const scrollToReviews = boolFromData(root.dataset.scrollToReviews, true);
+    const styleVars = applyRootStyleVars(root);
 
     if (!productId || !shop || !endpoint) return;
+
+    root.classList.add("is-loading");
 
     try {
       const result = await fetchApprovedReviews({
@@ -229,6 +322,7 @@
         showRatingNumber,
         showReviewCount,
         extraClass: "pr-star-badge--product",
+        styleVars,
       });
 
       const badgeEl = root.querySelector(".pr-star-badge");
@@ -253,7 +347,10 @@
         showRatingNumber,
         showReviewCount,
         extraClass: "pr-star-badge--product",
+        styleVars,
       });
+    } finally {
+      root.classList.remove("is-loading");
     }
   }
 
@@ -276,14 +373,15 @@
 
     try {
       const parsed = new URL(href, window.location.origin);
-      return `${parsed.pathname}${parsed.search}`;
+      return `${parsed.pathname}${parsed.search}#product-reviews-root`;
     } catch (error) {
-      return href;
+      return `${href}#product-reviews-root`;
     }
   }
 
   function findProductCard(linkEl) {
     if (!linkEl) return null;
+
     return (
       linkEl.closest(PRODUCT_CARD_SELECTORS) ||
       linkEl.closest("li") ||
@@ -298,54 +396,48 @@
       linkEl?.closest("[data-product-id]"),
       card?.closest("[data-product-id]"),
       card?.querySelector("[data-product-id]"),
+      card?.querySelector("[data-productid]"),
+      card?.querySelector("[data-id]"),
     ].filter(Boolean);
 
     for (const element of candidates) {
       const productId =
         element?.dataset?.productId ||
-        element?.getAttribute?.("data-product-id");
+        element?.dataset?.productid ||
+        element?.getAttribute?.("data-product-id") ||
+        element?.getAttribute?.("data-productid");
+
       if (productId) return safeText(productId);
     }
 
     return "";
   }
 
+  function removeExistingCollectionBadge(card) {
+    if (!card) return;
+    const existing = card.querySelector(COLLECTION_HOST_SELECTOR);
+    if (existing) existing.remove();
+  }
+
   function findInsertPosition(card) {
     if (!card) return null;
 
-    const existingHost = card.querySelector(".pr-star-badge-host--collection");
-    if (existingHost) {
-      existingHost.remove();
-    }
-
     const priceEl = card.querySelector(PRODUCT_PRICE_SELECTORS);
     if (priceEl && priceEl.parentNode) {
-      return {
-        mode: "before",
-        target: priceEl,
-      };
+      return { mode: "before", target: priceEl };
     }
 
     const titleEl = card.querySelector(PRODUCT_TITLE_SELECTORS);
     if (titleEl && titleEl.parentNode) {
-      return {
-        mode: "after",
-        target: titleEl,
-      };
+      return { mode: "after", target: titleEl };
     }
 
     const infoEl = card.querySelector(PRODUCT_INFO_SELECTORS);
     if (infoEl) {
-      return {
-        mode: "append",
-        target: infoEl,
-      };
+      return { mode: "append", target: infoEl };
     }
 
-    return {
-      mode: "append",
-      target: card,
-    };
+    return { mode: "append", target: card };
   }
 
   function insertCollectionBadge(card, html) {
@@ -370,24 +462,68 @@
   }
 
   async function fetchProductIdByHandle(handle) {
-    if (!handle) return "";
+    const normalizedHandle = safeText(handle);
+    if (!normalizedHandle) return "";
 
-    try {
-      const rootPath = window.Shopify?.routes?.root || "/";
-      const response = await fetch(`${rootPath}products/${handle}.js`, {
+    if (handleToIdCache.has(normalizedHandle)) {
+      return handleToIdCache.get(normalizedHandle);
+    }
+
+    const promise = fetch(
+      `${window.Shopify?.routes?.root || "/"}products/${normalizedHandle}.js`,
+      {
         method: "GET",
         headers: {
           Accept: "application/json",
         },
+      }
+    )
+      .then(async (response) => {
+        if (!response.ok) return "";
+        const product = await response.json();
+        return safeText(product?.id);
+      })
+      .catch(() => "")
+      .then((resolvedId) => {
+        handleToIdCache.set(normalizedHandle, Promise.resolve(resolvedId));
+        return resolvedId;
       });
 
-      if (!response.ok) return "";
+    handleToIdCache.set(normalizedHandle, promise);
+    return promise;
+  }
 
-      const product = await response.json();
-      return safeText(product?.id);
-    } catch (error) {
-      return "";
+  function getCollectionCardItems() {
+    const productLinks = Array.from(
+      document.querySelectorAll('a[href*="/products/"]')
+    );
+
+    if (!productLinks.length) return [];
+
+    const seenCards = new WeakSet();
+    const items = [];
+
+    for (const linkEl of productLinks) {
+      const card = findProductCard(linkEl);
+      if (!card || seenCards.has(card)) continue;
+      seenCards.add(card);
+
+      const handle = extractProductHandleFromUrl(linkEl.getAttribute("href"));
+      const productUrl = getProductUrlFromLink(linkEl);
+      if (!handle || !productUrl) continue;
+
+      removeExistingCollectionBadge(card);
+
+      items.push({
+        card,
+        linkEl,
+        handle,
+        productId: findExistingProductId(card, linkEl),
+        productUrl,
+      });
     }
+
+    return items;
   }
 
   async function initCollectionBadges(root) {
@@ -399,55 +535,19 @@
     const showRatingNumber = boolFromData(root.dataset.showRatingNumber, true);
     const showReviewCount = boolFromData(root.dataset.showReviewCount, true);
     const hideWhenNoReviews = boolFromData(root.dataset.hideWhenNoReviews, true);
+    const styleVars = applyRootStyleVars(root);
 
     if (!shop || !endpoint) return;
 
-    const productLinks = Array.from(
-      document.querySelectorAll('a[href*="/products/"]')
-    );
-
-    if (!productLinks.length) return;
-
-    const seenCards = new WeakSet();
-    const cardItems = [];
-
-    for (const linkEl of productLinks) {
-      const card = findProductCard(linkEl);
-      if (!card || seenCards.has(card)) continue;
-      seenCards.add(card);
-
-      const handle = extractProductHandleFromUrl(linkEl.getAttribute("href"));
-      const productUrl = getProductUrlFromLink(linkEl);
-      if (!handle || !productUrl) continue;
-
-      const productId = findExistingProductId(card, linkEl);
-
-      cardItems.push({
-        card,
-        linkEl,
-        handle,
-        productId,
-        productUrl,
-      });
-    }
-
+    const cardItems = getCollectionCardItems();
     if (!cardItems.length) return;
 
     const missingIdItems = cardItems.filter((item) => !item.productId);
 
     if (missingIdItems.length) {
-      const handleIdMap = new Map();
-
       await Promise.all(
         missingIdItems.map(async (item) => {
-          if (handleIdMap.has(item.handle)) {
-            item.productId = handleIdMap.get(item.handle);
-            return;
-          }
-
-          const resolvedId = await fetchProductIdByHandle(item.handle);
-          handleIdMap.set(item.handle, resolvedId);
-          item.productId = resolvedId;
+          item.productId = await fetchProductIdByHandle(item.handle);
         })
       );
     }
@@ -473,17 +573,16 @@
         const count = productReviews.length;
         const average = count > 0 ? calculateAverage(productReviews) : 0;
 
-        if (count === 0 && hideWhenNoReviews) {
-          return;
-        }
+        if (count === 0 && hideWhenNoReviews) return;
 
         const badgeHtml = buildBadgeMarkup({
           average,
           count,
           showRatingNumber,
           showReviewCount,
-          href: `${item.productUrl}#product-reviews-root`,
+          href: item.productUrl,
           extraClass: "pr-star-badge--collection",
+          styleVars,
         });
 
         insertCollectionBadge(item.card, badgeHtml);
@@ -507,17 +606,19 @@
   }
 
   async function initAll(scope = document) {
+    const container = scope || document;
+
     const productRoots = Array.from(
-      (scope || document).querySelectorAll(PRODUCT_BADGE_ROOT_SELECTOR)
+      container.querySelectorAll(PRODUCT_BADGE_ROOT_SELECTOR)
     );
-    await Promise.all(productRoots.map(initProductBadge));
+    await Promise.all(productRoots.map((root) => initProductBadge(root)));
 
     const collectionRoots = Array.from(
-      (scope || document).querySelectorAll(COLLECTION_BADGE_ROOT_SELECTOR)
+      container.querySelectorAll(COLLECTION_BADGE_ROOT_SELECTOR)
     );
 
-    for (const collectionRoot of collectionRoots) {
-      await initCollectionBadges(collectionRoot);
+    for (const root of collectionRoots) {
+      await initCollectionBadges(root);
     }
   }
 
