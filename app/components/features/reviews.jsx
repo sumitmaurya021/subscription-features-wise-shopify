@@ -1444,7 +1444,7 @@ export default function ReviewsPage() {
                   />
                 </div>
 
-                <div className="field-shell">
+                {/* <div className="field-shell">
                   <TextField
                     label="Shop"
                     value={filters.shop}
@@ -1452,9 +1452,9 @@ export default function ReviewsPage() {
                     autoComplete="off"
                     placeholder="Enter shop domain"
                   />
-                </div>
+                </div> */}
 
-                <div className="field-shell">
+                {/* <div className="field-shell">
                   <TextField
                     label="Target ID"
                     value={filters.targetId}
@@ -1462,9 +1462,9 @@ export default function ReviewsPage() {
                     autoComplete="off"
                     placeholder="Product / Collection target id"
                   />
-                </div>
+                </div> */}
 
-                <div className="field-shell">
+                {/* <div className="field-shell">
                   <TextField
                     label="Target Handle"
                     value={filters.targetHandle}
@@ -1482,7 +1482,7 @@ export default function ReviewsPage() {
                     autoComplete="off"
                     placeholder="Old product id filter"
                   />
-                </div>
+                </div> */}
               </div>
             </div>
 

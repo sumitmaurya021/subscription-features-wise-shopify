@@ -1,185 +1,48 @@
-<div
-  id="hcr-root-{{ block.id }}"
-  class="hcr-root"
-  data-section-id="{{ block.id }}"
-  data-endpoint="/apps/reviews"
-  data-shop="{{ shop.permanent_domain }}"
-  data-shop-name="{{ shop.name | escape }}"
-  data-default-tab="{{ block.settings.default_tab }}"
-  data-reviews-per-page="{{ block.settings.reviews_per_page }}"
-  data-default-sort="{{ block.settings.default_sort }}"
-  data-show-bar-chart="{{ block.settings.show_bar_chart }}"
-  data-show-media-gallery="{{ block.settings.show_media_gallery }}"
-  data-show-filters="{{ block.settings.show_filters }}"
-  data-show-sort="{{ block.settings.show_sort }}"
-  data-image-style="{{ block.settings.image_style }}"
-  data-stars-size="{{ block.settings.stars_size }}"
-  data-verified-badge-style="{{ block.settings.verified_badge_style }}"
-  data-review-title-size="{{ block.settings.review_title_text_size }}"
-  data-review-text-size="{{ block.settings.review_text_size }}"
-  data-review-text-length="{{ block.settings.review_text_length }}"
-  data-reviewer-name-format="{{ block.settings.reviewer_name_format }}"
-  data-cloudinary-cloud-name="{{ block.settings.cloudinary_cloud_name }}"
-  data-cloudinary-upload-preset="{{ block.settings.cloudinary_upload_preset }}"
-  data-app-script="{{ 'happy-customers-reviews-main.js' | asset_url }}"
-  data-review-flow-script="{{ 'happy-customers-review-form.js' | asset_url }}"
-  data-root-url="{{ routes.root_url }}"
-  data-products-json-url="{{ routes.root_url }}products.json"
-  data-predictive-search-url="{{ routes.predictive_search_url }}"
-  data-search-url="{{ routes.search_url }}"
-  data-fallback-write-review-url="{{ block.settings.write_review_url }}"
-  style="--hcr-accent:{{ block.settings.accent_color }};--hcr-button-bg:{{ block.settings.button_color }};--hcr-button-text:{{ block.settings.button_text_color }};--hcr-text:{{ block.settings.text_color }};--hcr-subtext:{{ block.settings.lighter_text_color }};--hcr-card-bg:{{ block.settings.card_background }};--hcr-section-bg:{{ block.settings.section_background }};--hcr-border:{{ block.settings.border_color }};"
->
+<div id="hcr-root-{{ block.id }}" class="hcr-root" data-section-id="{{ block.id }}" data-endpoint="/apps/reviews" data-shop="{{ shop.permanent_domain }}" data-shop-name="{{ shop.name | escape }}" data-default-tab="{{ block.settings.default_tab }}" data-reviews-per-page="{{ block.settings.reviews_per_page }}" data-default-sort="{{ block.settings.default_sort }}" data-show-bar-chart="{{ block.settings.show_bar_chart }}" data-show-media-gallery="{{ block.settings.show_media_gallery }}" data-show-filters="{{ block.settings.show_filters }}" data-show-sort="{{ block.settings.show_sort }}" data-image-style="{{ block.settings.image_style }}" data-stars-size="{{ block.settings.stars_size }}" data-verified-badge-style="{{ block.settings.verified_badge_style }}" data-review-title-size="{{ block.settings.review_title_text_size }}" data-review-text-size="{{ block.settings.review_text_size }}" data-review-text-length="{{ block.settings.review_text_length }}" data-reviewer-name-format="{{ block.settings.reviewer_name_format }}" data-cloudinary-cloud-name="{{ block.settings.cloudinary_cloud_name }}" data-cloudinary-upload-preset="{{ block.settings.cloudinary_upload_preset }}" data-app-script="{{ 'happy-customers-reviews-main.js' | asset_url }}" data-review-flow-script="{{ 'happy-customers-review-form.js' | asset_url }}" data-root-url="{{ routes.root_url }}" data-products-json-url="{{ routes.root_url }}products.json" data-predictive-search-url="{{ routes.predictive_search_url }}" data-search-url="{{ routes.search_url }}" data-fallback-write-review-url="{{ block.settings.write_review_url }}" style="--hcr-accent:{{ block.settings.accent_color }};--hcr-button-bg:{{ block.settings.button_color }};--hcr-button-text:{{ block.settings.button_text_color }};--hcr-text:{{ block.settings.text_color }};--hcr-subtext:{{ block.settings.lighter_text_color }};--hcr-card-bg:{{ block.settings.card_background }};--hcr-section-bg:{{ block.settings.section_background }};--hcr-border:{{ block.settings.border_color }};">
   <div class="hcr-widget hcr-corner--{{ block.settings.corner_styling }} hcr-header-size--{{ block.settings.header_text_size }} hcr-header-weight--{{ block.settings.header_text_weight }} hcr-rating-style--{{ block.settings.average_rating_style }} hcr-stars-size--{{ block.settings.stars_size }} hcr-review-title-size--{{ block.settings.review_title_text_size }} hcr-review-text-size--{{ block.settings.review_text_size }} hcr-review-text-length--{{ block.settings.review_text_length }}">
     <div class="hcr-top">
-      {% if block.settings.show_widget_title %}
-        <h2 class="hcr-widget-title">{{ block.settings.widget_title }}</h2>
-      {% endif %}
-
+      {% if block.settings.show_widget_title %}<h2 class="hcr-widget-title">{{ block.settings.widget_title }}</h2>{% endif %}
       <div class="hcr-summary-wrap">
         <div class="hcr-summary-header">
           <div class="hcr-summary-title-wrap">
             <h3 class="hcr-summary-title">{{ block.settings.store_summary_title }}</h3>
-            <div class="hcr-summary-rating-line">
-              <span class="hcr-summary-average">0.0</span>
-              <span class="hcr-summary-count">0 reviews</span>
-              <span class="hcr-summary-verified" hidden><span class="hcr-summary-verified-badge">Verified</span></span>
-            </div>
+            <div class="hcr-summary-rating-line"><span class="hcr-summary-average">0.0</span><span class="hcr-summary-count">0 reviews</span><span class="hcr-summary-verified" hidden><span class="hcr-summary-verified-badge">Verified</span></span></div>
           </div>
         </div>
-
         <div class="hcr-summary-grid">
           <div class="hcr-bar-chart" {% unless block.settings.show_bar_chart %}hidden{% endunless %}>
-            {% for star in (1..5) reversed %}
-              <div class="hcr-bar-row" data-star-row="{{ star }}">
-                <div class="hcr-bar-label"><span>{{ star }}</span><span class="hcr-bar-star">★</span></div>
-                <div class="hcr-bar-track"><div class="hcr-bar-fill" style="width:0%"></div></div>
-                <div class="hcr-bar-value">0</div>
-              </div>
-            {% endfor %}
+            {% for star in (1..5) reversed %}<div class="hcr-bar-row" data-star-row="{{ star }}"><div class="hcr-bar-label"><span>{{ star }}</span><span class="hcr-bar-star">★</span></div><div class="hcr-bar-track"><div class="hcr-bar-fill" style="width:0%"></div></div><div class="hcr-bar-value">0</div></div>{% endfor %}
           </div>
-
-          <div class="hcr-media-gallery" {% unless block.settings.show_media_gallery %}hidden{% endunless %}>
-            <div class="hcr-media-grid"></div>
-          </div>
-
-          <div class="hcr-write-review-wrap">
-            <button type="button" class="hcr-write-review-btn" data-hcr-open-review-flow aria-haspopup="dialog" aria-expanded="false">
-              {{ block.settings.write_review_label }}
-            </button>
-          </div>
+          <div class="hcr-media-gallery" {% unless block.settings.show_media_gallery %}hidden{% endunless %}><div class="hcr-media-grid"></div></div>
+          <div class="hcr-write-review-wrap"><button type="button" class="hcr-write-review-btn" data-hcr-open-review-flow aria-haspopup="dialog" aria-expanded="false">{{ block.settings.write_review_label }}</button></div>
         </div>
       </div>
     </div>
-
     <div class="hcr-controls">
       <div class="hcr-tabs" role="tablist" aria-label="Review type tabs">
-        <button type="button" class="hcr-tab" data-tab="product" role="tab" aria-selected="true">
-          Product reviews <span class="hcr-tab-count">(0)</span>
-        </button>
-        <button type="button" class="hcr-tab" data-tab="store" role="tab" aria-selected="false">
-          Store reviews <span class="hcr-tab-count">(0)</span>
-        </button>
+        <button type="button" class="hcr-tab" data-tab="product" role="tab" aria-selected="true">Product reviews <span class="hcr-tab-count">(0)</span></button>
+        <button type="button" class="hcr-tab" data-tab="store" role="tab" aria-selected="false">Store reviews <span class="hcr-tab-count">(0)</span></button>
       </div>
-
       <div class="hcr-actions">
-        {% if block.settings.show_filters %}
-          <button type="button" class="hcr-filter-toggle" aria-expanded="false" aria-controls="hcr-filters-{{ block.id }}">
-            <span class="hcr-filter-icon" aria-hidden="true">
-              <svg viewBox="0 0 20 20" focusable="false"><path d="M3.5 5h13l-5 5.5v4l-3 1v-5L3.5 5z" fill="currentColor"/></svg>
-            </span>
-            <span>Filters</span>
-          </button>
-        {% endif %}
-
-        {% if block.settings.show_sort %}
-          <label class="hcr-sort-wrap">
-            <span class="hcr-visually-hidden">Sort reviews</span>
-            <select class="hcr-sort-select">
-              <option value="most_recent" {% if block.settings.default_sort == 'most_recent' %}selected{% endif %}>Most recent</option>
-              <option value="highest_rating" {% if block.settings.default_sort == 'highest_rating' %}selected{% endif %}>Highest rating</option>
-              <option value="lowest_rating" {% if block.settings.default_sort == 'lowest_rating' %}selected{% endif %}>Lowest rating</option>
-              <option value="oldest" {% if block.settings.default_sort == 'oldest' %}selected{% endif %}>Oldest</option>
-            </select>
-          </label>
-        {% endif %}
+        {% if block.settings.show_filters %}<button type="button" class="hcr-filter-toggle" aria-expanded="false" aria-controls="hcr-filters-{{ block.id }}"><span class="hcr-filter-icon" aria-hidden="true"><svg viewBox="0 0 20 20" focusable="false"><path d="M3.5 5h13l-5 5.5v4l-3 1v-5L3.5 5z" fill="currentColor"/></svg></span><span>Filters</span></button>{% endif %}
+        {% if block.settings.show_sort %}<label class="hcr-sort-wrap"><span class="hcr-visually-hidden">Sort reviews</span><select class="hcr-sort-select"><option value="most_recent" {% if block.settings.default_sort == 'most_recent' %}selected{% endif %}>Most recent</option><option value="highest_rating" {% if block.settings.default_sort == 'highest_rating' %}selected{% endif %}>Highest rating</option><option value="lowest_rating" {% if block.settings.default_sort == 'lowest_rating' %}selected{% endif %}>Lowest rating</option><option value="oldest" {% if block.settings.default_sort == 'oldest' %}selected{% endif %}>Oldest</option></select></label>{% endif %}
       </div>
     </div>
-
     <div id="hcr-filters-{{ block.id }}" class="hcr-filters-panel" hidden>
       <div class="hcr-filter-group">
         <div class="hcr-filter-title">Rating</div>
-        <div class="hcr-rating-chips">
-          <button type="button" class="hcr-chip is-active" data-rating="all">All</button>
-          <button type="button" class="hcr-chip" data-rating="1">1 ★</button>
-          <button type="button" class="hcr-chip" data-rating="2">2 ★</button>
-          <button type="button" class="hcr-chip" data-rating="3">3 ★</button>
-          <button type="button" class="hcr-chip" data-rating="4">4 ★</button>
-          <button type="button" class="hcr-chip" data-rating="5">5 ★</button>
-        </div>
+        <div class="hcr-rating-chips"><button type="button" class="hcr-chip is-active" data-rating="all">All</button><button type="button" class="hcr-chip" data-rating="1">1 ★</button><button type="button" class="hcr-chip" data-rating="2">2 ★</button><button type="button" class="hcr-chip" data-rating="3">3 ★</button><button type="button" class="hcr-chip" data-rating="4">4 ★</button><button type="button" class="hcr-chip" data-rating="5">5 ★</button></div>
       </div>
-
-      <div class="hcr-filter-group">
-        <div class="hcr-filter-title">Keyword</div>
-        <div class="hcr-keyword-chips"></div>
-      </div>
-
-      <div class="hcr-filter-group hcr-filter-group--search">
-        <div class="hcr-filter-title">Search</div>
-        <label class="hcr-search-wrap">
-          <input type="search" class="hcr-search-input" placeholder="Search reviews" autocomplete="off">
-        </label>
-      </div>
-
-      <div class="hcr-filter-actions">
-        <button type="button" class="hcr-clear-filters">Clear filters</button>
-      </div>
+      <div class="hcr-filter-group"><div class="hcr-filter-title">Keyword</div><div class="hcr-keyword-chips"></div></div>
+      <div class="hcr-filter-group hcr-filter-group--search"><div class="hcr-filter-title">Search</div><label class="hcr-search-wrap"><input type="search" class="hcr-search-input" placeholder="Search reviews" autocomplete="off"></label></div>
+      <div class="hcr-filter-actions"><button type="button" class="hcr-clear-filters">Clear filters</button></div>
     </div>
-
-    <div class="hcr-reviews-state hcr-reviews-state--loading">
-      <div class="hcr-loading-card">
-        <div class="hcr-loading-line hcr-loading-line--lg"></div>
-        <div class="hcr-loading-line"></div>
-        <div class="hcr-loading-line"></div>
-        <div class="hcr-loading-line hcr-loading-line--sm"></div>
-      </div>
-    </div>
-
-    <div class="hcr-reviews-state hcr-reviews-state--empty" hidden>
-      <p>{{ block.settings.no_reviews_text }}</p>
-    </div>
-
+    <div class="hcr-reviews-state hcr-reviews-state--loading"><div class="hcr-loading-card"><div class="hcr-loading-line hcr-loading-line--lg"></div><div class="hcr-loading-line"></div><div class="hcr-loading-line"></div><div class="hcr-loading-line hcr-loading-line--sm"></div></div></div>
+    <div class="hcr-reviews-state hcr-reviews-state--empty" hidden><p>{{ block.settings.no_reviews_text }}</p></div>
     <div class="hcr-reviews-list" hidden></div>
-
-    <div class="hcr-pagination" hidden>
-      <button type="button" class="hcr-page-btn hcr-page-btn--prev" disabled>Previous</button>
-      <div class="hcr-page-numbers"></div>
-      <button type="button" class="hcr-page-btn hcr-page-btn--next" disabled>Next</button>
-    </div>
+    <div class="hcr-pagination" hidden><button type="button" class="hcr-page-btn hcr-page-btn--prev" disabled>Previous</button><div class="hcr-page-numbers"></div><button type="button" class="hcr-page-btn hcr-page-btn--next" disabled>Next</button></div>
   </div>
-
-  <template id="hcr-review-card-template-{{ block.id }}">
-    <article class="hcr-review-card">
-      <div class="hcr-review-stars">★★★★★</div>
-      <div class="hcr-review-meta">
-        <div class="hcr-reviewer-avatar">A</div>
-        <div class="hcr-reviewer-info">
-          <div class="hcr-reviewer-topline">
-            <div class="hcr-reviewer-name">Anonymous</div>
-            <div class="hcr-review-verified"></div>
-          </div>
-        </div>
-      </div>
-      <h4 class="hcr-review-title"></h4>
-      <div class="hcr-review-text"></div>
-      <div class="hcr-review-media-row"></div>
-      <div class="hcr-review-footer">
-        <div class="hcr-review-source-badge"></div>
-        <div class="hcr-review-date"></div>
-      </div>
-    </article>
-  </template>
-
+  <template id="hcr-review-card-template-{{ block.id }}"><article class="hcr-review-card"><div class="hcr-review-stars">★★★★★</div><div class="hcr-review-meta"><div class="hcr-reviewer-avatar">A</div><div class="hcr-reviewer-info"><div class="hcr-reviewer-topline"><div class="hcr-reviewer-name">Anonymous</div><div class="hcr-review-verified"></div></div></div></div><h4 class="hcr-review-title"></h4><div class="hcr-review-text"></div><div class="hcr-review-media-row"></div><div class="hcr-review-footer"><div class="hcr-review-source-badge"></div><div class="hcr-review-date"></div></div></article></template>
   <div class="hcr-review-flow-host" data-hcr-review-flow-host></div>
 </div>
 
