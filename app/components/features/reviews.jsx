@@ -1296,7 +1296,7 @@ export default function ReviewsPage() {
                   <BlockStack gap="150">
                     <span className="hero-kicker">
                       <span className="hero-dot" />
-                      Review Intelligence Dashboard
+                      Review Dashboard
                     </span>
 
                     <div>

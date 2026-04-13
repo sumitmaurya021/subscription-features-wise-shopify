@@ -488,7 +488,7 @@ body.frt-no-scroll {
 }
 
 .frt-summary-star.is-filled {
-  color: #f59e0b;
+  color: #108474;
   transform: scale(1.04);
 }
 
@@ -644,9 +644,9 @@ body.frt-no-scroll {
   font-size: 13px;
   line-height: 1;
   letter-spacing: 1px;
-  color: #f59e0b;
-  background: linear-gradient(180deg, #fff7ed, #fffbeb);
-  border: 1px solid rgba(253, 230, 138, 0.95);
+  color: #108474;
+  background: linear-gradient(180deg, #ffffff, #a2e7c178);
+  border: 1px solid #108474;
   padding: 6px 9px;
   border-radius: 999px;
   box-shadow: 0 8px 18px rgba(245, 158, 11, 0.1);
