@@ -27,6 +27,30 @@
   padding: 0 18px;
 }
 
+.prvc-loader-shell {
+  width: 100%;
+  min-height: 420px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.prvc-spinner {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 5px solid #d7d7d7;
+  border-top-color: #0f8e87;
+  border-right-color: #0f8e87;
+  animation: prvcSpin 0.8s linear infinite;
+}
+
+@keyframes prvcSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .prvc-head {
   text-align: center;
   margin-bottom: 34px;
@@ -380,6 +404,10 @@
   .prvc-controls {
     margin-top: 22px;
   }
+
+  .prvc-loader-shell {
+    min-height: 360px;
+  }
 }
 
 @media (max-width: 767px) {
@@ -390,6 +418,16 @@
 
   .prvc-shell {
     padding: 0 14px;
+  }
+
+  .prvc-loader-shell {
+    min-height: 300px;
+  }
+
+  .prvc-spinner {
+    width: 48px;
+    height: 48px;
+    border-width: 4px;
   }
 
   .prvc-title {

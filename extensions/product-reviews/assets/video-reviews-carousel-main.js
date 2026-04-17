@@ -55,18 +55,10 @@
 
       const existing = document.getElementById(id);
       if (existing) {
-        existing.addEventListener(
-          "load",
-          function () {
-            resolve();
-          },
-          { once: true }
-        );
+        existing.addEventListener("load", () => resolve(), { once: true });
         existing.addEventListener(
           "error",
-          function () {
-            reject(new Error("Failed to load script: " + url));
-          },
+          () => reject(new Error("Failed to load script: " + url)),
           { once: true }
         );
         return;
@@ -76,12 +68,9 @@
       script.id = id;
       script.src = url;
       script.async = true;
-      script.onload = function () {
-        resolve();
-      };
-      script.onerror = function () {
+      script.onload = () => resolve();
+      script.onerror = () =>
         reject(new Error("Failed to load script: " + url));
-      };
       document.head.appendChild(script);
     });
   }
@@ -282,7 +271,7 @@
         '">' +
         '<div class="prvc-youtube-thumb" style="background-image:url(\'' +
         escapeHtml(getYoutubeThumb(review.reviewYoutubeUrl)) +
-        '\')"></div>' +
+        "')\"></div>" +
         '<button type="button" class="prvc-play" aria-label="Play video">' +
         '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6.5v11l9-5.5-9-5.5z"></path></svg>' +
         "</button>" +
@@ -346,7 +335,6 @@
           "</div>" +
           "</div>"
         : "") +
-      "</div>" +
       '<div class="prvc-slider-area">' +
       '<div class="prvc-track" data-prvc-track>' +
       reviews
@@ -364,16 +352,26 @@
       "</button>" +
       "</div>" +
       "</div>" +
+      "</div>" +
       "</div>"
     );
+  }
+
+  function renderLoader() {
+    return (
+      '<div class="prvc-loader-shell">' +
+      '<div class="prvc-spinner" aria-label="Loading" role="status"></div>' +
+      "</div>"
+    );
+  }
+
+  function showLoader(mount) {
+    mount.innerHTML = renderLoader();
   }
 
   function showEmpty(mount, message) {
     mount.innerHTML =
       '<div class="prvc-shell">' +
-      '<div class="prvc-head">' +
-      '<h2 class="prvc-title">Customers are saying</h2>' +
-      "</div>" +
       '<div class="prvc-empty">' +
       "<p>" +
       escapeHtml(message) +
@@ -416,7 +414,7 @@
     mediaEl.innerHTML =
       '<div class="prvc-youtube-thumb" style="background-image:url(\'' +
       escapeHtml(getYoutubeThumb(youtubeUrl)) +
-      '\')"></div>' +
+      "')\"></div>" +
       '<button type="button" class="prvc-play" aria-label="Play video">' +
       '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6.5v11l9-5.5-9-5.5z"></path></svg>' +
       "</button>";
@@ -433,10 +431,11 @@
       const youtubeUrl = media.getAttribute("data-youtube-url");
 
       if (video) {
+        const playBtn = media.querySelector(".prvc-play");
+
         if (isCenter) {
           video.muted = true;
           video.playsInline = true;
-          const playBtn = media.querySelector(".prvc-play");
           if (playBtn) playBtn.classList.add("is-hidden");
           video.play().catch(function () {});
         } else {
@@ -444,7 +443,6 @@
           try {
             video.currentTime = 0;
           } catch (error) {}
-          const playBtn = media.querySelector(".prvc-play");
           if (playBtn) playBtn.classList.remove("is-hidden");
         }
         return;
@@ -515,13 +513,6 @@
           throw new Error("Slick not available.");
         }
 
-        mount.innerHTML = renderShell(settings, reviews, averageRating);
-
-        const $mount = $(mount);
-        const $track = $mount.find("[data-prvc-track]");
-        const $prev = $mount.find("[data-prvc-prev]");
-        const $next = $mount.find("[data-prvc-next]");
-
         if (!reviews.length) {
           showEmpty(mount, "No video reviews yet.");
           return;
@@ -531,6 +522,13 @@
           initSingleView(mount, settings, reviews, averageRating);
           return;
         }
+
+        mount.innerHTML = renderShell(settings, reviews, averageRating);
+
+        const $mount = $(mount);
+        const $track = $mount.find("[data-prvc-track]");
+        const $prev = $mount.find("[data-prvc-prev]");
+        const $next = $mount.find("[data-prvc-next]");
 
         $track.on("init", function () {
           setTimeout(function () {
@@ -570,7 +568,7 @@
             {
               breakpoint: 767,
               settings: {
-                slidesToShow: 2,
+                slidesToShow: 1,
                 centerMode: true,
               },
             },
@@ -702,8 +700,7 @@
         } catch (error) {}
       }
 
-      mount.innerHTML =
-        '<div class="prvc-shell"><div class="prvc-loading">Loading reviews...</div></div>';
+      showLoader(mount);
 
       try {
         const result = await fetchReviews(settings);
