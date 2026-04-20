@@ -1,13 +1,9 @@
 <div
   id="prvc-root-{{ block.id }}"
-  class="prvc-root"
+  class="prvc-root is-loading"
   data-block-id="{{ block.id }}"
   data-app-script="{{ 'video-reviews-carousel-main.js' | asset_url }}"
-  style="
-    --prvc-max-width: {{ block.settings.maximum_width }}px;
-    --prvc-section-pt: {{ block.settings.padding_top }}px;
-    --prvc-section-pb: {{ block.settings.padding_bottom }}px;
-  "
+  style="--prvc-max-width:{{ block.settings.maximum_width }}px;--prvc-section-pt:{{ block.settings.padding_top }}px;--prvc-section-pb:{{ block.settings.padding_bottom }}px;"
   {{ block.shopify_attributes }}
 >
   <script type="application/json" data-prvc-config>
@@ -15,7 +11,7 @@
       "shop": {{ shop.permanent_domain | json }},
       "endpoint": {{ '/apps/reviews' | json }},
       "productId": {{ product.id | json }},
-      "selectedProductId": {% if block.settings.custom_product != blank %}{{ block.settings.custom_product.id | json }}{% else %}null{% endif %},
+      "selectedProductId": {{ block.settings.custom_product.id | json }},
       "showSampleReviews": {{ block.settings.show_sample_reviews | json }},
       "reviewSelection": {{ block.settings.review_selection | json }},
       "starRating": {{ block.settings.star_rating | json }},
@@ -29,11 +25,7 @@
     }
   </script>
 
-  <div class="prvc-mount" data-prvc-mount>
-    <div class="prvc-loader-shell">
-      <div class="prvc-spinner" aria-label="Loading" role="status"></div>
-    </div>
-  </div>
+  <div class="prvc-mount" data-prvc-mount></div>
 </div>
 
 {% schema %}

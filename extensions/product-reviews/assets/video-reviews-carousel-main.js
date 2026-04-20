@@ -357,19 +357,17 @@
     );
   }
 
-  function renderLoader() {
-    return (
-      '<div class="prvc-loader-shell">' +
-      '<div class="prvc-spinner" aria-label="Loading" role="status"></div>' +
-      "</div>"
-    );
+  function setLoadingState(root, isLoading) {
+    root.classList.toggle("is-loading", !!isLoading);
+    root.classList.toggle("is-loaded", !isLoading);
   }
 
-  function showLoader(mount) {
-    mount.innerHTML = renderLoader();
+  function clearMount(mount) {
+    mount.innerHTML = "";
   }
 
-  function showEmpty(mount, message) {
+  function showEmpty(root, mount, message) {
+    setLoadingState(root, false);
     mount.innerHTML =
       '<div class="prvc-shell">' +
       '<div class="prvc-empty">' +
@@ -420,7 +418,7 @@
       "</button>";
   }
 
-  function setActiveMedia($track) {
+  function setActiveMedia($track, settings) {
     $track.find(".prvc-slide").each(function () {
       const slide = this;
       const media = slide.querySelector(".prvc-media");
@@ -433,7 +431,7 @@
       if (video) {
         const playBtn = media.querySelector(".prvc-play");
 
-        if (isCenter) {
+        if (isCenter && settings.autoplayMedia) {
           video.muted = true;
           video.playsInline = true;
           if (playBtn) playBtn.classList.add("is-hidden");
@@ -449,7 +447,7 @@
       }
 
       if (youtubeUrl) {
-        if (isCenter) {
+        if (isCenter && settings.autoplayMedia) {
           mountYoutubeIframe(media, youtubeUrl);
         } else {
           mountYoutubeThumb(media, youtubeUrl);
@@ -458,7 +456,7 @@
     });
   }
 
-  function bindSlideInteractions($, $track) {
+  function bindSlideInteractions($, $track, settings) {
     $track.on("click", ".prvc-slide", function (event) {
       const $slide = $(this);
 
@@ -475,6 +473,7 @@
 
       const video = media.querySelector("video");
       const playBtn = media.querySelector(".prvc-play");
+      const youtubeUrl = media.getAttribute("data-youtube-url");
 
       if (video) {
         if (video.paused) {
@@ -484,19 +483,24 @@
           video.pause();
           if (playBtn) playBtn.classList.remove("is-hidden");
         }
+        return;
+      }
+
+      if (youtubeUrl && !media.querySelector("iframe")) {
+        mountYoutubeIframe(media, youtubeUrl);
       }
     });
   }
 
-  function initSingleView(mount, settings, reviews, averageRating) {
+  function initSingleView(root, mount, settings, reviews, averageRating) {
     mount.innerHTML = renderShell(settings, reviews, averageRating);
 
     const track = mount.querySelector("[data-prvc-track]");
     const slide = track ? track.querySelector(".prvc-slide") : null;
 
-    if (slide) {
+    if (slide && window.jQuery) {
       slide.classList.add("slick-center", "is-single");
-      setActiveMedia(window.jQuery(track));
+      setActiveMedia(window.jQuery(track), settings);
     }
 
     const prev = mount.querySelector("[data-prvc-prev]");
@@ -504,6 +508,8 @@
 
     if (prev) prev.disabled = true;
     if (next) next.disabled = true;
+
+    setLoadingState(root, false);
   }
 
   function initSlickCarousel(root, mount, settings, reviews, averageRating) {
@@ -514,12 +520,12 @@
         }
 
         if (!reviews.length) {
-          showEmpty(mount, "No video reviews yet.");
+          showEmpty(root, mount, "No video reviews yet.");
           return;
         }
 
         if (reviews.length === 1) {
-          initSingleView(mount, settings, reviews, averageRating);
+          initSingleView(root, mount, settings, reviews, averageRating);
           return;
         }
 
@@ -532,12 +538,13 @@
 
         $track.on("init", function () {
           setTimeout(function () {
-            setActiveMedia($track);
+            setActiveMedia($track, settings);
+            setLoadingState(root, false);
           }, 60);
         });
 
         $track.on("afterChange", function () {
-          setActiveMedia($track);
+          setActiveMedia($track, settings);
         });
 
         $track.slick({
@@ -583,10 +590,14 @@
           $track.slick("slickNext");
         });
 
-        bindSlideInteractions($, $track);
+        bindSlideInteractions($, $track, settings);
 
         root.__prvcDestroy = function () {
           try {
+            $track.find("video").each(function () {
+              this.pause();
+            });
+
             if ($track.hasClass("slick-initialized")) {
               $track.slick("unslick");
             }
@@ -595,7 +606,11 @@
       })
       .catch(function (error) {
         console.error("PRVC slick init error:", error);
-        showEmpty(mount, "Carousel load nahi ho paaya.");
+        showEmpty(
+          root,
+          mount,
+          "Carousel load nahi ho paaya. Error: " + (error && error.message ? error.message : "Unknown")
+        );
       });
   }
 
@@ -674,12 +689,18 @@
       },
     });
 
-    const result = await response.json();
+    let result = null;
+
+    try {
+      result = await response.json();
+    } catch (error) {
+      throw new Error("Invalid review response.");
+    }
 
     if (!response.ok || !result.success) {
       return {
         success: false,
-        message: "Reviews fetch nahi hui.",
+        message: result && result.message ? result.message : "Reviews fetch nahi hui.",
         data: [],
       };
     }
@@ -700,7 +721,8 @@
         } catch (error) {}
       }
 
-      showLoader(mount);
+      clearMount(mount);
+      setLoadingState(root, true);
 
       try {
         const result = await fetchReviews(settings);
@@ -710,6 +732,7 @@
 
         if (!result.success || !reviews.length) {
           showEmpty(
+            root,
             mount,
             result.message ||
               "Approved video reviews yahan show hongi jab media review available hoga."
@@ -725,7 +748,7 @@
         initSlickCarousel(root, mount, settings, reviews, averageRating);
       } catch (error) {
         console.error("PRVC fetch error:", error);
-        showEmpty(mount, "Something went wrong while loading reviews.");
+        showEmpty(root, mount, "Something went wrong while loading reviews.");
       }
     }
 
@@ -734,6 +757,7 @@
 
   function initRoot(root) {
     if (!root) return;
+    if (!root.dataset) return;
     if (root.dataset.prvcInitialized === "true") return;
 
     const controller = createController(root);

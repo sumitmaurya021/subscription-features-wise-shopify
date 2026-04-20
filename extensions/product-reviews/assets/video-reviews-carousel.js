@@ -15,11 +15,11 @@
     }
 
     const promise = new Promise((resolve, reject) => {
-      const existing = Array.from(document.scripts).find(
-        (script) => script.dataset.prvcAppScript === src
-      );
+      const existing = Array.from(document.scripts).find(function (script) {
+        return script.dataset.prvcAppScript === src;
+      });
 
-      const resolveApp = () => {
+      const resolveApp = function () {
         if (window.PRVCApp && typeof window.PRVCApp.initRoot === "function") {
           resolve(window.PRVCApp);
         } else {
@@ -36,7 +36,9 @@
         existing.addEventListener("load", resolveApp, { once: true });
         existing.addEventListener(
           "error",
-          () => reject(new Error("Failed to load carousel app script.")),
+          function () {
+            reject(new Error("Failed to load carousel app script."));
+          },
           { once: true }
         );
         return;
@@ -58,7 +60,7 @@
       };
 
       document.head.appendChild(script);
-    }).catch((error) => {
+    }).catch(function (error) {
       scriptCache.delete(src);
       throw error;
     });
@@ -67,20 +69,43 @@
     return promise;
   }
 
+  function showBootstrapError(root) {
+    if (!root) return;
+
+    root.classList.remove("is-loading");
+
+    const mount = root.querySelector("[data-prvc-mount]");
+    if (!mount) return;
+
+    mount.innerHTML =
+      '<div class="prvc-shell">' +
+      '<div class="prvc-empty"><p>Carousel load nahi ho paaya.</p></div>' +
+      "</div>";
+  }
+
   function bootRoot(root) {
     if (!root) return;
     if (root.dataset.prvcBooted === "true") return;
 
     root.dataset.prvcBooted = "true";
+    root.classList.add("is-loading");
 
     loadScriptOnce(root.dataset.appScript || "")
-      .then((app) => {
+      .then(function (app) {
         app.initRoot(root);
       })
-      .catch((error) => {
-        root.dataset.prvcBooted = "false";
-        console.error("PRVC bootstrap error:", error);
-      });
+.catch(function (error) {
+  root.dataset.prvcBooted = "false";
+  console.error("PRVC bootstrap error:", error);
+  const mount = root.querySelector("[data-prvc-mount]");
+  root.classList.remove("is-loading");
+  if (mount) {
+    mount.innerHTML =
+      '<div class="prvc-shell"><div class="prvc-empty"><p>Carousel load nahi ho paaya. Error: ' +
+      (error && error.message ? error.message : "Unknown") +
+      "</p></div></div>";
+  }
+});
   }
 
   function observeRoot(root) {
@@ -111,7 +136,10 @@
     const context = scope || document;
     const roots = context.querySelectorAll(".prvc-root");
     if (!roots.length) return;
-    roots.forEach(observeRoot);
+
+    roots.forEach(function (root) {
+      observeRoot(root);
+    });
   }
 
   function onReady(callback) {

@@ -63,7 +63,9 @@ function normalizeVideoUrl(value) {
 }
 
 function normalizeReviewType(value) {
-  const reviewType = String(value || "product").trim().toLowerCase();
+  const reviewType = String(value || "product")
+    .trim()
+    .toLowerCase();
 
   if (["product", "collection", "store"].includes(reviewType)) {
     return reviewType;
@@ -81,7 +83,7 @@ function normalizeNullableString(value) {
 
 function buildReviewTargetFields(input = {}, existingReview = null) {
   const nextReviewType = normalizeReviewType(
-    input.reviewType ?? existingReview?.reviewType ?? "product"
+    input.reviewType ?? existingReview?.reviewType ?? "product",
   );
 
   const resolvedTargetId =
@@ -175,8 +177,8 @@ function normalizeReview(review) {
     review.targetId !== undefined && review.targetId !== null
       ? String(review.targetId)
       : review.productId
-      ? String(review.productId)
-      : null;
+        ? String(review.productId)
+        : null;
 
   const targetTitle =
     review.targetTitle ||
@@ -567,7 +569,7 @@ export const resolvers = {
 
         const normalizedImages = Array.isArray(reviewImages)
           ? reviewImages.filter(
-              (item) => typeof item === "string" && item.trim() !== ""
+              (item) => typeof item === "string" && item.trim() !== "",
             )
           : [];
 
@@ -711,7 +713,9 @@ export const resolvers = {
             where: {
               shop: existingReview.shop,
               reviewType: targetFields.reviewType,
-              ...(targetFields.targetId ? { targetId: targetFields.targetId } : {}),
+              ...(targetFields.targetId
+                ? { targetId: targetFields.targetId }
+                : {}),
               ...(targetFields.targetHandle
                 ? { targetHandle: targetFields.targetHandle }
                 : {}),
@@ -733,7 +737,7 @@ export const resolvers = {
         if (input.reviewImages !== undefined) {
           const normalizedImages = Array.isArray(input.reviewImages)
             ? input.reviewImages.filter(
-                (item) => typeof item === "string" && item.trim() !== ""
+                (item) => typeof item === "string" && item.trim() !== "",
               )
             : [];
 
@@ -965,9 +969,7 @@ export const resolvers = {
 
         return {
           success: true,
-          message: increment
-            ? "Review marked helpful"
-            : "Helpful mark removed",
+          message: increment ? "Review marked helpful" : "Helpful mark removed",
           data: normalizeReview(updatedReview),
         };
       } catch (error) {
