@@ -1,18 +1,9 @@
 <div
   id="prvc-root-{{ block.id }}"
-  class="prvc-root"
+  class="prvc-root is-loading"
   data-block-id="{{ block.id }}"
   data-app-script="{{ 'video-reviews-carousel-main.js' | asset_url }}"
-  style="
-    --prvc-max-width: {{ block.settings.maximum_width }}px;
-    --prvc-header-color: {{ block.settings.header_text_color }};
-    --prvc-card-bg: {{ block.settings.card_color }};
-    --prvc-stars-color: {{ block.settings.stars_color }};
-    --prvc-text-color: {{ block.settings.text_color }};
-    --prvc-arrow-color: {{ block.settings.arrows_color }};
-    --prvc-section-pt: {{ block.settings.padding_top }}px;
-    --prvc-section-pb: {{ block.settings.padding_bottom }}px;
-  "
+  style="--prvc-max-width:{{ block.settings.maximum_width }}px;--prvc-section-pt:{{ block.settings.padding_top }}px;--prvc-section-pb:{{ block.settings.padding_bottom }}px;"
   {{ block.shopify_attributes }}
 >
   <script type="application/json" data-prvc-config>
@@ -20,7 +11,7 @@
       "shop": {{ shop.permanent_domain | json }},
       "endpoint": {{ '/apps/reviews' | json }},
       "productId": {{ product.id | json }},
-      "selectedProductId": {% if block.settings.custom_product != blank %}{{ block.settings.custom_product.id | json }}{% else %}null{% endif %},
+      "selectedProductId": {{ block.settings.custom_product.id | json }},
       "showSampleReviews": {{ block.settings.show_sample_reviews | json }},
       "reviewSelection": {{ block.settings.review_selection | json }},
       "starRating": {{ block.settings.star_rating | json }},
@@ -34,48 +25,7 @@
     }
   </script>
 
-  <div
-    class="
-      prvc-shell
-      prvc-corner-{{ block.settings.corner_styling }}
-      prvc-arrows-{{ block.settings.arrows_position }}
-      prvc-stars-{{ block.settings.stars_size }}
-      prvc-text-{{ block.settings.text_size }}
-      prvc-style-{{ block.settings.carousel_style }}
-      {% if block.settings.show_drop_shadow %}prvc-has-shadow{% endif %}
-      {% if block.settings.show_border %}prvc-has-border{% endif %}
-    "
-  >
-    <div class="prvc-header" data-prvc-header>
-      <h2 class="prvc-title">{{ block.settings.header_text }}</h2>
-      {% if block.settings.show_average_rating %}
-        <div class="prvc-meta-row">
-          <span class="prvc-meta-stars">★★★★★</span>
-          <span class="prvc-meta-text">0.00 ★ (0)</span>
-          <span class="prvc-meta-verified">☑ Verified</span>
-        </div>
-      {% endif %}
-    </div>
-
-    <div class="prvc-stage">
-      <button type="button" class="prvc-nav prvc-nav--side prvc-nav--prev" data-prvc-prev aria-label="Previous slide">‹</button>
-
-      <div class="prvc-main">
-        <div class="prvc-loading" data-prvc-loading>Loading video reviews...</div>
-
-        <div class="swiper prvc-swiper" data-prvc-swiper hidden>
-          <div class="swiper-wrapper" data-prvc-wrapper></div>
-        </div>
-      </div>
-
-      <button type="button" class="prvc-nav prvc-nav--side prvc-nav--next" data-prvc-next aria-label="Next slide">›</button>
-    </div>
-
-    <div class="prvc-bottom-nav">
-      <button type="button" class="prvc-nav prvc-nav--bottom" data-prvc-prev aria-label="Previous slide">‹</button>
-      <button type="button" class="prvc-nav prvc-nav--bottom" data-prvc-next aria-label="Next slide">›</button>
-    </div>
-  </div>
+  <div class="prvc-mount" data-prvc-mount></div>
 </div>
 
 {% schema %}
@@ -86,8 +36,12 @@
   "javascript": "video-reviews-carousel.js",
   "stylesheet": "video-reviews-carousel.css",
   "settings": [
-    { "type": "checkbox", "id": "show_sample_reviews", "label": "Show sample reviews (Preview only)", "default": false },
-
+    {
+      "type": "checkbox",
+      "id": "show_sample_reviews",
+      "label": "Show sample reviews (Preview only)",
+      "default": false
+    },
     {
       "type": "select",
       "id": "review_selection",
@@ -99,9 +53,11 @@
         { "value": "custom_product", "label": "Custom product" }
       ]
     },
-
-    { "type": "product", "id": "custom_product", "label": "Select product (when Reviews selection = Custom product)" },
-
+    {
+      "type": "product",
+      "id": "custom_product",
+      "label": "Select product"
+    },
     {
       "type": "select",
       "id": "star_rating",
@@ -116,7 +72,6 @@
         { "value": "1", "label": "1 star" }
       ]
     },
-
     {
       "type": "select",
       "id": "review_type",
@@ -128,87 +83,79 @@
         { "value": "youtube", "label": "YouTube only" }
       ]
     },
-
-    { "type": "range", "id": "maximum_review_number", "label": "Maximum review number", "min": 3, "max": 30, "step": 1, "default": 9 },
-    { "type": "checkbox", "id": "show_reviewer_name", "label": "Show reviewer name", "default": true },
-
     {
-      "type": "select",
-      "id": "stars_size",
-      "label": "Stars size",
-      "default": "medium",
-      "options": [
-        { "value": "small", "label": "Small" },
-        { "value": "medium", "label": "Medium" },
-        { "value": "large", "label": "Large" }
-      ]
+      "type": "range",
+      "id": "maximum_review_number",
+      "label": "Maximum review number",
+      "min": 3,
+      "max": 30,
+      "step": 1,
+      "default": 9
     },
-
     {
-      "type": "select",
-      "id": "text_size",
-      "label": "Text size",
-      "default": "medium",
-      "options": [
-        { "value": "small", "label": "Small" },
-        { "value": "medium", "label": "Medium" },
-        { "value": "large", "label": "Large" }
-      ]
+      "type": "text",
+      "id": "header_text",
+      "label": "Heading text",
+      "default": "Customers are saying"
     },
-
     {
-      "type": "select",
-      "id": "arrows_position",
-      "label": "Arrows position",
-      "default": "bottom",
-      "options": [
-        { "value": "bottom", "label": "Bottom" },
-        { "value": "sides", "label": "Sides" }
-      ]
+      "type": "checkbox",
+      "id": "show_reviewer_name",
+      "label": "Show reviewer name",
+      "default": true
     },
-
-    { "type": "range", "id": "maximum_width", "label": "Maximum width", "min": 700, "max": 1400, "step": 20, "unit": "px", "default": 1100 },
-
     {
-      "type": "select",
-      "id": "corner_styling",
-      "label": "Corner styling",
-      "default": "extra_round",
-      "options": [
-        { "value": "medium", "label": "Medium" },
-        { "value": "large", "label": "Large" },
-        { "value": "extra_round", "label": "Extra round" }
-      ]
+      "type": "checkbox",
+      "id": "show_average_rating",
+      "label": "Show average rating",
+      "default": true
     },
-
-    { "type": "color", "id": "header_text_color", "label": "Header text color", "default": "#000000" },
-    { "type": "color", "id": "card_color", "label": "Card color", "default": "#7D7D7D" },
-    { "type": "color", "id": "stars_color", "label": "Stars color", "default": "#0F8E87" },
-    { "type": "color", "id": "text_color", "label": "Text color", "default": "#FFFFFF" },
-    { "type": "color", "id": "arrows_color", "label": "Arrows color", "default": "#000000" },
-
-    { "type": "checkbox", "id": "show_drop_shadow", "label": "Show drop shadow", "default": false },
-    { "type": "checkbox", "id": "show_border", "label": "Show border", "default": false },
-    { "type": "checkbox", "id": "autoplay_media", "label": "Autoplay media", "default": false },
-
-    { "type": "range", "id": "transition_speed", "label": "Transition speed", "min": 3, "max": 60, "step": 1, "unit": "s", "default": 6 },
-
     {
-      "type": "select",
-      "id": "carousel_style",
-      "label": "Carousel style",
-      "default": "highlight",
-      "options": [
-        { "value": "highlight", "label": "Highlight" },
-        { "value": "standard", "label": "Standard" }
-      ]
+      "type": "checkbox",
+      "id": "autoplay_media",
+      "label": "Autoplay center video",
+      "default": true
     },
-
-    { "type": "text", "id": "header_text", "label": "Header text", "default": "Real customer stories" },
-    { "type": "checkbox", "id": "show_average_rating", "label": "Average rating text", "default": true },
-
-    { "type": "range", "id": "padding_top", "label": "Padding top", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 28 },
-    { "type": "range", "id": "padding_bottom", "label": "Padding bottom", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 20 }
+    {
+      "type": "range",
+      "id": "transition_speed",
+      "label": "Auto slide speed",
+      "min": 3,
+      "max": 15,
+      "step": 1,
+      "unit": "s",
+      "default": 5
+    },
+    {
+      "type": "range",
+      "id": "maximum_width",
+      "label": "Maximum width",
+      "min": 700,
+      "max": 1400,
+      "step": 20,
+      "unit": "px",
+      "default": 1100
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "Padding top",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 28
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "Padding bottom",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 28
+    }
   ]
 }
 {% endschema %}

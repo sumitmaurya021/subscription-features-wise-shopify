@@ -12,7 +12,7 @@
   --pr-accent-soft: rgba(16, 132, 116, 0.1);
   --pr-star-empty: #d1d5db;
   --pr-overlay: rgba(15, 23, 42, 0.56);
-  --pr-overlay-strong: rgba(15, 23, 42, 0.78);
+  --pr-overlay-strong: rgba(15, 23, 42, 0.88);
   --pr-shadow-sm: 0 4px 12px rgba(15, 23, 42, 0.06);
   --pr-shadow-md: 0 12px 30px rgba(15, 23, 42, 0.1);
   --pr-shadow-lg: 0 20px 60px rgba(15, 23, 42, 0.18);
@@ -448,6 +448,7 @@
   gap: 10px;
   min-width: 0;
   flex: 1;
+  align-items: center;
 }
 
 .pr-avatar {
@@ -455,8 +456,8 @@
   height: 28px;
   min-width: 28px;
   border-radius: 999px;
-  background: #dbe7e3;
-  color: #344054;
+  background: #108474;
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1698,18 +1699,18 @@
   z-index: 1;
   width: 100vw;
   height: 100vh;
-  padding: 24px;
+  padding: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: stretch;
   animation: prModalZoomIn 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .pr-review-detail-close {
   position: absolute;
-  top: 18px;
-  right: 18px;
-  z-index: 4;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
   width: 40px;
   height: 40px;
   border: none;
@@ -1722,53 +1723,69 @@
 }
 
 .pr-review-detail-shell {
-  width: min(100%, 1380px);
-  height: min(100%, 94vh);
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
   background: #fff;
-  border-radius: 20px;
+  border-radius: 0;
   overflow: hidden;
   display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.72fr);
-  box-shadow: var(--pr-shadow-lg);
+  grid-template-columns: minmax(0, 1.25fr) minmax(380px, 0.75fr);
+  box-shadow: none;
 }
 
 .pr-review-detail-media-pane {
   position: relative;
-  background: #f4f5f7;
   min-width: 0;
-  padding: 0 0 78px;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  background: #0f172a;
+  overflow: hidden;
 }
 
 .pr-review-detail-stage {
+  position: relative;
   width: 100%;
   height: 100%;
-  min-height: 100%;
+  min-height: 0;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #eceff1;
+  padding: 24px;
+  background: #0f172a;
   overflow: hidden;
 }
 
 .pr-review-detail-stage img,
-.pr-review-detail-stage video,
+.pr-review-detail-stage video {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+  background: #0f172a;
+}
+
 .pr-review-detail-stage iframe {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  background: #eef0f2;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  background: #0f172a;
 }
 
 .pr-review-detail-stage video {
-  object-fit: contain;
   background: #000;
 }
 
 .pr-review-detail-nav {
   position: absolute;
-  top: 50%;
+  top: calc(50% - 32px);
   transform: translateY(-50%);
-  z-index: 2;
+  z-index: 3;
   width: 44px;
   height: 44px;
   border: none;
@@ -1792,12 +1809,10 @@
 }
 
 .pr-review-detail-thumbs-wrap {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 12px 18px 16px;
-  background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(17,24,39,0.1) 100%);
+  position: relative;
+  padding: 14px 18px 18px;
+  background: rgba(255, 255, 255, 0.06);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .pr-review-detail-thumbs {
@@ -1818,7 +1833,7 @@
   border-radius: 8px;
   overflow: hidden;
   border: 2px solid transparent;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.95);
   cursor: pointer;
   padding: 0;
   transition: border-color 0.2s ease, transform 0.2s ease;
@@ -1842,8 +1857,10 @@
 
 .pr-review-detail-content-pane {
   min-width: 0;
+  min-height: 0;
   background: #fff;
   overflow: auto;
+  height: 100%;
 }
 
 .pr-review-detail-content {
@@ -2067,7 +2084,7 @@
 /* responsive */
 @media screen and (max-width: 1199px) {
   .pr-review-detail-shell {
-    grid-template-columns: minmax(0, 1fr) 380px;
+    grid-template-columns: minmax(0, 1fr) 360px;
   }
 }
 
@@ -2094,21 +2111,21 @@
   }
 
   .pr-review-detail-dialog {
-    padding: 16px;
+    padding: 0;
   }
 
   .pr-review-detail-shell {
     grid-template-columns: 1fr;
-    height: min(100%, 96vh);
+    grid-template-rows: minmax(0, 56vh) minmax(0, 44vh);
+    height: 100vh;
   }
 
   .pr-review-detail-media-pane {
-    min-height: 48vh;
-    padding-bottom: 74px;
+    min-height: 0;
   }
 
   .pr-review-detail-content-pane {
-    max-height: 42vh;
+    max-height: none;
   }
 }
 
@@ -2318,7 +2335,10 @@
   .pr-review-detail-shell {
     width: 100%;
     height: 100%;
+    min-height: 100vh;
     border-radius: 0;
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 52vh) minmax(0, 48vh);
   }
 
   .pr-review-detail-close {
@@ -2327,13 +2347,18 @@
   }
 
   .pr-review-detail-media-pane {
-    min-height: 42vh;
+    min-height: 0;
+  }
+
+  .pr-review-detail-stage {
+    padding: 14px;
   }
 
   .pr-review-detail-nav {
     width: 38px;
     height: 38px;
     font-size: 24px;
+    top: calc(50% - 24px);
   }
 
   .pr-review-detail-prev {
@@ -2395,6 +2420,14 @@
   .pr-rating-preview-row {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .pr-review-detail-shell {
+    grid-template-rows: minmax(0, 48vh) minmax(0, 52vh);
+  }
+
+  .pr-review-detail-stage {
+    padding: 10px;
   }
 }
 

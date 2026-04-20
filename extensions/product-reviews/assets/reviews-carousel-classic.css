@@ -63,6 +63,50 @@
   min-height: var(--rcc-block-height);
 }
 
+/* =========================
+   LOADER
+   ========================= */
+
+.rcc-loading-state {
+  width: 100%;
+  min-height: var(--rcc-block-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rcc-spinner-loader {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+}
+
+.rcc-spinner-loader__track,
+.rcc-spinner-loader__segment {
+  position: absolute;
+  inset: 0;
+  display: block;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.rcc-spinner-loader__track {
+  border: 4px solid #d9d9d9;
+}
+
+.rcc-spinner-loader__segment {
+  border: 4px solid transparent;
+  border-right-color: var(--rcc-accent);
+  border-bottom-color: var(--rcc-accent);
+  animation: rccSpinnerRotate 0.9s linear infinite;
+  transform: rotate(18deg);
+}
+
+/* =========================
+   HEADER
+   ========================= */
+
 .rcc-header {
   display: flex;
   justify-content: flex-start;
@@ -148,6 +192,10 @@
   line-height: 1.55;
   color: var(--rcc-muted);
 }
+
+/* =========================
+   CAROUSEL
+   ========================= */
 
 .rcc-carousel {
   position: relative;
@@ -467,6 +515,10 @@
   -webkit-line-clamp: 3;
 }
 
+/* =========================
+   NAV
+   ========================= */
+
 .rcc-nav-btn {
   appearance: none;
   border: 0;
@@ -521,6 +573,10 @@
   font-size: 44px;
 }
 
+/* =========================
+   STATES
+   ========================= */
+
 .rcc-empty-state,
 .rcc-error-box {
   min-height: var(--rcc-block-height);
@@ -556,6 +612,10 @@
   color: var(--rcc-muted);
   text-align: center;
 }
+
+/* =========================
+   SKELETON
+   ========================= */
 
 .rcc-skeleton {
   display: flex;
@@ -615,13 +675,12 @@
   min-height: var(--rcc-block-height);
   border-radius: var(--rcc-radius);
   border: 1px solid var(--rcc-border);
-  background:
-    linear-gradient(
-      90deg,
-      rgba(229, 231, 235, 0.65) 0%,
-      rgba(243, 244, 246, 0.95) 50%,
-      rgba(229, 231, 235, 0.65) 100%
-    );
+  background: linear-gradient(
+    90deg,
+    rgba(229, 231, 235, 0.65) 0%,
+    rgba(243, 244, 246, 0.95) 50%,
+    rgba(229, 231, 235, 0.65) 100%
+  );
   background-size: 240% 100%;
   animation: rccShimmer 1.6s linear infinite;
 }
@@ -1004,7 +1063,6 @@
 
 /* =========================
    VERTICAL SLIDING THEME ONLY
-   Judge.me vertical layout
    ========================= */
 
 .rcc-theme--vertical_sliding .rcc-stage {
@@ -1220,7 +1278,10 @@
   margin-right: auto;
 }
 
-/* बाकी themes same */
+/* =========================
+   OTHER THEMES
+   ========================= */
+
 .rcc-theme--compact_with_pictures .rcc-card-inline-layout {
   min-height: auto;
 }
@@ -1327,6 +1388,10 @@
   flex-direction: row;
 }
 
+/* =========================
+   ANIMATIONS
+   ========================= */
+
 @keyframes rccShimmer {
   from {
     background-position: 200% 0;
@@ -1335,6 +1400,19 @@
     background-position: -40% 0;
   }
 }
+
+@keyframes rccSpinnerRotate {
+  from {
+    transform: rotate(18deg);
+  }
+  to {
+    transform: rotate(378deg);
+  }
+}
+
+/* =========================
+   RESPONSIVE
+   ========================= */
 
 @media (min-width: 768px) {
   .rcc-theme--compact .rcc-stage {

@@ -99,6 +99,14 @@
     );
   }
 
+  function getCloudinaryContain(url, width = 1800, height = 1800) {
+    if (!url || typeof url !== "string" || !url.includes("/upload/")) return url;
+    return url.replace(
+      "/upload/",
+      `/upload/f_auto,q_auto,c_limit,w_${width},h_${height}/`
+    );
+  }
+
   function getWidgetMarkup(config) {
     return `
       <div class="pr-widget">
@@ -723,6 +731,7 @@
     const reviewDetailStage = portalHost.querySelector("#pr-review-detail-stage");
     const reviewDetailThumbs = portalHost.querySelector("#pr-review-detail-thumbs");
     const reviewDetailContent = portalHost.querySelector("#pr-review-detail-content");
+    const reviewDetailContentPane = portalHost.querySelector(".pr-review-detail-content-pane");
 
     let allReviews = [];
     let serverTotalReviews = 0;
@@ -2521,27 +2530,58 @@
       `;
     }
 
+    function getDetailStageMarkup(item) {
+      if (!item) return "";
+
+      if (item.type === "image") {
+        const imageSrc = getCloudinaryContain(item.src, 1800, 1800) || item.src;
+        return `<img src="${escapeHtml(imageSrc)}" alt="Review media">`;
+      }
+
+      if (item.type === "video") {
+        return `
+          <video
+            src="${escapeHtml(item.src)}"
+            controls
+            playsinline
+            preload="metadata"
+          ></video>
+        `;
+      }
+
+      const autoplaySrc = item.src.includes("?")
+        ? `${item.src}&autoplay=1&rel=0`
+        : `${item.src}?autoplay=1&rel=0`;
+
+      return `
+        <iframe
+          src="${escapeHtml(autoplaySrc)}"
+          title="Review video"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+          allowfullscreen
+        ></iframe>
+      `;
+    }
+
     function renderDetailStage() {
       if (!reviewDetailStage || !detailMediaList.length) return;
 
       const item = detailMediaList[detailMediaIndex];
       if (!item) return;
 
-      if (item.type === "image") {
-        reviewDetailStage.innerHTML = `<img src="${escapeHtml(getCloudinaryThumb(item.src, 1000, 1000))}" alt="Review media">`;
-      } else if (item.type === "video") {
-        reviewDetailStage.innerHTML = `<video src="${escapeHtml(item.src)}" controls playsinline></video>`;
-      } else {
-        const autoplaySrc = item.src.includes("?") ? `${item.src}&autoplay=1` : `${item.src}?autoplay=1`;
-        reviewDetailStage.innerHTML = `
-          <iframe
-            src="${escapeHtml(autoplaySrc)}"
-            title="Review video"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowfullscreen
-          ></iframe>
-        `;
-      }
+      reviewDetailStage.innerHTML = getDetailStageMarkup(item);
+    }
+
+    function scrollActiveThumbIntoView() {
+      if (!reviewDetailThumbs) return;
+      const activeThumb = reviewDetailThumbs.querySelector(".pr-review-detail-thumb.is-active");
+      if (!activeThumb || typeof activeThumb.scrollIntoView !== "function") return;
+
+      activeThumb.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "center",
+      });
     }
 
     function renderDetailThumbs() {
@@ -2577,6 +2617,8 @@
           renderDetailThumbs();
         });
       });
+
+      requestAnimationFrame(scrollActiveThumbIntoView);
     }
 
     function renderDetailModal() {
@@ -2597,13 +2639,33 @@
       detailMediaIndex = Math.max(0, Math.min(Number(mediaIndex) || 0, mediaItems.length - 1));
 
       renderDetailModal();
+
+      if (reviewDetailContentPane) {
+        reviewDetailContentPane.scrollTop = 0;
+      }
+
       reviewDetailModal.hidden = false;
       setBodyLock(true);
     }
 
     function closeReviewDetailModal() {
       if (!reviewDetailModal) return;
+
+      const mediaEls = reviewDetailStage
+        ? Array.from(reviewDetailStage.querySelectorAll("video, iframe"))
+        : [];
+
+      mediaEls.forEach((el) => {
+        if (el.tagName === "VIDEO" && typeof el.pause === "function") {
+          try {
+            el.pause();
+          } catch {}
+        }
+      });
+
+      if (reviewDetailStage) reviewDetailStage.innerHTML = "";
       reviewDetailModal.hidden = true;
+
       if (reviewModal?.hidden !== false) setBodyLock(false);
     }
 

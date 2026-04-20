@@ -4,13 +4,21 @@
 
   function getRoots(scope) {
     if (!scope) return [];
+
     const roots = [];
-    if (scope.nodeType === 1 && typeof scope.matches === "function" && scope.matches(ROOT_SELECTOR)) {
+
+    if (
+      scope.nodeType === 1 &&
+      typeof scope.matches === "function" &&
+      scope.matches(ROOT_SELECTOR)
+    ) {
       roots.push(scope);
     }
+
     if (typeof scope.querySelectorAll === "function") {
       roots.push(...Array.from(scope.querySelectorAll(ROOT_SELECTOR)));
     }
+
     return roots;
   }
 
@@ -105,6 +113,12 @@
     root.style.setProperty("--rsn-card-shadow", getShadowValue(settings.shadowStrength));
   }
 
+  function setLoadingState(root, isLoading) {
+    if (!root) return;
+    root.classList.toggle("is-loading", Boolean(isLoading));
+    root.setAttribute("aria-busy", isLoading ? "true" : "false");
+  }
+
   function getSampleReviews(targetTitle) {
     const cleanTarget = targetTitle || "this item";
     return [
@@ -174,23 +188,6 @@
     });
   }
 
-  function renderLoading(root) {
-    root.innerHTML = `
-      <div class="rsn-shell">
-        <div class="rsn-slider">
-          <div class="rsn-card-wrap">
-            <div class="rsn-card rsn-card--loading">
-              <div class="rsn-skeleton rsn-skeleton--stars"></div>
-              <div class="rsn-skeleton rsn-skeleton--name"></div>
-              <div class="rsn-skeleton rsn-skeleton--line"></div>
-              <div class="rsn-skeleton rsn-skeleton--line rsn-skeleton--line-short"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
   function renderEmpty(root, settings) {
     root.innerHTML = `
       <div class="rsn-shell">
@@ -205,6 +202,7 @@
         </div>
       </div>
     `;
+    setLoadingState(root, false);
   }
 
   function showInlineNotice(instance, message, type) {
@@ -498,6 +496,7 @@
 
     root.addEventListener("keydown", (event) => {
       if ((instance.state.reviews || []).length <= 1) return;
+
       if (event.key === "ArrowLeft") {
         event.preventDefault();
         goTo(instance, instance.state.currentIndex - 1);
@@ -552,6 +551,7 @@
 
   function createInstance(root, settings) {
     root.innerHTML = buildWidgetMarkup(settings);
+    setLoadingState(root, false);
     root.tabIndex = 0;
 
     const instance = {
@@ -588,7 +588,11 @@
       try {
         root.__rsnPendingController.abort();
       } catch {}
+    }
+
+    if (root) {
       root.__rsnPendingController = null;
+      root.__rsnPendingSignature = null;
     }
   }
 
@@ -615,14 +619,19 @@
     const settings = extractSettings(root);
     const signature = buildSignature(settings);
 
-    if (!force && root.dataset.rsnInitKey === signature && instances.has(root)) {
-      return;
+    if (!force) {
+      if (root.__rsnPendingSignature === signature) return;
+      if (root.dataset.rsnInitKey === signature && instances.has(root)) return;
     }
 
     destroyRoot(root);
+
     root.dataset.rsnInitKey = signature;
+    root.__rsnPendingSignature = signature;
+
     applyRootStyles(root, settings);
-    renderLoading(root);
+    setLoadingState(root, true);
+    root.innerHTML = "";
 
     const controller = new AbortController();
     root.__rsnPendingController = controller;
@@ -639,6 +648,7 @@
       }
 
       root.__rsnPendingController = null;
+      root.__rsnPendingSignature = null;
 
       if (!reviews.length) {
         renderEmpty(root, settings);
@@ -652,11 +662,16 @@
       startAutoplay(instance);
     } catch (error) {
       if (error?.name === "AbortError") {
+        if (root.__rsnPendingController === controller) {
+          root.__rsnPendingController = null;
+          root.__rsnPendingSignature = null;
+        }
         return;
       }
 
       if (root.__rsnPendingController === controller) {
         root.__rsnPendingController = null;
+        root.__rsnPendingSignature = null;
       }
 
       if (isDesignMode()) {
@@ -687,36 +702,4 @@
     initRoot,
     destroyAll,
   };
-
-  if (document.readyState === "loading") {
-    document.addEventListener(
-      "DOMContentLoaded",
-      function () {
-        initAll(document);
-      },
-      { once: true }
-    );
-  } else {
-    initAll(document);
-  }
-
-  document.addEventListener("shopify:section:load", function (event) {
-    initAll(event.target || document, { force: true });
-  });
-
-  document.addEventListener("shopify:section:reorder", function (event) {
-    initAll(event.target || document, { force: true });
-  });
-
-  document.addEventListener("shopify:section:unload", function (event) {
-    destroyAll(event.target || document);
-  });
-
-  document.addEventListener("shopify:block:select", function (event) {
-    initAll(event.target || document, { force: true });
-  });
-
-  document.addEventListener("shopify:block:deselect", function (event) {
-    initAll(event.target || document);
-  });
 })();

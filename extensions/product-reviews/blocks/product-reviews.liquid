@@ -19,7 +19,7 @@
     assign form_subtext = 'Tell other shoppers about your experience with this product'
     assign review_subject_text = 'product'
     if product.featured_image
-      assign context_image = product.featured_image | image_url: width: 800
+      assign context_image = product.featured_image | image_url: width: 1200
     endif
   elsif template.name == 'collection' and collection
     assign review_type = 'collection'
@@ -31,7 +31,7 @@
     assign form_subtext = 'Tell other shoppers about your experience with this collection'
     assign review_subject_text = 'collection'
     if collection.image
-      assign context_image = collection.image | image_url: width: 800
+      assign context_image = collection.image | image_url: width: 1200
     endif
   endif
 %}
