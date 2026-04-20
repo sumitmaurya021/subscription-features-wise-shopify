@@ -24,6 +24,7 @@
 
   function toBoolean(value, fallback) {
     if (value === true || value === false) return value;
+
     const normalized = safeText(value).trim().toLowerCase();
 
     if (normalized === "true") return true;
@@ -483,21 +484,17 @@
     root.innerHTML = `
       <div class="rcc-widget rcc-theme--${escapeHtml(settings.widgetTheme)}">
         <div class="rcc-shell" style="width:${settings.pageWidth}%;">
-
-          <div class="rcc-stage">
-            <div class="rcc-skeleton rcc-skeleton--header">
-              <div class="rcc-skeleton-line rcc-skeleton-line--title"></div>
-              <div class="rcc-skeleton-line rcc-skeleton-line--stars"></div>
-              <div class="rcc-skeleton-line rcc-skeleton-line--meta"></div>
+          <div
+            class="rcc-loading-state"
+            style="min-height:${settings.blockHeight}px;"
+            role="status"
+            aria-live="polite"
+            aria-label="${escapeHtml(settings.loadingText)}"
+          >
+            <div class="rcc-spinner-loader" aria-hidden="true">
+              <span class="rcc-spinner-loader__track"></span>
+              <span class="rcc-spinner-loader__segment"></span>
             </div>
-
-            <div class="rcc-skeleton-track">
-              <div class="rcc-skeleton-card"></div>
-              <div class="rcc-skeleton-card"></div>
-              <div class="rcc-skeleton-card"></div>
-            </div>
-
-            <div class="rcc-loading-copy">${escapeHtml(settings.loadingText)}</div>
           </div>
         </div>
       </div>
@@ -513,7 +510,6 @@
         settings.widgetTheme
       )}">
         <div class="rcc-shell" style="width:${settings.pageWidth}%;">
-
           <div class="rcc-error-box" role="alert">
             ${escapeHtml(message || "Failed to load reviews")}
           </div>
@@ -886,7 +882,6 @@
         settings.widgetTheme
       )} rcc-arrow--${escapeHtml(settings.arrowPosition)}">
         <div class="rcc-shell" style="width:${settings.pageWidth}%;">
-
           <div class="rcc-stage">
             ${
               settings.showHeader
@@ -941,11 +936,9 @@
               <div class="rcc-empty-state">${escapeHtml(settings.emptyText)}</div>
             `
                 : `
-              <div class="rcc-carousel ${navBelowClass} ${
-                    settings.widgetTheme === "vertical_sliding"
-                      ? "is-vertical"
-                      : "is-horizontal"
-                  }">
+              <div class="rcc-carousel ${
+                navBelowClass
+              } ${settings.widgetTheme === "vertical_sliding" ? "is-vertical" : "is-horizontal"}">
                 ${
                   showNav && settings.arrowPosition === "sides"
                     ? `
@@ -985,24 +978,82 @@
     `;
   }
 
-  function getMaxIndex(state) {
+  function shouldUseLoop(settings, state) {
+    return Boolean(settings.loop && state.reviews.length > state.slidesPerView);
+  }
+
+  function getNonLoopMaxIndex(state) {
     return Math.max(0, state.reviews.length - state.slidesPerView);
   }
 
-  function updateSlider(root, settings, state) {
+  function setTrackTransition(track, enabled) {
+    if (!track) return;
+
+    if (!enabled) {
+      track.style.transition = "none";
+      return;
+    }
+
+    track.style.transition = "";
+  }
+
+  function getTrackSlides(root) {
     const track = root.querySelector(".rcc-track");
-    const slides = Array.from(root.querySelectorAll(".rcc-slide"));
-    const prevButtons = Array.from(root.querySelectorAll(".rcc-nav-btn--prev"));
-    const nextButtons = Array.from(root.querySelectorAll(".rcc-nav-btn--next"));
+    if (!track) return [];
+    return Array.from(track.children).filter((child) =>
+      child.classList.contains("rcc-slide")
+    );
+  }
+
+  function setupLoopClones(root, settings, state) {
+    const track = root.querySelector(".rcc-track");
+    if (!track) return;
+
+    const slides = getTrackSlides(root);
+
+    state.loopEnabled = shouldUseLoop(settings, state);
+    state.cloneCount = 0;
+
+    if (!state.loopEnabled || !slides.length) {
+      state.currentIndex = 0;
+      return;
+    }
+
+    const cloneCount = Math.min(state.slidesPerView, slides.length);
+
+    const prependClones = slides.slice(-cloneCount).map((slide) => {
+      const clone = slide.cloneNode(true);
+      clone.classList.add("rcc-slide--clone");
+      clone.setAttribute("aria-hidden", "true");
+      return clone;
+    });
+
+    const appendClones = slides.slice(0, cloneCount).map((slide) => {
+      const clone = slide.cloneNode(true);
+      clone.classList.add("rcc-slide--clone");
+      clone.setAttribute("aria-hidden", "true");
+      return clone;
+    });
+
+    prependClones.reverse().forEach((clone) => {
+      track.insertBefore(clone, track.firstChild);
+    });
+
+    appendClones.forEach((clone) => {
+      track.appendChild(clone);
+    });
+
+    state.cloneCount = cloneCount;
+    state.currentIndex = cloneCount;
+  }
+
+  function applySlideSizing(root, settings, state) {
+    const track = root.querySelector(".rcc-track");
+    const slides = getTrackSlides(root);
 
     if (!track || !slides.length) return;
 
     const gap = settings.cardGap;
-    const maxIndex = getMaxIndex(state);
-
-    if (state.currentIndex > maxIndex) {
-      state.currentIndex = maxIndex;
-    }
 
     if (settings.widgetTheme === "vertical_sliding") {
       const slideHeight = settings.blockHeight;
@@ -1010,55 +1061,144 @@
       slides.forEach((slide) => {
         slide.style.height = `${slideHeight}px`;
         slide.style.minHeight = `${slideHeight}px`;
+        slide.style.maxHeight = `${slideHeight}px`;
       });
 
+      const viewport = root.querySelector(".rcc-viewport");
       const visibleHeight =
         slideHeight * state.slidesPerView +
         gap * Math.max(0, state.slidesPerView - 1);
 
-      const viewport = root.querySelector(".rcc-viewport");
-      if (viewport) viewport.style.height = `${visibleHeight}px`;
+      if (viewport) {
+        viewport.style.height = `${visibleHeight}px`;
+      }
 
-      const offset = state.currentIndex * (slideHeight + gap);
-      track.style.transform = `translate3d(0, -${offset}px, 0)`;
-    } else {
-      const widthPercent = 100 / state.slidesPerView;
-
-      slides.forEach((slide) => {
-        slide.style.minWidth = `calc(${widthPercent}% - ${
-          (gap * (state.slidesPerView - 1)) / state.slidesPerView
-        }px)`;
-        slide.style.maxWidth = `calc(${widthPercent}% - ${
-          (gap * (state.slidesPerView - 1)) / state.slidesPerView
-        }px)`;
-      });
-
-      const viewport = root.querySelector(".rcc-viewport");
-      const slideWidth = slides[0].getBoundingClientRect().width;
-      const offset = state.currentIndex * (slideWidth + gap);
-
-      track.style.transform = `translate3d(-${offset}px, 0, 0)`;
-
-      if (viewport) viewport.style.height = "";
+      return;
     }
 
+    const widthPercent = 100 / state.slidesPerView;
+    const gapShare =
+      (gap * Math.max(0, state.slidesPerView - 1)) / state.slidesPerView;
+
+    slides.forEach((slide) => {
+      slide.style.minWidth = `calc(${widthPercent}% - ${gapShare}px)`;
+      slide.style.maxWidth = `calc(${widthPercent}% - ${gapShare}px)`;
+      slide.style.height = "";
+      slide.style.minHeight = "";
+      slide.style.maxHeight = "";
+    });
+
+    const viewport = root.querySelector(".rcc-viewport");
+    if (viewport) {
+      viewport.style.height = "";
+    }
+  }
+
+  function getSlideDistance(root, settings, state) {
+    const slides = getTrackSlides(root);
+    if (!slides.length) return 0;
+
+    if (settings.widgetTheme === "vertical_sliding") {
+      return settings.blockHeight + settings.cardGap;
+    }
+
+    const firstSlideWidth = slides[0].getBoundingClientRect().width;
+
+    if (firstSlideWidth > 0) {
+      return firstSlideWidth + settings.cardGap;
+    }
+
+    const viewport = root.querySelector(".rcc-viewport");
+    const viewportWidth = viewport ? viewport.getBoundingClientRect().width : 0;
+
+    if (!viewportWidth) return 0;
+
+    const totalGap = settings.cardGap * Math.max(0, state.slidesPerView - 1);
+    return (viewportWidth - totalGap) / state.slidesPerView + settings.cardGap;
+  }
+
+  function normalizeLoopIndex(root, settings, state) {
+    if (!state.loopEnabled) return;
+
+    const lowerBound = state.cloneCount;
+    const upperBound = state.cloneCount + state.reviews.length;
+    let nextIndex = state.currentIndex;
+
+    if (state.currentIndex < lowerBound) {
+      nextIndex = state.currentIndex + state.reviews.length;
+    } else if (state.currentIndex >= upperBound) {
+      nextIndex = state.currentIndex - state.reviews.length;
+    }
+
+    if (nextIndex !== state.currentIndex) {
+      state.currentIndex = nextIndex;
+      updateSlider(root, settings, state, { skipAnimation: true });
+    }
+  }
+
+  function updateSlider(root, settings, state, options) {
+    const track = root.querySelector(".rcc-track");
+    const prevButtons = Array.from(root.querySelectorAll(".rcc-nav-btn--prev"));
+    const nextButtons = Array.from(root.querySelectorAll(".rcc-nav-btn--next"));
+    const skipAnimation = Boolean(options && options.skipAnimation);
+
+    if (!track) return;
+
+    applySlideSizing(root, settings, state);
+
+    const distance = getSlideDistance(root, settings, state);
+
+    if (skipAnimation) {
+      setTrackTransition(track, false);
+    } else {
+      setTrackTransition(track, true);
+    }
+
+    if (settings.widgetTheme === "vertical_sliding") {
+      const offset = state.currentIndex * distance;
+      track.style.transform = `translate3d(0, -${offset}px, 0)`;
+    } else {
+      const offset = state.currentIndex * distance;
+      track.style.transform = `translate3d(-${offset}px, 0, 0)`;
+    }
+
+    if (skipAnimation) {
+      track.getBoundingClientRect();
+      setTrackTransition(track, true);
+    }
+
+    const disablePrev =
+      !state.canSlide || (!state.loopEnabled && state.currentIndex <= 0);
+    const disableNext =
+      !state.canSlide ||
+      (!state.loopEnabled && state.currentIndex >= getNonLoopMaxIndex(state));
+
     prevButtons.forEach((btn) => {
-      btn.disabled = !settings.loop && state.currentIndex <= 0;
+      btn.disabled = disablePrev;
     });
 
     nextButtons.forEach((btn) => {
-      btn.disabled = !settings.loop && state.currentIndex >= maxIndex;
+      btn.disabled = disableNext;
     });
   }
 
   function goToIndex(root, settings, state, nextIndex) {
-    const maxIndex = getMaxIndex(state);
+    if (!state.canSlide) {
+      state.currentIndex = state.loopEnabled ? state.cloneCount : 0;
+      updateSlider(root, settings, state, { skipAnimation: true });
+      return;
+    }
 
-    if (maxIndex <= 0) {
-      state.currentIndex = 0;
+    if (state.loopEnabled) {
+      if (state.isAnimating) return;
+
+      state.currentIndex = nextIndex;
+      state.isAnimating = true;
       updateSlider(root, settings, state);
       return;
     }
+
+    const maxIndex = getNonLoopMaxIndex(state);
 
     if (nextIndex < 0) {
       state.currentIndex = settings.loop ? maxIndex : 0;
@@ -1075,11 +1215,11 @@
     stopAutoplay(state);
 
     if (!settings.enableAutoplay || settings.autoslideInterval <= 0) return;
-    if (state.reviews.length <= state.slidesPerView) return;
+    if (!state.canSlide) return;
 
     state.autoplayTimer = window.setInterval(() => {
       if (settings.pauseOnHover && state.isHovered) return;
-      if (state.isDragging) return;
+      if (state.isDragging || state.isAnimating) return;
 
       goToIndex(root, settings, state, state.currentIndex + 1);
     }, settings.autoslideInterval);
@@ -1092,34 +1232,46 @@
     }
   }
 
-  function bindNav(root, settings, state) {
+  function bindNav(root, settings, state, cleanup) {
     Array.from(root.querySelectorAll(".rcc-nav-btn--prev")).forEach((btn) => {
-      btn.addEventListener("click", () => {
+      const handler = () => {
         goToIndex(root, settings, state, state.currentIndex - 1);
-      });
+      };
+
+      btn.addEventListener("click", handler);
+      cleanup.push(() => btn.removeEventListener("click", handler));
     });
 
     Array.from(root.querySelectorAll(".rcc-nav-btn--next")).forEach((btn) => {
-      btn.addEventListener("click", () => {
+      const handler = () => {
         goToIndex(root, settings, state, state.currentIndex + 1);
-      });
+      };
+
+      btn.addEventListener("click", handler);
+      cleanup.push(() => btn.removeEventListener("click", handler));
     });
   }
 
-  function bindHover(root, settings, state) {
+  function bindHover(root, settings, state, cleanup) {
     const carousel = root.querySelector(".rcc-carousel");
     if (!carousel) return;
 
-    carousel.addEventListener("mouseenter", () => {
+    const onEnter = () => {
       if (settings.pauseOnHover) state.isHovered = true;
-    });
+    };
 
-    carousel.addEventListener("mouseleave", () => {
+    const onLeave = () => {
       state.isHovered = false;
-    });
+    };
+
+    carousel.addEventListener("mouseenter", onEnter);
+    carousel.addEventListener("mouseleave", onLeave);
+
+    cleanup.push(() => carousel.removeEventListener("mouseenter", onEnter));
+    cleanup.push(() => carousel.removeEventListener("mouseleave", onLeave));
   }
 
-  function bindSwipe(root, settings, state) {
+  function bindSwipe(root, settings, state, cleanup) {
     if (!settings.enableSwipe) return;
 
     const viewport = root.querySelector(".rcc-viewport");
@@ -1143,7 +1295,7 @@
     }
 
     function onStart(event) {
-      if (state.reviews.length <= state.slidesPerView) return;
+      if (!state.canSlide || state.isAnimating) return;
 
       state.isDragging = true;
       hasMoved = false;
@@ -1179,10 +1331,37 @@
     viewport.addEventListener("touchstart", onStart, { passive: true });
     viewport.addEventListener("touchmove", onMove, { passive: true });
     viewport.addEventListener("touchend", onEnd);
+    viewport.addEventListener("touchcancel", onEnd);
 
     viewport.addEventListener("mousedown", onStart);
     viewport.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onEnd);
+
+    cleanup.push(() => viewport.removeEventListener("touchstart", onStart));
+    cleanup.push(() => viewport.removeEventListener("touchmove", onMove));
+    cleanup.push(() => viewport.removeEventListener("touchend", onEnd));
+    cleanup.push(() => viewport.removeEventListener("touchcancel", onEnd));
+    cleanup.push(() => viewport.removeEventListener("mousedown", onStart));
+    cleanup.push(() => viewport.removeEventListener("mousemove", onMove));
+    cleanup.push(() => window.removeEventListener("mouseup", onEnd));
+  }
+
+  function bindTrackLoop(root, settings, state, cleanup) {
+    const track = root.querySelector(".rcc-track");
+    if (!track) return;
+
+    const onTransitionEnd = (event) => {
+      if (event.target !== track || event.propertyName !== "transform") return;
+
+      if (state.loopEnabled) {
+        normalizeLoopIndex(root, settings, state);
+      }
+
+      state.isAnimating = false;
+    };
+
+    track.addEventListener("transitionend", onTransitionEnd);
+    cleanup.push(() => track.removeEventListener("transitionend", onTransitionEnd));
   }
 
   function debounce(fn, wait) {
@@ -1198,6 +1377,14 @@
   }
 
   function mount(root, settings, reviewsPayload) {
+    if (
+      root.__rccController &&
+      typeof root.__rccController.destroy === "function"
+    ) {
+      root.__rccController.destroy();
+      root.__rccController = null;
+    }
+
     const state = {
       reviews: Array.isArray(reviewsPayload.data) ? reviewsPayload.data : [],
       totalReviews: Number(reviewsPayload.totalReviews || 0),
@@ -1207,7 +1394,13 @@
       autoplayTimer: null,
       isHovered: false,
       isDragging: false,
+      isAnimating: false,
+      loopEnabled: false,
+      cloneCount: 0,
+      canSlide: false,
     };
+
+    state.canSlide = state.reviews.length > state.slidesPerView;
 
     root.setAttribute("aria-busy", "false");
     applyThemeVars(root, settings);
@@ -1221,19 +1414,34 @@
         settings.widgetTheme === "vertical_sliding" ? "column" : "row";
     }
 
-    updateSlider(root, settings, state);
-    bindNav(root, settings, state);
-    bindHover(root, settings, state);
-    bindSwipe(root, settings, state);
+    setupLoopClones(root, settings, state);
+    updateSlider(root, settings, state, { skipAnimation: true });
+
+    const cleanup = [];
+
+    bindNav(root, settings, state, cleanup);
+    bindHover(root, settings, state, cleanup);
+    bindSwipe(root, settings, state, cleanup);
+    bindTrackLoop(root, settings, state, cleanup);
     startAutoplay(root, settings, state);
 
     const controller = {
       root,
       settings,
       state,
+      cleanup,
       onResize: null,
       destroy() {
         stopAutoplay(state);
+
+        cleanup.forEach((fn) => {
+          try {
+            fn();
+          } catch {}
+        });
+
+        cleanup.length = 0;
+
         if (this.onResize) {
           window.removeEventListener("resize", this.onResize);
         }
@@ -1241,7 +1449,18 @@
     };
 
     controller.onResize = debounce(() => {
-      state.slidesPerView = getSlidesPerView(settings);
+      const nextSlidesPerView = getSlidesPerView(settings);
+
+      if (nextSlidesPerView !== state.slidesPerView) {
+        mount(root, settings, {
+          data: state.reviews,
+          totalReviews: state.totalReviews,
+          averageRating: state.averageRating,
+        });
+        return;
+      }
+
+      state.canSlide = state.reviews.length > state.slidesPerView;
       updateSlider(root, settings, state);
       startAutoplay(root, settings, state);
     }, 120);
