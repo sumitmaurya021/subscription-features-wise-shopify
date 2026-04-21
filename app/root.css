@@ -1,3 +1,8 @@
 *{
     font-family: "Nunito", "Segoe UI", arial;
 }
+
+.Polaris-Page{
+    margin: 0 !important; 
+    max-width: 100% !important;
+}
