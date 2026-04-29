@@ -1,3 +1,4 @@
+/* eslint-disable no-empty, no-unused-vars, no-extra-boolean-cast */
 (function () {
   const ROOT_SELECTOR = "#product-reviews-root";
   const MAX_REVIEW_IMAGES = 4;

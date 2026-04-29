@@ -1,3 +1,4 @@
+/* eslint-disable no-empty */
 (function (window, document) {
   if (window.ReviewCardsCarouselApp) return;
 

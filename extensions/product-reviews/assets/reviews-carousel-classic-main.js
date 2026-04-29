@@ -1,3 +1,4 @@
+/* eslint-disable no-empty */
 (function () {
   const ROOT_SELECTOR = ".rcc-root";
   const GLOBAL_KEY = "ReviewsCarouselClassicMain";
@@ -13,7 +14,7 @@
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
-      .replace(/\"/g, "&quot;")
+      .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
   }
 

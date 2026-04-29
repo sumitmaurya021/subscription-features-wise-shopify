@@ -1,3 +1,5 @@
+/* eslint-disable no-empty */
+/* global Shopify */
 (function () {
   const ROOT_SELECTOR = ".rsn-root";
   const instances = new WeakMap();

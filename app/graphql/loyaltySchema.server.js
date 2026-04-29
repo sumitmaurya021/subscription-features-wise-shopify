@@ -6,7 +6,6 @@ import {
   normalizeRewardRedemption,
   normalizeReferralInvite,
   getOrCreateLoyaltyCustomer,
-  resolveOwnerKey,
   addPointsToCustomer,
   redeemRewardForCustomer,
   createShopifyDiscountCode,

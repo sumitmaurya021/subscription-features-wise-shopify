@@ -1,3 +1,4 @@
+/* eslint-disable no-empty */
 (function () {
   const MAX_REVIEW_IMAGES = 4;
   const MAX_IMAGE_SIZE_MB = 10;
