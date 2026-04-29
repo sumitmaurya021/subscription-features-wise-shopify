@@ -1,3 +1,4 @@
+/* eslint-disable no-empty, no-unused-vars */
 (function (window, document) {
   if (window.PRVCApp) return;
 
