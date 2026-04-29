@@ -1,108 +1,102 @@
-import {
-  Card,
-  Text,
-  Button,
-  Badge,
-  BlockStack,
-  InlineStack,
-} from "@shopify/polaris";
-
+/* eslint-disable react/prop-types */
 export default function PlanCard({
   name,
   price,
+  eyebrow,
+  description,
+  perks,
   features,
+  widgetCount,
+  totalWidgets,
   isPopular,
   isCurrentPlan,
+  tone = "basic",
   onSubscribe,
 }) {
+  const formattedPrice = new Intl.NumberFormat("en-IN").format(price);
+  const cardClassName = [
+    "pricing-card",
+    `pricing-card--${tone}`,
+    isPopular ? "pricing-card--popular" : "",
+    isCurrentPlan ? "pricing-card--current" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <div
-      style={{
-        height: "100%",
-        position: "relative",
-      }}
-    >
-      {isPopular && (
-        <div
-          style={{
-            position: "absolute",
-            top: "-12px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 10,
-            padding: "4px 8px",
-            fontSize: "20px",
-          }}
-        >
-          <Badge tone="success">Most popular</Badge>
+    <article className={cardClassName}>
+      {isPopular ? (
+        <div className="pricing-card__badge">Most popular</div>
+      ) : null}
+
+      <div className="pricing-card__topline" aria-hidden="true" />
+
+      <div className="pricing-card__header">
+        <div>
+          <span className="pricing-card__eyebrow">{eyebrow}</span>
+          <h2>{name}</h2>
         </div>
-      )}
 
-      <Card
-        roundedAbove="sm"
-        style={{
-          width: "100%",
-          display: "flex",
-          flexDirection: "column",
-          border: isPopular ? "2px solid #5c6ac4" : "1px solid #e1e3e5",
-          boxShadow: isPopular
-            ? "0 12px 30px rgba(92,106,196,0.25)"
-            : "0 4px 10px rgba(0,0,0,0.05)",
-          background: isPopular ? "#f4f6ff" : "white",
-        }}
-      >
-        <BlockStack gap="400">
+        <div className="pricing-card__counter">
+          <strong>{widgetCount}</strong>
+          <span>/{totalWidgets}</span>
+        </div>
+      </div>
 
-          <Text variant="headingLg" as="h2" alignment="center">
-            {name}
-          </Text>
+      <p className="pricing-card__description">{description}</p>
 
-          <InlineStack gap="100" align="center">
-            <Text variant="heading2xl" as="p">
-              ₹{price}
-            </Text>
+      <div className="pricing-card__price">
+        <span className="pricing-card__currency">{"\u20B9"}</span>
+        <span className="pricing-card__amount">{formattedPrice}</span>
+        <span className="pricing-card__period">/month</span>
+      </div>
 
-            <Text variant="bodySm" tone="subdued">
-              /month
-            </Text>
-          </InlineStack>
+      <div className="pricing-card__perks">
+        {perks.map((perk) => (
+          <span key={perk}>{perk}</span>
+        ))}
+      </div>
 
-          <div
-            style={{
-              maxHeight: "220px",
-              overflowY: "auto",
-            }}
+      <div className="pricing-card__divider" />
+
+      <div className="pricing-card__feature-heading">
+        <span>Widget access</span>
+        <span>{widgetCount} included</span>
+      </div>
+
+      <ul className="pricing-card__features">
+        {features.map((feature) => (
+          <li
+            key={feature.label}
+            className={
+              feature.available
+                ? "pricing-feature pricing-feature--available"
+                : "pricing-feature pricing-feature--locked"
+            }
           >
-            <BlockStack gap="100">
-              {features.map((f, i) => (
-                <InlineStack key={i} gap="200">
-                  <Text tone={f.available ? "success" : "subdued"}>
-                    {f.available ? "✔" : "✖"}
-                  </Text>
+            <span className="pricing-feature__icon" aria-hidden="true" />
+            <span className="pricing-feature__label">{feature.label}</span>
+            <span className="pricing-feature__group">{feature.group}</span>
+          </li>
+        ))}
+      </ul>
 
-                  <Text tone={!f.available ? "subdued" : ""}>
-                    {f.label}
-                  </Text>
-                </InlineStack>
-              ))}
-            </BlockStack>
-          </div>
-
-          <div style={{ marginTop: "auto" }}>
-            <Button
-              variant="primary"
-              fullWidth
-              size="large"
-              disabled={isCurrentPlan}
-              onClick={onSubscribe}
-            >
-              {isCurrentPlan ? "Current Plan ✓" : "Subscribe"}
-            </Button>
-          </div>
-
-        </BlockStack>
-      </Card>
-    </div>
+      <div className="pricing-card__action">
+        <button
+          type="button"
+          className="pricing-card__button"
+          disabled={isCurrentPlan}
+          onClick={onSubscribe}
+        >
+          {isCurrentPlan ? (
+            <>
+              Current plan <span aria-hidden="true">{"\u2713"}</span>
+            </>
+          ) : (
+            "Subscribe"
+          )}
+        </button>
+      </div>
+    </article>
   );
 }

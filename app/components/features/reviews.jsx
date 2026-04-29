@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types, no-unused-vars */
 import { useEffect, useMemo, useState, useCallback } from "react";
 import {
   Page,
@@ -17,6 +18,7 @@ import {
   Box,
   Divider,
 } from "@shopify/polaris";
+import "./reviews.css";
 
 const GRAPHQL_ENDPOINT = "/graphql";
 const PAGE_SIZE = 10;
@@ -617,6 +619,52 @@ function PremiumStatCard({
   );
 }
 
+function SegmentBar({ segments }) {
+  const total = segments.reduce((sum, segment) => sum + segment.value, 0);
+
+  return (
+    <div className="review-segment">
+      <div className="review-segment__track">
+        {segments.map((segment) => (
+          <span
+            key={segment.label}
+            className={`review-segment__fill review-segment__fill--${segment.tone}`}
+            style={{ width: `${total ? (segment.value / total) * 100 : 0}%` }}
+            title={`${segment.label}: ${segment.value}`}
+          />
+        ))}
+      </div>
+
+      <div className="review-segment__legend">
+        {segments.map((segment) => (
+          <span key={segment.label}>
+            <i className={`review-segment__dot review-segment__dot--${segment.tone}`} />
+            {segment.label} {segment.value}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MiniBarList({ items }) {
+  const maxValue = Math.max(1, ...items.map((item) => item.value));
+
+  return (
+    <div className="review-mini-bars">
+      {items.map((item) => (
+        <div className="review-mini-bars__row" key={item.label}>
+          <span>{item.label}</span>
+          <div>
+            <i style={{ width: `${(item.value / maxValue) * 100}%` }} />
+          </div>
+          <strong>{item.value}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ReviewsPage() {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -673,6 +721,11 @@ export default function ReviewsPage() {
     const pending = reviews.filter((r) => r.status === "pending").length;
     const rejected = reviews.filter((r) => r.status === "rejected").length;
     const pinned = reviews.filter((r) => Boolean(r.isPinned)).length;
+    const mediaReviews = reviews.filter(hasMedia).length;
+    const totalHelpful = reviews.reduce(
+      (sum, r) => sum + Number(r.helpfulCount || 0),
+      0
+    );
 
     const productReviews = reviews.filter(
       (r) => normalizeReviewType(r.reviewType) === "product"
@@ -690,6 +743,11 @@ export default function ReviewsPage() {
             reviews.reduce((sum, r) => sum + Number(r.rating || 0), 0) / total
           ).toFixed(1)
         : "0.0";
+    const approvalRate = total ? Math.round((approved / total) * 100) : 0;
+    const ratingBuckets = [5, 4, 3, 2, 1].map((rating) => ({
+      label: `${rating} star`,
+      value: reviews.filter((r) => Number(r.rating || 0) === rating).length,
+    }));
 
     return {
       total,
@@ -698,6 +756,10 @@ export default function ReviewsPage() {
       rejected,
       pinned,
       average,
+      approvalRate,
+      mediaReviews,
+      totalHelpful,
+      ratingBuckets,
       productReviews,
       collectionReviews,
       storeReviews,
@@ -1023,6 +1085,16 @@ export default function ReviewsPage() {
   const selectedImages = getReviewImages(selectedMediaReview?.reviewImages);
   const selectedYoutubeEmbedUrl = getYoutubeEmbedUrl(selectedMediaReview?.reviewYoutubeUrl);
   const visiblePages = getVisiblePages(safeCurrentPage, totalPages);
+  const statusSegments = [
+    { label: "Approved", value: reviewStats.approved, tone: "green" },
+    { label: "Pending", value: reviewStats.pending, tone: "amber" },
+    { label: "Rejected", value: reviewStats.rejected, tone: "red" },
+  ];
+  const typeSegments = [
+    { label: "Product", value: reviewStats.productReviews, tone: "blue" },
+    { label: "Collection", value: reviewStats.collectionReviews, tone: "amber" },
+    { label: "Store", value: reviewStats.storeReviews, tone: "violet" },
+  ];
 
   return (
     <Page
@@ -1290,219 +1362,152 @@ export default function ReviewsPage() {
               </Banner>
             ) : null}
 
-            <div className="hero-surface">
-              <BlockStack gap="500">
-                <InlineStack align="space-between" wrap gap="300">
-                  <BlockStack gap="150">
-                    <span className="hero-kicker">
-                      <span className="hero-dot" />
-                      Review Dashboard
-                    </span>
-
-                    <div>
-                      <Text as="h2" variant="heading2xl">
-                        Review Overview
-                      </Text>
-                      <div style={{ marginTop: 6 }}>
-                        <Text as="p" variant="bodyMd" tone="subdued">
-                          Track moderation, ratings, and distribution across all review types.
-                        </Text>
-                      </div>
-                    </div>
-                  </BlockStack>
-
-                  <div
-                    style={{
-                      padding: "10px 14px",
-                      borderRadius: 18,
-                      background: "rgba(255,255,255,0.86)",
-                      border: "1px solid #dbeafe",
-                      boxShadow: "0 10px 24px rgba(59, 130, 246, 0.08)",
-                    }}
-                  >
-                    <BlockStack gap="050">
-                      <Text as="span" variant="bodySm" tone="subdued">
-                        Live Review Count
-                      </Text>
-                      <Text as="span" variant="headingLg">
-                        {reviewStats.total} reviews
-                      </Text>
-                    </BlockStack>
-                  </div>
-                </InlineStack>
-
-                <div className="premium-stats-grid">
-                  <PremiumStatCard
-                    title="Total Reviews"
-                    value={reviewStats.total}
-                    helper="Overall moderation volume"
-                    accent="blue"
-                    softLabel="All"
-                  />
-                  <PremiumStatCard
-                    title="Average Rating"
-                    value={`${reviewStats.average}/5`}
-                    helper={renderStars(Math.round(Number(reviewStats.average)))}
-                    accent="violet"
-                    softLabel="Quality"
-                  />
-                  <PremiumStatCard
-                    title="Approved"
-                    value={reviewStats.approved}
-                    helper="Visible to shoppers"
-                    accent="green"
-                    softLabel="Live"
-                  />
-                  <PremiumStatCard
-                    title="Pending"
-                    value={reviewStats.pending}
-                    helper="Needs moderation"
-                    accent="amber"
-                    softLabel="Queue"
-                  />
-                  <PremiumStatCard
-                    title="Rejected"
-                    value={reviewStats.rejected}
-                    helper="Hidden from storefront"
-                    accent="red"
-                    softLabel="Blocked"
-                  />
-                  <PremiumStatCard
-                    title="Pinned"
-                    value={reviewStats.pinned}
-                    helper="Highlighted reviews"
-                    accent="slate"
-                    softLabel="Featured"
-                  />
-                  <PremiumStatCard
-                    title="Product Reviews"
-                    value={reviewStats.productReviews}
-                    helper="Item-specific feedback"
-                    accent="blue"
-                    softLabel="Product"
-                  />
-                  <PremiumStatCard
-                    title="Collection Reviews"
-                    value={reviewStats.collectionReviews}
-                    helper="Category-based sentiment"
-                    accent="amber"
-                    softLabel="Collection"
-                  />
-                  <PremiumStatCard
-                    title="Store Reviews"
-                    value={reviewStats.storeReviews}
-                    helper="Brand trust signals"
-                    accent="violet"
-                    softLabel="Store"
-                  />
-                </div>
-              </BlockStack>
-            </div>
-
-            <div className="premium-filter-panel">
-              <div className="premium-filter-header">
-                <BlockStack gap="100">
-                  <Text as="h2" variant="headingLg">
-                    Smart Filters
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Narrow down reviews by type, status, shop, target ID, handle, or legacy product ID.
-                  </Text>
-                </BlockStack>
-
-                <InlineStack gap="200" wrap>
-                  <span className="filter-chip">
-                    Active Filters: {activeFilterCount}
-                  </span>
-                  <Button variant="primary" onClick={applyFilters}>
-                    Apply Filters
-                  </Button>
-                  <Button onClick={resetFilters}>Reset</Button>
-                </InlineStack>
+            <div className="reviews-premium-hero">
+              <div className="reviews-premium-hero__copy">
+                <span className="reviews-premium-kicker">
+                  <span />
+                  Review command center
+                </span>
+                <h2>Review Overview</h2>
+                <p>
+                  Track moderation health, rating quality, media reviews, and review sources
+                  from one clean admin dashboard.
+                </p>
               </div>
 
-              <Divider />
-
-              <div style={{ height: 16 }} />
-
-              <div className="premium-input-grid">
-                <div className="field-shell">
-                  <Select
-                    label="Status"
-                    options={getStatusOptions()}
-                    value={filters.status}
-                    onChange={handleFilterChange("status")}
-                  />
+              <div className="reviews-premium-metrics">
+                <div>
+                  <span>Total reviews</span>
+                  <strong>{reviewStats.total}</strong>
                 </div>
-
-                <div className="field-shell">
-                  <Select
-                    label="Review Type"
-                    options={getReviewTypeOptions(true)}
-                    value={filters.reviewType}
-                    onChange={handleFilterChange("reviewType")}
-                  />
+                <div>
+                  <span>Avg rating</span>
+                  <strong>{reviewStats.average}/5</strong>
                 </div>
-
-                {/* <div className="field-shell">
-                  <TextField
-                    label="Shop"
-                    value={filters.shop}
-                    onChange={handleFilterChange("shop")}
-                    autoComplete="off"
-                    placeholder="Enter shop domain"
-                  />
-                </div> */}
-
-                {/* <div className="field-shell">
-                  <TextField
-                    label="Target ID"
-                    value={filters.targetId}
-                    onChange={handleFilterChange("targetId")}
-                    autoComplete="off"
-                    placeholder="Product / Collection target id"
-                  />
-                </div> */}
-
-                {/* <div className="field-shell">
-                  <TextField
-                    label="Target Handle"
-                    value={filters.targetHandle}
-                    onChange={handleFilterChange("targetHandle")}
-                    autoComplete="off"
-                    placeholder="Collection handle"
-                  />
+                <div>
+                  <span>Approval rate</span>
+                  <strong>{reviewStats.approvalRate}%</strong>
                 </div>
+                <div>
+                  <span>Media reviews</span>
+                  <strong>{reviewStats.mediaReviews}</strong>
+                </div>
+              </div>
+            </div>
 
-                <div className="field-shell">
-                  <TextField
-                    label="Legacy Product ID"
-                    value={filters.productId}
-                    onChange={handleFilterChange("productId")}
-                    autoComplete="off"
-                    placeholder="Old product id filter"
-                  />
-                </div> */}
+            <div className="reviews-insight-grid">
+              <div className="reviews-insight-card">
+                <div className="reviews-insight-card__head">
+                  <span>Moderation flow</span>
+                  <strong>{reviewStats.pending} pending</strong>
+                </div>
+                <SegmentBar segments={statusSegments} />
+              </div>
+
+              <div className="reviews-insight-card">
+                <div className="reviews-insight-card__head">
+                  <span>Review source mix</span>
+                  <strong>{reviewStats.total} total</strong>
+                </div>
+                <SegmentBar segments={typeSegments} />
+              </div>
+
+              <div className="reviews-insight-card">
+                <div className="reviews-insight-card__head">
+                  <span>Rating distribution</span>
+                  <strong>{renderStars(Math.round(Number(reviewStats.average)))}</strong>
+                </div>
+                <MiniBarList items={reviewStats.ratingBuckets} />
               </div>
             </div>
 
             <Card roundedAbove="sm">
               <BlockStack gap="0">
-                <div style={{ padding: 20 }}>
-                  <InlineStack align="space-between" wrap gap="300">
-                    <BlockStack gap="050">
-                      <Text as="h2" variant="headingLg">
-                        Reviews Table
-                      </Text>
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        Table view with media modal and fixed 10 items per page.
-                      </Text>
-                    </BlockStack>
+                <div className="reviews-table-panel__header">
+                  <div>
+                    <Text as="h2" variant="headingLg">
+                      Reviews Table
+                    </Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Filter, review media, moderate status, and pin highlights from the table itself.
+                    </Text>
+                  </div>
 
+                  <InlineStack gap="200" wrap>
+                    <span className="reviews-filter-count">
+                      Active filters: {activeFilterCount}
+                    </span>
                     <Badge tone={reviews.length ? "success" : "attention"}>
                       {reviews.length} items
                     </Badge>
                   </InlineStack>
+                </div>
+
+                <div className="reviews-table-filters">
+                  <div className="reviews-filter-field">
+                    <Select
+                      label="Status"
+                      options={getStatusOptions()}
+                      value={filters.status}
+                      onChange={handleFilterChange("status")}
+                    />
+                  </div>
+
+                  <div className="reviews-filter-field">
+                    <Select
+                      label="Review Type"
+                      options={getReviewTypeOptions(true)}
+                      value={filters.reviewType}
+                      onChange={handleFilterChange("reviewType")}
+                    />
+                  </div>
+
+                  <div className="reviews-filter-field">
+                    <TextField
+                      label="Shop"
+                      value={filters.shop}
+                      onChange={handleFilterChange("shop")}
+                      autoComplete="off"
+                      placeholder="store.myshopify.com"
+                    />
+                  </div>
+
+                  <div className="reviews-filter-field">
+                    <TextField
+                      label="Target ID"
+                      value={filters.targetId}
+                      onChange={handleFilterChange("targetId")}
+                      autoComplete="off"
+                      placeholder="Product / collection ID"
+                    />
+                  </div>
+
+                  <div className="reviews-filter-field">
+                    <TextField
+                      label="Target Handle"
+                      value={filters.targetHandle}
+                      onChange={handleFilterChange("targetHandle")}
+                      autoComplete="off"
+                      placeholder="collection-handle"
+                    />
+                  </div>
+
+                  <div className="reviews-filter-field">
+                    <TextField
+                      label="Legacy Product ID"
+                      value={filters.productId}
+                      onChange={handleFilterChange("productId")}
+                      autoComplete="off"
+                      placeholder="Product ID"
+                    />
+                  </div>
+
+                  <div className="reviews-filter-actions">
+                    <Button variant="primary" onClick={applyFilters}>
+                      Apply
+                    </Button>
+                    <Button onClick={resetFilters}>Reset</Button>
+                  </div>
                 </div>
 
                 <Divider />
@@ -1829,7 +1834,9 @@ export default function ReviewsPage() {
                         background: "#000",
                         display: "block",
                       }}
-                    />
+                    >
+                      <track kind="captions" />
+                    </video>
                   </BlockStack>
                 </div>
               ) : null}
