@@ -1,5 +1,9 @@
 import { json } from "@remix-run/node";
 import prisma from "../db.server";
+import {
+  rateLimitRequest,
+  rejectLargeJsonRequest,
+} from "../utils/requestGuards.server";
 
 function normalizeWishlistItem(item) {
   if (!item) return null;
@@ -153,6 +157,16 @@ export const loader = async ({ request }) => {
 
 export const action = async ({ request }) => {
   try {
+    const bodySizeError = rejectLargeJsonRequest(request);
+    if (bodySizeError) return bodySizeError;
+
+    const rateLimitError = rateLimitRequest(request, {
+      namespace: "wishlist-proxy-action",
+      limit: 80,
+      windowMs: 60_000,
+    });
+    if (rateLimitError) return rateLimitError;
+
     const body = await request.json();
     const { action } = body;
 

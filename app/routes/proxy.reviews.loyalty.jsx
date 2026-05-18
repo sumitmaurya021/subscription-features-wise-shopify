@@ -10,6 +10,10 @@ import {
   normalizeRewardRedemption,
   normalizeLoyaltyCustomer,
 } from "../utils/loyalty.server";
+import {
+  rateLimitRequest,
+  rejectLargeJsonRequest,
+} from "../utils/requestGuards.server";
 
 export const loader = async ({ request }) => {
   try {
@@ -102,6 +106,16 @@ export const loader = async ({ request }) => {
 
 export const action = async ({ request }) => {
   try {
+    const bodySizeError = rejectLargeJsonRequest(request);
+    if (bodySizeError) return bodySizeError;
+
+    const rateLimitError = rateLimitRequest(request, {
+      namespace: "loyalty-proxy-action",
+      limit: 30,
+      windowMs: 60_000,
+    });
+    if (rateLimitError) return rateLimitError;
+
     const body = await request.json();
     const { action } = body;
 

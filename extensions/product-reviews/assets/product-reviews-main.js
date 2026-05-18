@@ -964,6 +964,7 @@
           },
           body: JSON.stringify({
             action: "updateMediaUploadStatus",
+            shop,
             reviewId,
             status,
             progress,
@@ -1079,6 +1080,7 @@
         },
         body: JSON.stringify({
           action: "attachMedia",
+          shop,
           reviewId,
           reviewImages,
           reviewVideoUrl,
