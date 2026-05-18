@@ -1,5 +1,9 @@
 import { json } from "@remix-run/node";
 import prisma from "../db.server";
+import {
+  rateLimitRequest,
+  rejectLargeJsonRequest,
+} from "../utils/requestGuards.server";
 
 const MAX_REVIEW_IMAGES = 4;
 const MAX_PAGE_SIZE = 250;
@@ -68,6 +72,21 @@ function normalizeVideoUrl(value) {
   return url || null;
 }
 
+function isSafeRemoteMediaUrl(value) {
+  const url = normalizeNullableString(value);
+
+  if (!url || url.length > 2048) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 function normalizeReviewType(value) {
   const reviewType = String(value || "product").trim().toLowerCase();
 
@@ -93,6 +112,16 @@ function normalizeUploadStatus(value) {
   }
 
   return "none";
+}
+
+function isReviewFromRequestShop(review, shop) {
+  const normalizedShop = normalizeNullableString(shop);
+
+  if (!normalizedShop) {
+    return true;
+  }
+
+  return review?.shop === normalizedShop;
 }
 
 function parseCsvIds(value) {
@@ -634,6 +663,16 @@ export const loader = async ({ request }) => {
 
 export const action = async ({ request }) => {
   try {
+    const bodySizeError = rejectLargeJsonRequest(request);
+    if (bodySizeError) return bodySizeError;
+
+    const rateLimitError = rateLimitRequest(request, {
+      namespace: "reviews-proxy-action",
+      limit: 40,
+      windowMs: 60_000,
+    });
+    if (rateLimitError) return rateLimitError;
+
     if (request.method === "POST") {
       const body = await request.json();
 
@@ -677,6 +716,13 @@ export const action = async ({ request }) => {
         );
       }
 
+      if (normalizedImages.some((item) => !isSafeRemoteMediaUrl(item))) {
+        return json(
+          { success: false, message: "Review image URLs must be secure HTTPS URLs" },
+          { status: 400 }
+        );
+      }
+
       if (normalizedImages.length > MAX_REVIEW_IMAGES) {
         return json(
           {
@@ -689,6 +735,13 @@ export const action = async ({ request }) => {
 
       const normalizedVideoUrl = normalizeVideoUrl(reviewVideoUrl);
       const normalizedYoutubeUrl = normalizeYoutubeUrl(reviewYoutubeUrl);
+
+      if (normalizedVideoUrl && !isSafeRemoteMediaUrl(normalizedVideoUrl)) {
+        return json(
+          { success: false, message: "Review video URL must be a secure HTTPS URL" },
+          { status: 400 }
+        );
+      }
 
       if (reviewYoutubeUrl && !normalizedYoutubeUrl) {
         return json(
@@ -757,6 +810,7 @@ export const action = async ({ request }) => {
 
     if (request.method === "PUT") {
       const body = await request.json();
+      const requestShop = body.shop;
 
       if (body.action === "updateMediaUploadStatus") {
         const { reviewId, status, progress, errorMessage } = body;
@@ -782,6 +836,13 @@ export const action = async ({ request }) => {
           return json(
             { success: false, message: "Review not found" },
             { status: 404 }
+          );
+        }
+
+        if (!isReviewFromRequestShop(existingReview, requestShop)) {
+          return json(
+            { success: false, message: "Review does not belong to this shop" },
+            { status: 403 }
           );
         }
 
@@ -819,6 +880,28 @@ export const action = async ({ request }) => {
           );
         }
 
+        if (normalizedImages.some((item) => !isSafeRemoteMediaUrl(item))) {
+          return json(
+            {
+              success: false,
+              message: "Review image URLs must be secure HTTPS URLs",
+            },
+            { status: 400 }
+          );
+        }
+
+        const normalizedVideoUrl = normalizeVideoUrl(reviewVideoUrl);
+
+        if (normalizedVideoUrl && !isSafeRemoteMediaUrl(normalizedVideoUrl)) {
+          return json(
+            {
+              success: false,
+              message: "Review video URL must be a secure HTTPS URL",
+            },
+            { status: 400 }
+          );
+        }
+
         if (normalizedImages.length > MAX_REVIEW_IMAGES) {
           return json(
             {
@@ -840,6 +923,24 @@ export const action = async ({ request }) => {
           );
         }
 
+        if (!isReviewFromRequestShop(existingReview, requestShop)) {
+          return json(
+            { success: false, message: "Review does not belong to this shop" },
+            { status: 403 }
+          );
+        }
+
+        if (
+          !["queued", "uploading", "failed"].includes(
+            existingReview.mediaUploadStatus || "none"
+          )
+        ) {
+          return json(
+            { success: false, message: "Review is not waiting for media upload" },
+            { status: 409 }
+          );
+        }
+
         const existingImages = safeParseImages(existingReview.reviewImages);
         const mergedImages = [...existingImages, ...normalizedImages].slice(
           0,
@@ -851,7 +952,7 @@ export const action = async ({ request }) => {
           data: {
             reviewImages: mergedImages.length ? JSON.stringify(mergedImages) : null,
             reviewVideoUrl:
-              normalizeVideoUrl(reviewVideoUrl) || existingReview.reviewVideoUrl,
+              normalizedVideoUrl || existingReview.reviewVideoUrl,
             mediaUploadStatus: "completed",
             mediaUploadProgress: 100,
             mediaUploadError: null,
